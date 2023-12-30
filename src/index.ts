@@ -1,4 +1,3 @@
-import { Configuration } from "./configuration";
 import logger from "./logger";
 import { estabilishMqttConnection, handleIncomingMessage } from "./mqtt";
 import global from './global'

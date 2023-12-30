@@ -1,7 +1,7 @@
 import { MqttClient } from "mqtt";
 
 export type Configuration = {
-  mqtt_host: string,
+  mqtt_url: string,
   mqtt_port: number
 }
 
