@@ -1,6 +1,6 @@
 import { Configuration } from "./configuration";
 import logger from "./logger";
-import { estabilishMqttConnection } from "./mqtt";
+import { estabilishMqttConnection, handleIncomingMessage } from "./mqtt";
 import mqtt from 'mqtt'
 
 if (Bun.argv.length < 3) {
@@ -34,4 +34,6 @@ finally {
 
 logger.info('Subscribing to the version topic')
 connection.subscribe('+/+/version')
+
+connection.on('message', handleIncomingMessage)
 
