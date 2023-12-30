@@ -14,9 +14,10 @@ export async function estabilishMqttConnection(url: string, port: number = 1883)
 export async function handleIncomingMessage(topic: string, payload: Buffer) {
   logger.info(`Received incoming message on topic ${topic}`)
   for (const [ handlerTopic, handlerFunction ] of Object.entries(topicHandlers)) {
-    if (buildTopicRegex(handlerTopic).test(topic)) {
+    const matches = [...topic.matchAll(buildTopicRegex(handlerTopic))]
+    if (matches.length > 0) {
       logger.info(`Topic has matched ${handlerTopic}`)
-      handlerFunction(topic, payload)
+      handlerFunction(topic, payload, matches[0])
     }
   }
 }
@@ -26,5 +27,5 @@ export function buildTopicRegex(topic: string): RegExp {
 }
 
 export const topicHandlers = {
-  '+/+/#': handleVersionMessage 
+  '+/+/version': handleVersionMessage 
 }
