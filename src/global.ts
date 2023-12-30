@@ -1,11 +1,21 @@
 import { MqttClient } from "mqtt";
-import { Configuration } from "./configuration";
+
+export type Configuration = {
+  mqtt_host: string,
+  mqtt_port: number
+}
 
 export type Global = {
   configuration: Configuration,
-  connection: MqttClient
+  connection: MqttClient,
+  deviceVersions: { [k: string]: string }
 }
 
 const _global = global as typeof globalThis & Global
 
+if (!_global.deviceVersions) {
+  _global.deviceVersions = {}
+}
+
 export default _global
+
