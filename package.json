@@ -1,11 +1,19 @@
 {
   "name": "influx-logger",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts configuration.json" 
+  },
   "devDependencies": {
     "bun-types": "latest"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.4",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1"
   }
 }
