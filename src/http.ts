@@ -7,11 +7,11 @@ export async function checkCommitExistance(hash: string): Promise<boolean> {
   return response.ok
 }
 
-export async function downloadProtoVersion(hash: string, network: string): Promise<object> {
+export async function downloadProtoVersion(hash: string, network: string): Promise<string> {
   const url = CAN_PROTO_URL.replace(/hash/g, hash).replaceAll(/network/g, network)
   const response = await fetch(url)
   if (!response.ok) {
     throw Error()
   }
-  return await response.json() as object
+  return await response.text()
 }

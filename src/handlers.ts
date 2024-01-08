@@ -1,6 +1,7 @@
 import logger from "./logger";
 import global from './global'
-import { checkCommitExistance } from "./http";
+import { checkCommitExistance, downloadProtoVersion } from "./http";
+import protobufjs from 'protobufjs'
 
 export async function handleVersionMessage(topic: string, payload: Buffer, [vehicleId, deviceId]: string[]) {
   logger.info(`Checking existance of commit ${payload.toString()}, requested by device '${vehicleId}/${deviceId}'`)
@@ -9,8 +10,42 @@ export async function handleVersionMessage(topic: string, payload: Buffer, [vehi
     logger.info(`Subscribing to data topics for the new device (${vehicleId}/${deviceId})`)
     global.connection.subscribe(`${vehicleId}/${deviceId}/data/+`)
     global.deviceVersions[`${vehicleId}/${deviceId}`] = payload.toString()
+    global.versionDescriptors[payload.toString()] = {}
   }
   else {
     logger.error(`Device '${vehicleId}/${deviceId}' uses a CAN commit that apparently doesn't exists. This device will not be considered`)
   }
+}
+
+export async function handleDataMessage(topic: string, payload: Buffer, [vehicleId, deviceId, network]: string[]) {
+
+  if (!(`${vehicleId}/${deviceId}` in global.deviceVersions)) {
+    logger.error(`Device '${vehicleId}/${deviceId}' started streaming data before sending version. Skipping`)
+    return
+  }
+
+  const version = global.deviceVersions[`${vehicleId}/${deviceId}`]
+
+  if (!(network in global.versionDescriptors[version])) {
+    logger.info(`Network '${network}' with version ${version} never seen before. Downloading .proto descriptor`)
+
+    let descriptorRaw: string
+    try {
+      descriptorRaw = await downloadProtoVersion(version, network)
+    } catch {
+      logger.error(`Proto descriptor for network '${network}' (version ${version}) cannot be downloaded`)
+      return
+    }
+    logger.info('Descriptor successfully downloaded')
+
+    try {
+      global.versionDescriptors[version][network] = protobufjs.parse(descriptorRaw)
+        .root.lookupType(`${network}.Root`)
+    }
+    catch {
+      logger.error(`Downloaded proto descriptor for network '${network}' (version ${version}) is not a valid proto file`)
+      return
+    }
+    logger.info('Descriptor successfully parsed and now is ready for deserialize data')
+  } 
 }

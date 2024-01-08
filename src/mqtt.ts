@@ -1,6 +1,6 @@
 import mqtt from 'mqtt'
 import logger from './logger'
-import { handleVersionMessage } from './handlers'
+import { handleDataMessage, handleVersionMessage } from './handlers'
 
 export async function estabilishMqttConnection(url: string, port: number = 1883): Promise<mqtt.MqttClient> {
   return mqtt.connectAsync(`mqtt:${url}`, {
@@ -27,5 +27,6 @@ export function buildTopicRegex(topic: string): RegExp {
 }
 
 export const topicHandlers = {
-  '+/+/version': handleVersionMessage 
+  '+/+/version': handleVersionMessage,
+  '+/+/data/+': handleDataMessage
 }
