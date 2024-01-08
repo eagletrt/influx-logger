@@ -13,9 +13,8 @@ try {
 } catch {
   logger.fatal('Given configuration file doesn\'t exists or doesn\'t contain a valid json')
   process.exit(0)
-} finally {
-  logger.info('Configuration succesfully loaded')
-}
+} 
+logger.info('Configuration succesfully loaded')
 
 logger.info(`Trying connecting to ${global.configuration.mqtt_url}:${global.configuration.mqtt_port}`)
 try {
@@ -25,9 +24,7 @@ catch {
   logger.fatal('Cannot estabilish connection with MQTT server')
   process.exit(1)
 }
-finally {
-  logger.info('MQTT connection successfully estabilished')
-}
+logger.info('MQTT connection successfully estabilished')
 
 logger.info('Subscribing to the version topic')
 global.connection.subscribe('+/+/version')
