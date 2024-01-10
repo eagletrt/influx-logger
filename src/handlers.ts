@@ -40,12 +40,12 @@ export async function handleDataMessage(topic: string, payload: Buffer, [vehicle
 
     try {
       global.versionDescriptors[version][network] = protobufjs.parse(descriptorRaw)
-        .root.lookupType(`${network}.Root`)
-    }
-    catch {
+        .root.lookupType(`${network}.Pack`)
+    } catch (e) {
+      logger.trace(e)
       logger.error(`Downloaded proto descriptor for network '${network}' (version ${version}) is not a valid proto file`)
       return
     }
-    logger.info('Descriptor successfully parsed and now is ready for deserialize data')
+    logger.info('Descriptor successfully parsed and is now ready for deserialize data')
   } 
 }

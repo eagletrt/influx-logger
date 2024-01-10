@@ -1,7 +1,7 @@
 import pino from 'pino'
 
 export default pino({
-  level: 'info',
+  level: process.env.NODE_ENV === 'development' ? 'trace' : 'info',
   transport: {
     target: 'pino-pretty',
     options: {
