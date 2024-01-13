@@ -1,5 +1,5 @@
 import logger from "./logger";
-import global from './global'
+import global, { Line } from './global'
 import { checkCommitExistance, downloadProtoVersion } from "./http";
 import protobufjs from 'protobufjs'
 
@@ -48,4 +48,25 @@ export async function handleDataMessage(topic: string, payload: Buffer, [vehicle
     }
     logger.info('Descriptor successfully parsed and is now ready for deserialize data')
   } 
+
+  let messageContent: { [key: string]: { [key: string]: string | number | boolean }[] }
+  try {
+    messageContent = global.versionDescriptors[version][network].decode(payload).toJSON()
+  } catch (e) {
+    logger.trace(e)
+    logger.error('Cannot deserialized payload with saved descriptor')
+    return
+  }
+
+  for (const measurement in messageContent) {
+    for (const rawLine of messageContent[measurement]) {
+      let timestamp: number
+      let tags: { [key: string]: string }
+      let fields: { [key: string]: string | number | boolean }
+
+      for (const field in rawLine) {
+        logger.trace(`${field}: ${rawLine[field]}`)
+      }
+    }     
+  }
 }
