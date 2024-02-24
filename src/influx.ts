@@ -1,3 +1,5 @@
+import logger from "./logger"
+
 export class Line {
   measurement: string
   tags: Record<string, string>
@@ -22,10 +24,9 @@ export class Line {
     tags: Record<string, string>
   ): Line {
 
-    const timestamp = obj._timestamp
-
-    if (!timestamp || typeof timestamp !== 'number') {
-      throw new Error('Timestamp is required')
+    const timestamp = obj['_innerTimestamp']
+    if (!timestamp || typeof timestamp !== 'string') {
+      throw new Error('Missing or invalid timestamp')
     }
 
     const fields = Object.entries(obj)
@@ -35,7 +36,7 @@ export class Line {
         return prev
       }, {})
 
-    return new Line(measurement, tags, fields, timestamp)
+    return new Line(measurement, tags, fields, parseInt(timestamp))
   }
 
   toString(): string {
@@ -54,7 +55,29 @@ export class Line {
     return `${this.measurement}${Object.keys(this.tags).length > 0 ? ',' : ''}${tagsString} ${fieldsString} ${this.timestamp}`
   }
 
-  static packLines(
+}
+
+export class LineRepository {
+  private lines: Line[] = []
+  private limit: number 
+
+  constructor(limit: number) {
+    this.limit = limit
+  }
+
+  async push(line: Line) {
+    this.lines.push(line)
+    if (this.lines.length >= this.limit) {
+      await this.commit()
+      this.lines = []
+    }
+  }
+
+  private async commit() {
+    logger.info(`Committing ${this.lines.length} lines`) 
+  } 
+
+  packLines(
     lines: Line[],
   ): string {
     return lines.map(line => line.toString()).join('\n')
