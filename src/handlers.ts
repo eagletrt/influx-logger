@@ -1,9 +1,10 @@
 import logger from "./logger";
-import global, { Line } from './global'
-import { checkCommitExistance, downloadProtoVersion } from "./http";
-import protobufjs from 'protobufjs'
+import global from './global'
+import { checkCommitExistance } from "./http";
+import { getProtoDescriptor } from "./proto";
+import { Line } from "./influx";
 
-export async function handleVersionMessage(topic: string, payload: Buffer, [vehicleId, deviceId]: string[]) {
+export async function handleVersionMessage(_topic: string, payload: Buffer, [vehicleId, deviceId]: string[]) {
   logger.info(`Checking existance of commit ${payload.toString()}, requested by device '${vehicleId}/${deviceId}'`)
   const check = await checkCommitExistance(payload.toString())
   if (check) {
@@ -17,7 +18,7 @@ export async function handleVersionMessage(topic: string, payload: Buffer, [vehi
   }
 }
 
-export async function handleDataMessage(topic: string, payload: Buffer, [vehicleId, deviceId, network]: string[]) {
+export async function handleDataMessage(_topic: string, payload: Buffer, [vehicleId, deviceId, network]: string[]) {
 
   if (!(`${vehicleId}/${deviceId}` in global.deviceVersions)) {
     logger.error(`Device '${vehicleId}/${deviceId}' started streaming data before sending version. Skipping`)
@@ -28,26 +29,12 @@ export async function handleDataMessage(topic: string, payload: Buffer, [vehicle
 
   if (!(network in global.versionDescriptors[version])) {
     logger.info(`Network '${network}' with version ${version} never seen before. Downloading .proto descriptor`)
-
-    let descriptorRaw: string
     try {
-      descriptorRaw = await downloadProtoVersion(version, network)
+      await getProtoDescriptor(version, network)
     } catch {
-      logger.error(`Proto descriptor for network '${network}' (version ${version}) cannot be downloaded`)
-      return
+      logger.error('Error while getting proto, skipping message')
     }
-    logger.info('Descriptor successfully downloaded')
-
-    try {
-      global.versionDescriptors[version][network] = protobufjs.parse(descriptorRaw)
-        .root.lookupType(`${network}.Pack`)
-    } catch (e) {
-      logger.trace(e)
-      logger.error(`Downloaded proto descriptor for network '${network}' (version ${version}) is not a valid proto file`)
-      return
-    }
-    logger.info('Descriptor successfully parsed and is now ready for deserialize data')
-  } 
+  }
 
   let messageContent: { [key: string]: { [key: string]: string | number | boolean }[] }
   try {
@@ -58,15 +45,35 @@ export async function handleDataMessage(topic: string, payload: Buffer, [vehicle
     return
   }
 
-  for (const measurement in messageContent) {
-    for (const rawLine of messageContent[measurement]) {
-      let timestamp: number
-      let tags: { [key: string]: string }
-      let fields: { [key: string]: string | number | boolean }
+  const tags: { [key: string]: string } = {
+    'vehicle-id': vehicleId,
+    'device-id': deviceId,
+    'network': network
+  } 
 
-      for (const field in rawLine) {
-        logger.trace(`${field}: ${rawLine[field]}`)
+  for (const measurement in messageContent) {
+    for (const record in messageContent[measurement]) {
+      
+      const validObject = Object.values(
+        messageContent[measurement][record]
+      ).every(
+        field => typeof field === 'string' || 
+                 typeof field === 'number' || 
+                 typeof field === 'boolean'
+      )
+
+      if (!validObject) {
+        logger.warn('Invalid object received from device')
+        break;
       }
-    }     
+
+      const line = Line.fromObject(
+        messageContent[measurement][record],
+        measurement,
+        tags
+      )
+
+      await global.lineRepository.push(line)
+    }
   }
 }
