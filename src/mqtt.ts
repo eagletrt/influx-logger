@@ -6,8 +6,8 @@ export async function estabilishMqttConnection(url: string, port: number = 1883)
   return mqtt.connectAsync(`mqtt:${url}`, {
     port: port,
     resubscribe: true,
-    protocolId: 'MQTT',
     protocolVersion: 5,
+    protocol: 'mqtt'
   })
 }
 

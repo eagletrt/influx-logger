@@ -1,6 +1,7 @@
 import logger from "./logger";
 import { estabilishMqttConnection, handleIncomingMessage } from "./mqtt";
 import global from './global'
+import { LineRepository } from "./influx";
 
 if (Bun.argv.length < 3) {
   logger.fatal(`Configuration file path not provided`)
@@ -15,6 +16,17 @@ try {
   process.exit(0)
 } 
 logger.info('Configuration succesfully loaded')
+
+global.lineRepository = new LineRepository(
+  global.configuration.influx_url,
+  global.configuration.influx_bucket,
+  global.configuration.influx_org,
+  global.configuration.influx_token,
+  'us',
+  5000
+)
+
+logger.debug(`Configuration: ${JSON.stringify(global.configuration)}`)
 
 logger.info(`Trying connecting to ${global.configuration.mqtt_url}:${global.configuration.mqtt_port}`)
 try {

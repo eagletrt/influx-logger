@@ -59,9 +59,27 @@ export class Line {
 
 export class LineRepository {
   private lines: Line[] = []
-  private limit: number 
+  private limit: number
+  private url: string
+  private bucket: string
+  private token: string
+  private org: string
+  private timestampPrecision: 'ns' | 'us' | 'ms' | 's'
+  private prendingCommitsCount: number = 0
 
-  constructor(limit: number) {
+  constructor(
+    url: string,
+    bucket: string, 
+    org: string, 
+    token: string,
+    timestampPrecision: 'ns' | 'us' | 'ms' | 's' = 'ns',
+    limit: number, 
+  ) {
+    this.url = url
+    this.bucket = bucket
+    this.token = token
+    this.org = org
+    this.timestampPrecision = timestampPrecision
     this.limit = limit
   }
 
@@ -74,10 +92,35 @@ export class LineRepository {
   }
 
   private async commit() {
-    logger.info(`Committing ${this.lines.length} lines`) 
+
+    const linesCount = this.lines.length
+    logger.info(`Committing ${linesCount} lines`)
+    logger.info(`Pending commits: ${this.prendingCommitsCount}`)
+    this.prendingCommitsCount += 1
+
+    const pack = LineRepository.packLines(this.lines)
+    const url = `${this.url}/api/v2/write?org=${this.org}&bucket=${this.bucket}&precision=${this.timestampPrecision}`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: pack,
+      headers: {
+        "Authorization": `Token ${this.token}`
+      },
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      logger.error(`Failed to commit lines: ${text}`)
+    }
+    else {
+      logger.info(`Committed ${linesCount} lines`)
+    }
+
+    this.prendingCommitsCount -= 1
   } 
 
-  packLines(
+  static packLines(
     lines: Line[],
   ): string {
     return lines.map(line => line.toString()).join('\n')

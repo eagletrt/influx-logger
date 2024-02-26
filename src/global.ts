@@ -1,9 +1,14 @@
 import { MqttClient } from "mqtt";
 import protobuf from 'protobufjs'
+import { LineRepository } from "./influx";
 
 export type Configuration = {
   mqtt_url: string,
-  mqtt_port: number
+  mqtt_port: number,
+  influx_url: string,
+  influx_bucket: string
+  influx_token: string,
+  influx_org: string, 
 }
 
 export type Line = {
@@ -18,7 +23,7 @@ export type Global = {
   connection: MqttClient,
   deviceVersions: { [k: string]: string }
   versionDescriptors: { [version: string]: { [network: string]: protobuf.Type } }
-  linesBuffer: Line[]
+  lineRepository: LineRepository
 }
 
 const _global = global as typeof globalThis & Global
@@ -28,9 +33,6 @@ if (!_global.deviceVersions) {
 }
 if (!_global.versionDescriptors) {
   _global.versionDescriptors = {}
-}
-if (!_global.linesBuffer) {
-  _global.linesBuffer = []
 }
 
 export default _global
