@@ -9,6 +9,7 @@ export type Configuration = {
   influx_bucket: string;
   influx_token: string;
   influx_org: string;
+  excludedNetworks: string[];
 };
 
 export type Line = {

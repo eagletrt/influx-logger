@@ -39,6 +39,13 @@ export async function handleDataMessage(
     return;
   }
 
+  if (global.configuration.excludedNetworks.includes(network)) {
+    logger.debug(
+      `Network '${network}' is in the exclusion list. Skipping message`,
+    );
+    return;
+  }
+
   const version = global.deviceVersions[`${vehicleId}/${deviceId}`];
 
   if (!(network in global.versionDescriptors[version])) {
