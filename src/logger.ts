@@ -1,11 +1,11 @@
-import pino from 'pino'
+import pino from "pino";
 
 export default pino({
-  level: process.env.NODE_ENV === 'development' ? 'trace' : 'info',
+  level: process.env.NODE_ENV === "development" ? "trace" : "info",
   transport: {
-    target: 'pino-pretty',
+    target: "pino-pretty",
     options: {
-      colorize: true
-    }
-  }
-})
+      colorize: true,
+    },
+  },
+});
