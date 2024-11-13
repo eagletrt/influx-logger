@@ -19,8 +19,7 @@ export async function getProtoDescriptor(version: string, network: string) {
   try {
     global.versionDescriptors[version][network] = protobufjs.parse(
       descriptorRaw,
-    )
-      .root.lookupType(`${network}.Pack`);
+    ).root.lookupType(`${network}.Pack`);
   } catch (e) {
     logger.trace(e);
     logger.error(

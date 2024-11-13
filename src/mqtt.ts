@@ -2,6 +2,7 @@ import mqtt from "mqtt";
 import logger from "./logger";
 import { handleDataMessage, handleVersionMessage } from "./handlers";
 
+
 export async function estabilishMqttConnection(
   url: string,
   port: number = 1883,

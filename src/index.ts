@@ -3,6 +3,8 @@ import { estabilishMqttConnection, handleIncomingMessage } from "./mqtt";
 import global from "./global";
 import { LineRepository } from "./influx";
 
+
+
 if (Bun.argv.length < 3) {
   logger.fatal(`Configuration file path not provided`);
   process.exit(1);

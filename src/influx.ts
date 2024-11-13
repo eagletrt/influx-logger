@@ -10,7 +10,7 @@ export class Line {
     measurement: string,
     tags: Record<string, string>,
     fields: Record<string, LineFieldType>,
-    timestamp: number,
+    timestamp: number
   ) {
     this.measurement = measurement;
     this.tags = tags;
@@ -21,7 +21,7 @@ export class Line {
   static fromObject(
     obj: Record<string, LineFieldType>,
     measurement: string,
-    tags: Record<string, string>,
+    tags: Record<string, string>
   ): Line {
     const timestamp = obj["_innerTimestamp"];
     if (!timestamp || typeof timestamp !== "string") {
@@ -39,19 +39,23 @@ export class Line {
   }
 
   toString(): string {
-    const fieldsString = Object.entries(this.fields).map(([key, value]) => {
-      if (typeof value === "string") {
-        return `${key}="${value}"`;
-      } else {
-        return `${key}=${value}`;
-      }
-    }).join(",");
+    const fieldsString = Object.entries(this.fields)
+      .map(([key, value]) => {
+        if (typeof value === "string") {
+          return `${key}="${value}"`;
+        } else {
+          return `${key}=${value}`;
+        }
+      })
+      .join(",");
 
     const tagsString = Object.entries(this.tags)
-      .map(([key, value]) => `${key}=${value}`).join(",");
+      .map(([key, value]) => `${key}=${value}`)
+      .join(",");
 
-    return `${this.measurement}${Object.keys(this.tags).length > 0 ? "," : ""
-      }${tagsString} ${fieldsString} ${this.timestamp}`;
+    return `${this.measurement}${
+      Object.keys(this.tags).length > 0 ? "," : ""
+    }${tagsString} ${fieldsString} ${this.timestamp}`;
   }
 }
 
@@ -71,7 +75,7 @@ export class LineRepository {
     org: string,
     token: string,
     timestampPrecision: "ns" | "us" | "ms" | "s" = "ns",
-    limit: number,
+    limit: number
   ) {
     this.url = url;
     this.bucket = bucket;
@@ -96,14 +100,13 @@ export class LineRepository {
     this.prendingCommitsCount += 1;
 
     const pack = LineRepository.packLines(this.lines);
-    const url =
-      `${this.url}/api/v2/write?org=${this.org}&bucket=${this.bucket}&precision=${this.timestampPrecision}`;
+    const url = `${this.url}/api/v2/write?org=${this.org}&bucket=${this.bucket}&precision=${this.timestampPrecision}`;
 
     const response = await fetch(url, {
       method: "POST",
       body: pack,
       headers: {
-        "Authorization": `Token ${this.token}`,
+        Authorization: `Token ${this.token}`,
       },
     });
 
@@ -117,9 +120,7 @@ export class LineRepository {
     this.prendingCommitsCount -= 1;
   }
 
-  static packLines(
-    lines: Line[],
-  ): string {
+  static packLines(lines: Line[]): string {
     return lines.map((line) => line.toString()).join("\n");
   }
 }
