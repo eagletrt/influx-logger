@@ -25,7 +25,7 @@ export async function downloadProtoVersion(
 }
 
 export async function checkBucketExistance(_url: string, _bucket: string) {
-  const url = `http://${_url}/api/v2/buckets`;
+  const url = `${_url}/api/v2/buckets`;
   console.log(url);
   const response = await fetch(url, {
     method: "GET",
