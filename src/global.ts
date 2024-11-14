@@ -6,7 +6,6 @@ export type Configuration = {
   mqtt_url: string;
   mqtt_port: number;
   influx_url: string;
-  influx_bucket: string;
   influx_token: string;
   influx_org: string;
   excludedNetworks: string[];
@@ -23,6 +22,7 @@ export type Global = {
   configuration: Configuration;
   connection: MqttClient;
   deviceVersions: { [k: string]: string };
+  current_bucket: string;
   versionDescriptors: {
     [version: string]: { [network: string]: protobuf.Type };
   };

@@ -63,7 +63,6 @@ export class LineRepository {
   private lines: Line[] = [];
   private limit: number;
   private url: string;
-  private bucket: string;
   private token: string;
   private org: string;
   private timestampPrecision: "ns" | "us" | "ms" | "s";
@@ -71,21 +70,19 @@ export class LineRepository {
 
   constructor(
     url: string,
-    bucket: string,
     org: string,
     token: string,
     timestampPrecision: "ns" | "us" | "ms" | "s" = "ns",
     limit: number
   ) {
     this.url = url;
-    this.bucket = bucket;
     this.token = token;
     this.org = org;
     this.timestampPrecision = timestampPrecision;
     this.limit = limit;
   }
 
-  async push(line: Line) {
+  async push(line: Line, bucket: string) {
     this.lines.push(line);
     if (this.lines.length >= this.limit) {
       await this.commit();
@@ -93,7 +90,7 @@ export class LineRepository {
     }
   }
 
-  private async commit() {
+  private async commit(bucket: string) {
     const linesCount = this.lines.length;
     logger.info(`Committing ${linesCount} lines`);
     logger.info(`Pending commits: ${this.prendingCommitsCount}`);

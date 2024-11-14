@@ -1,28 +1,37 @@
 import logger from "./logger";
 import global from "./global";
-import { checkCommitExistance } from "./http";
+import { checkBucketExistance, checkCommitExistance } from "./http";
 import { getProtoDescriptor } from "./proto";
 import { Line } from "./influx";
 
 export async function handleVersionMessage(
   _topic: string,
   payload: Buffer,
-  [vehicleId, deviceId]: string[],
+  [vehicleId, deviceId]: string[]
 ) {
   logger.info(
-    `Checking existance of commit ${payload.toString()}, requested by device '${vehicleId}/${deviceId}'`,
+    `Checking existance of commit ${payload.toString()}, requested by device '${vehicleId}/${deviceId}'`
   );
   const check = await checkCommitExistance(payload.toString());
   if (check) {
     logger.info(
-      `Subscribing to data topics for the new device (${vehicleId}/${deviceId})`,
+      `Subscribing to data topics for the new device (${vehicleId}/${deviceId})`
     );
     global.connection.subscribe(`${vehicleId}/${deviceId}/data/+`);
     global.deviceVersions[`${vehicleId}/${deviceId}`] = payload.toString();
+    global.current_bucket = payload.toString();
+    if (
+      !(await checkBucketExistance(
+        global.configuration.influx_url,
+        global.current_bucket
+      ))
+    ) {
+      //TODO:crete new version bucket
+    }
     global.versionDescriptors[payload.toString()] = {};
   } else {
     logger.error(
-      `Device '${vehicleId}/${deviceId}' uses a CAN commit that apparently doesn't exists. This device will not be considered`,
+      `Device '${vehicleId}/${deviceId}' uses a CAN commit that apparently doesn't exists. This device will not be considered`
     );
   }
 }
@@ -30,18 +39,18 @@ export async function handleVersionMessage(
 export async function handleDataMessage(
   _topic: string,
   payload: Buffer,
-  [vehicleId, deviceId, network]: string[],
+  [vehicleId, deviceId, network]: string[]
 ) {
   if (!(`${vehicleId}/${deviceId}` in global.deviceVersions)) {
     logger.error(
-      `Device '${vehicleId}/${deviceId}' started streaming data before sending version. Skipping`,
+      `Device '${vehicleId}/${deviceId}' started streaming data before sending version. Skipping`
     );
     return;
   }
 
   if (global.configuration.excludedNetworks.includes(network)) {
     logger.debug(
-      `Network '${network}' is in the exclusion list. Skipping message`,
+      `Network '${network}' is in the exclusion list. Skipping message`
     );
     return;
   }
@@ -50,7 +59,7 @@ export async function handleDataMessage(
 
   if (!(network in global.versionDescriptors[version])) {
     logger.info(
-      `Network '${network}' with version ${version} never seen before. Downloading .proto descriptor`,
+      `Network '${network}' with version ${version} never seen before. Downloading .proto descriptor`
     );
     try {
       await getProtoDescriptor(version, network);
@@ -63,7 +72,8 @@ export async function handleDataMessage(
     [key: string]: { [key: string]: string | number | boolean }[];
   };
   try {
-    messageContent = global.versionDescriptors[version][network].decode(payload)
+    messageContent = global.versionDescriptors[version][network]
+      .decode(payload)
       .toJSON();
   } catch (e) {
     logger.trace(e);
@@ -74,18 +84,18 @@ export async function handleDataMessage(
   const tags: { [key: string]: string } = {
     "vehicle-id": vehicleId,
     "device-id": deviceId,
-    "network": network,
+    network: network,
   };
 
   for (const measurement in messageContent) {
     for (const record in messageContent[measurement]) {
       const validObject = Object.values(
-        messageContent[measurement][record],
+        messageContent[measurement][record]
       ).every(
         (field) =>
           typeof field === "string" ||
           typeof field === "number" ||
-          typeof field === "boolean",
+          typeof field === "boolean"
       );
 
       if (!validObject) {
@@ -96,7 +106,7 @@ export async function handleDataMessage(
       const line = Line.fromObject(
         messageContent[measurement][record],
         measurement,
-        tags,
+        tags
       );
 
       await global.lineRepository.push(line);
