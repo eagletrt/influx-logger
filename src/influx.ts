@@ -1,5 +1,5 @@
 import logger from "./logger";
-
+import global from "./global";
 export class Line {
   measurement: string;
   tags: Record<string, string>;
@@ -97,7 +97,7 @@ export class LineRepository {
     this.prendingCommitsCount += 1;
 
     const pack = LineRepository.packLines(this.lines);
-    const url = `${this.url}/api/v2/write?org=${this.org}&bucket=${this.bucket}&precision=${this.timestampPrecision}`;
+    const url = `${this.url}/api/v2/write?org=${this.org}&bucket=${global.current_bucket}&precision=${this.timestampPrecision}`;
 
     const response = await fetch(url, {
       method: "POST",

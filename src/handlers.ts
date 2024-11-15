@@ -1,6 +1,10 @@
 import logger from "./logger";
 import global from "./global";
-import { checkBucketExistance, checkCommitExistance } from "./http";
+import {
+  checkBucketExistance,
+  checkCommitExistance,
+  createNewBucket,
+} from "./http";
 import { getProtoDescriptor } from "./proto";
 import { Line } from "./influx";
 
@@ -19,13 +23,14 @@ export async function handleVersionMessage(
     );
     global.connection.subscribe(`${vehicleId}/${deviceId}/data/+`);
     global.deviceVersions[`${vehicleId}/${deviceId}`] = payload.toString();
-    global.current_bucket = payload.toString();
+    global.current_bucket = payload.toString(); //set CAN version as bucket name
     if (
       !(await checkBucketExistance(
         global.configuration.influx_url,
         global.current_bucket
       ))
     ) {
+      createNewBucket(global.configuration.influx_url, global.current_bucket);
       //TODO:crete new version bucket
     }
     global.versionDescriptors[payload.toString()] = {};
@@ -109,7 +114,7 @@ export async function handleDataMessage(
         tags
       );
 
-      await global.lineRepository.push(line);
+      await global.lineRepository.push(line, global.current_bucket);
     }
   }
 }

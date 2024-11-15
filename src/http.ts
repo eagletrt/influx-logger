@@ -26,11 +26,13 @@ export async function downloadProtoVersion(
 
 export async function checkBucketExistance(_url: string, _bucket: string) {
   const url = `${_url}/api/v2/buckets`;
+  const Token =
+    "peMPKUjADy9eMVxDg4SVMGFIsvfxlfcA5USlcc6M4aHewKaB4heJTK8kRu6uAkQ86xmh8UnQmEeyfcOTC7skGA==";
   console.log(url);
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Token peMPKUjADy9eMVxDg4SVMGFIsvfxlfcA5USlcc6M4aHewKaB4heJTK8kRu6uAkQ86xmh8UnQmEeyfcOTC7skGA==`,
+      Authorization: `Token ${Token}`,
     },
   });
 
@@ -49,4 +51,38 @@ export async function checkBucketExistance(_url: string, _bucket: string) {
   });
   console.log(found);
   return found;
+}
+
+export async function createNewBucket(_url: string, _bucketName: string) {
+  const url = `${_url}/api/v2/buckets`;
+  const Token =
+    "peMPKUjADy9eMVxDg4SVMGFIsvfxlfcA5USlcc6M4aHewKaB4heJTK8kRu6uAkQ86xmh8UnQmEeyfcOTC7skGA==";
+  const orgID = "7336e3e2d69a5216";
+  const data = {
+    name: _bucketName,
+    description: _bucketName,
+    orgID: orgID,
+    retentionRules: [],
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${Token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      logger.error("response:", response.status);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    logger.info("Bucket created:", _bucketName);
+  } catch (error) {
+    logger.error(error);
+  }
 }
