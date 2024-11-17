@@ -1,4 +1,5 @@
 import logger from "./logger";
+import global from "./global";
 const CAN_PROTO_URL: string =
   "https://raw.githubusercontent.com/eagletrt/can/hash/proto/network/network.proto";
 const CAN_COMMIT_URL: string = "https://github.com/eagletrt/can/tree/hash";
@@ -26,9 +27,7 @@ export async function downloadProtoVersion(
 
 export async function checkBucketExistance(_url: string, _bucket: string) {
   const url = `${_url}/api/v2/buckets`;
-  const Token =
-    "peMPKUjADy9eMVxDg4SVMGFIsvfxlfcA5USlcc6M4aHewKaB4heJTK8kRu6uAkQ86xmh8UnQmEeyfcOTC7skGA==";
-  console.log(url);
+  const Token = global.configuration.influx_token;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -44,20 +43,21 @@ export async function checkBucketExistance(_url: string, _bucket: string) {
   const buckets = jsonData.buckets;
 
   const found = buckets.some((bucket: any) => {
-    console.log("Bucket ID:", bucket.id);
-    console.log("Name:", bucket.name);
-    console.log("---------------------------");
+    logger.info("found bucket: " + bucket.name + " with ID: " + bucket.id);
     return bucket.name === _bucket;
   });
-  console.log(found);
+  logger.info(
+    found
+      ? global.current_bucket + " exists"
+      : global.current_bucket + " doesn't exists"
+  );
   return found;
 }
 
 export async function createNewBucket(_url: string, _bucketName: string) {
   const url = `${_url}/api/v2/buckets`;
-  const Token =
-    "peMPKUjADy9eMVxDg4SVMGFIsvfxlfcA5USlcc6M4aHewKaB4heJTK8kRu6uAkQ86xmh8UnQmEeyfcOTC7skGA==";
-  const orgID = "7336e3e2d69a5216";
+  const Token = global.configuration.influx_token;
+  const orgID = global.configuration.influx_org;
   const data = {
     name: _bucketName,
     description: _bucketName,
