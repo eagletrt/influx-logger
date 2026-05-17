@@ -1,50 +1,54 @@
-import logger from "./logger";
-import { estabilishMqttConnection, handleIncomingMessage } from "./mqtt";
-import global from "./global";
-import { LineRepository } from "./influx";
+import sys
+import json
+from .logger import logger
+from .mqtt import estabilish_mqtt_connection, handle_incoming_message
+from .global import global_state
+from .influx import LineRepository
 
-if (Bun.argv.length < 3) {
-  logger.fatal(`Configuration file path not provided`);
-  process.exit(1);
-}
 
-const configurationFile = Bun.file(Bun.argv[2]);
-try {
-  global.configuration = await configurationFile.json();
-} catch {
-  logger.fatal(
-    "Given configuration file doesn't exists or doesn't contain a valid json",
-  );
-  process.exit(0);
-}
-logger.info("Configuration succesfully loaded");
+def main(argv=None):
+    argv = argv or sys.argv
+    if len(argv) < 2:
+        logger.fatal("Configuration file path not provided")
+        sys.exit(1)
 
-global.lineRepository = new LineRepository(
-  global.configuration.influx_url,
-  global.configuration.influx_bucket,
-  global.configuration.influx_org,
-  global.configuration.influx_token,
-  "us",
-  5000,
-);
+    config_path = argv[1]
+    try:
+        with open(config_path, "r") as fh:
+            global_state.configuration = json.load(fh)
+    except Exception:
+        logger.fatal("Given configuration file doesn't exists or doesn't contain a valid json")
+        sys.exit(1)
 
-logger.debug(`Configuration: ${JSON.stringify(global.configuration)}`);
+    logger.info("Configuration succesfully loaded")
 
-logger.info(
-  `Trying connecting to ${global.configuration.mqtt_url}:${global.configuration.mqtt_port}`,
-);
-try {
-  global.connection = await estabilishMqttConnection(
-    global.configuration.mqtt_url,
-    global.configuration.mqtt_port,
-  );
-} catch {
-  logger.fatal("Cannot estabilish connection with MQTT server");
-  process.exit(1);
-}
-logger.info("MQTT connection successfully estabilished");
+    cfg = global_state.configuration
+    global_state.line_repository = LineRepository(
+        cfg["influx_url"], cfg["influx_bucket"], cfg["influx_org"], cfg["influx_token"], "us", 5000
+    )
 
-logger.info("Subscribing to the version topic");
-global.connection.subscribe("+/+/version");
+    logger.debug(f"Configuration: {cfg}")
 
-global.connection.on("message", handleIncomingMessage);
+    logger.info(f"Trying connecting to {cfg['mqtt_url']}:{cfg['mqtt_port']}")
+    try:
+        client = estabilish_mqtt_connection(cfg["mqtt_url"], cfg["mqtt_port"])
+        global_state.connection = client
+    except Exception:
+        logger.fatal("Cannot estabilish connection with MQTT server")
+        sys.exit(1)
+
+    logger.info("MQTT connection successfully estabilished")
+
+    logger.info("Subscribing to the version topic")
+    client.subscribe("+/+/version")
+
+    # wire the message handler
+    client.on_message = lambda client, userdata, msg: handle_incoming_message(msg.topic, msg.payload)
+    client.loop_start()
+
+
+if __name__ == "__main__":
+    main()
+
+
+__all__ = ["main"]

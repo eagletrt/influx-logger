@@ -1,105 +1,75 @@
-import logger from "./logger";
-import global from "./global";
-import { checkCommitExistance } from "./http";
-import { getProtoDescriptor } from "./proto";
-import { Line } from "./influx";
+from typing import List
 
-export async function handleVersionMessage(
-  _topic: string,
-  payload: Buffer,
-  [vehicleId, deviceId]: string[],
-) {
-  logger.info(
-    `Checking existance of commit ${payload.toString()}, requested by device '${vehicleId}/${deviceId}'`,
-  );
-  const check = await checkCommitExistance(payload.toString());
-  if (check) {
-    logger.info(
-      `Subscribing to data topics for the new device (${vehicleId}/${deviceId})`,
-    );
-    global.connection.subscribe(`${vehicleId}/${deviceId}/data/+`);
-    global.deviceVersions[`${vehicleId}/${deviceId}`] = payload.toString();
-    global.versionDescriptors[payload.toString()] = {};
-  } else {
-    logger.error(
-      `Device '${vehicleId}/${deviceId}' uses a CAN commit that apparently doesn't exists. This device will not be considered`,
-    );
-  }
-}
+from .logger import logger
+from .global import global_state
+from .http import check_commit_existence
+from .proto import get_proto_descriptor
+from .influx import Line
 
-export async function handleDataMessage(
-  _topic: string,
-  payload: Buffer,
-  [vehicleId, deviceId, network]: string[],
-) {
-  if (!(`${vehicleId}/${deviceId}` in global.deviceVersions)) {
-    logger.error(
-      `Device '${vehicleId}/${deviceId}' started streaming data before sending version. Skipping`,
-    );
-    return;
-  }
 
-  if (global.configuration.excludedNetworks.includes(network)) {
-    logger.debug(
-      `Network '${network}' is in the exclusion list. Skipping message`,
-    );
-    return;
-  }
+def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
+    vehicle_id, device_id = ids
+    payload_str = payload.decode()
+    logger.info(f"Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
+    check = check_commit_existence(payload_str)
+    if check:
+        logger.info(f"Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
+        if global_state.connection:
+            global_state.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
+        global_state.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
+        global_state.version_descriptors[payload_str] = {}
+    else:
+        logger.error(f"Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
 
-  const version = global.deviceVersions[`${vehicleId}/${deviceId}`];
 
-  if (!(network in global.versionDescriptors[version])) {
-    logger.info(
-      `Network '${network}' with version ${version} never seen before. Downloading .proto descriptor`,
-    );
-    try {
-      await getProtoDescriptor(version, network);
-    } catch {
-      logger.error("Error while getting proto, skipping message");
+def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
+    vehicle_id, device_id, network = ids
+    key = f"{vehicle_id}/{device_id}"
+    if key not in global_state.device_versions:
+        logger.error(f"Device '{key}' started streaming data before sending version. Skipping")
+        return
+
+    if global_state.configuration and "excludedNetworks" in global_state.configuration and network in global_state.configuration["excludedNetworks"]:
+        logger.debug(f"Network '{network}' is in the exclusion list. Skipping message")
+        return
+
+    version = global_state.device_versions[key]
+
+    if network not in global_state.version_descriptors.get(version, {}):
+        logger.info(f"Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+        try:
+            get_proto_descriptor(version, network)
+        except Exception:
+            logger.error("Error while getting proto, skipping message")
+            return
+
+    try:
+        decoder = global_state.version_descriptors[version][network]
+        # Expect decoder to provide a `decode` method returning a dict-like object
+        message_content = decoder.decode(payload)
+    except Exception as e:
+        logger.trace(e)
+        logger.error("Cannot deserialized payload with saved descriptor")
+        return
+
+    tags = {
+        "vehicle-id": vehicle_id,
+        "device-id": device_id,
+        "network": network,
     }
-  }
 
-  let messageContent: {
-    [key: string]: { [key: string]: string | number | boolean }[];
-  };
-  try {
-    messageContent = global.versionDescriptors[version][network].decode(payload)
-      .toJSON();
-  } catch (e) {
-    logger.trace(e);
-    logger.error("Cannot deserialized payload with saved descriptor");
-    return;
-  }
+    for measurement, records in message_content.items():
+        for record in records:
+            valid_object = all(
+                isinstance(v, (str, int, float, bool)) for v in record.values()
+            )
+            if not valid_object:
+                logger.warn("Invalid object received from device")
+                break
 
-  const tags: { [key: string]: string } = {
-    "vehicle-id": vehicleId,
-    "device-id": deviceId,
-    "network": network,
-  };
+            line = Line.from_object(record, measurement, tags)
+            if global_state.line_repository:
+                global_state.line_repository.push(line)
 
-  for (const measurement in messageContent) {
-    for (const record in messageContent[measurement]) {
-      const validObject = Object.values(
-        messageContent[measurement][record],
-      ).every(
-        (field) =>
-          typeof field === "string" ||
-          typeof field === "number" ||
-          typeof field === "boolean",
-      );
 
-      if (!validObject) {
-        logger.warn("Invalid object received from device");
-        break;
-      }
-
-      const line = Line.fromObject(
-        messageContent[measurement][record],
-        measurement,
-        tags,
-      );
-
-      await global.lineRepository.push(line);
-    }
-  }
-}
+__all__ = ["handle_version_message", "handle_data_message"]

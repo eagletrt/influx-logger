@@ -1,127 +1,80 @@
-import logger from "./logger";
+import time
+from typing import Dict, Any, List
 
-export class Line {
-  measurement: string;
-  tags: Record<string, string>;
-  fields: Record<string, LineFieldType>;
-  timestamp: number;
+from .logger import logger
+import requests
 
-  constructor(
-    measurement: string,
-    tags: Record<string, string>,
-    fields: Record<string, LineFieldType>,
-    timestamp: number,
-  ) {
-    this.measurement = measurement;
-    this.tags = tags;
-    this.fields = fields;
-    this.timestamp = timestamp;
-  }
 
-  static fromObject(
-    obj: Record<string, LineFieldType>,
-    measurement: string,
-    tags: Record<string, string>,
-  ): Line {
-    const timestamp = obj["_innerTimestamp"];
-    if (!timestamp || typeof timestamp !== "string") {
-      throw new Error("Missing or invalid timestamp");
-    }
+LineFieldType = (str, int, float, bool)
 
-    const fields = Object.entries(obj)
-      .filter(([key]) => key !== "_timestamp")
-      .reduce<Record<string, LineFieldType>>((prev, [key, value]) => {
-        prev[key] = value;
-        return prev;
-      }, {});
 
-    return new Line(measurement, tags, fields, parseInt(timestamp));
-  }
+class Line:
+    def __init__(self, measurement: str, tags: Dict[str, str], fields: Dict[str, Any], timestamp: int) -> None:
+        self.measurement = measurement
+        self.tags = tags
+        self.fields = fields
+        self.timestamp = timestamp
 
-  toString(): string {
-    const fieldsString = Object.entries(this.fields).map(([key, value]) => {
-      if (typeof value === "string") {
-        return `${key}="${value}"`;
-      } else {
-        return `${key}=${value}`;
-      }
-    }).join(",");
+    @staticmethod
+    def from_object(obj: Dict[str, Any], measurement: str, tags: Dict[str, str]) -> "Line":
+        timestamp = obj.get("_innerTimestamp")
+        if not timestamp or not isinstance(timestamp, str):
+            raise ValueError("Missing or invalid timestamp")
 
-    const tagsString = Object.entries(this.tags)
-      .map(([key, value]) => `${key}=${value}`).join(",");
+        fields = {k: v for k, v in obj.items() if k != "_timestamp"}
 
-    return `${this.measurement}${Object.keys(this.tags).length > 0 ? "," : ""
-      }${tagsString} ${fieldsString} ${this.timestamp}`;
-  }
-}
+        return Line(measurement, tags, {k: v for k, v in fields.items()}, int(timestamp))
 
-export class LineRepository {
-  private lines: Line[] = [];
-  private limit: number;
-  private url: string;
-  private bucket: string;
-  private token: string;
-  private org: string;
-  private timestampPrecision: "ns" | "us" | "ms" | "s";
-  private prendingCommitsCount: number = 0;
+    def __str__(self) -> str:
+        def field_to_str(k, v):
+            if isinstance(v, str):
+                return f'{k}="{v}"'
+            else:
+                return f"{k}={v}"
 
-  constructor(
-    url: string,
-    bucket: string,
-    org: string,
-    token: string,
-    timestampPrecision: "ns" | "us" | "ms" | "s" = "ns",
-    limit: number,
-  ) {
-    this.url = url;
-    this.bucket = bucket;
-    this.token = token;
-    this.org = org;
-    this.timestampPrecision = timestampPrecision;
-    this.limit = limit;
-  }
+        fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
+        tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
+        prefix = f"{self.measurement}{"," + tags_str if self.tags else ""}"
+        return f"{prefix} {fields_str} {self.timestamp}"
 
-  async push(line: Line) {
-    this.lines.push(line);
-    if (this.lines.length >= this.limit) {
-      await this.commit();
-      this.lines = [];
-    }
-  }
 
-  private async commit() {
-    const linesCount = this.lines.length;
-    logger.info(`Committing ${linesCount} lines`);
-    logger.info(`Pending commits: ${this.prendingCommitsCount}`);
-    this.prendingCommitsCount += 1;
+class LineRepository:
+    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "ns", limit: int = 5000) -> None:
+        self.lines: List[Line] = []
+        self.limit = limit
+        self.url = url
+        self.bucket = bucket
+        self.token = token
+        self.org = org
+        self.timestamp_precision = timestamp_precision
+        self.pending_commits_count = 0
 
-    const pack = LineRepository.packLines(this.lines);
-    const url =
-      `${this.url}/api/v2/write?org=${this.org}&bucket=${this.bucket}&precision=${this.timestampPrecision}`;
+    def push(self, line: Line) -> None:
+        self.lines.append(line)
+        if len(self.lines) >= self.limit:
+            self.commit()
+            self.lines = []
 
-    const response = await fetch(url, {
-      method: "POST",
-      body: pack,
-      headers: {
-        "Authorization": `Token ${this.token}`,
-      },
-    });
+    def commit(self) -> None:
+        lines_count = len(self.lines)
+        logger.info(f"Committing {lines_count} lines")
+        logger.info(f"Pending commits: {self.pending_commits_count}")
+        self.pending_commits_count += 1
 
-    if (!response.ok) {
-      const text = await response.text();
-      logger.error(`Failed to commit lines: ${text}`);
-    } else {
-      logger.info(`Committed ${linesCount} lines`);
-    }
+        pack = LineRepository.pack_lines(self.lines)
+        url = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
 
-    this.prendingCommitsCount -= 1;
-  }
+        resp = requests.post(url, data=pack, headers={"Authorization": f"Token {self.token}"})
+        if not resp.ok:
+            logger.error(f"Failed to commit lines: {resp.text}")
+        else:
+            logger.info(f"Committed {lines_count} lines")
 
-  static packLines(
-    lines: Line[],
-  ): string {
-    return lines.map((line) => line.toString()).join("\n");
-  }
-}
+        self.pending_commits_count -= 1
 
-export type LineFieldType = string | number | boolean;
+    @staticmethod
+    def pack_lines(lines: List[Line]) -> str:
+        return "\n".join(str(line) for line in lines)
+
+
+__all__ = ["Line", "LineRepository"]

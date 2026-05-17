@@ -1,41 +1,37 @@
-import mqtt from "mqtt";
-import logger from "./logger";
-import { handleDataMessage, handleVersionMessage } from "./handlers";
+import re
+from typing import Callable, Dict
 
-export async function estabilishMqttConnection(
-  url: string,
-  port: number = 1883,
-): Promise<mqtt.MqttClient> {
-  return mqtt.connectAsync(`mqtt:${url}`, {
-    port: port,
-    resubscribe: true,
-    protocolVersion: 5,
-    protocol: "mqtt",
-  });
+import paho.mqtt.client as mqtt
+
+from .logger import logger
+from .handlers import handle_data_message, handle_version_message
+
+
+def estabilish_mqtt_connection(url: str, port: int = 1883) -> mqtt.Client:
+    client = mqtt.Client()
+    client.connect(host=url, port=port)
+    return client
+
+
+def build_topic_regex(topic: str) -> re.Pattern:
+    pattern = topic.replace("/", "\\/").replace("+", "([^\\/]+)").replace("#", ".*")
+    return re.compile(pattern)
+
+
+topic_handlers: Dict[str, Callable] = {
+    "+/+/version": handle_version_message,
+    "+/+/data/+": handle_data_message,
 }
 
-export async function handleIncomingMessage(topic: string, payload: Buffer) {
-  logger.info(`Received message on topic ${topic}`);
-  for (const [handlerTopic, handlerFunction] of Object.entries(topicHandlers)) {
-    const matches = [...topic.matchAll(buildTopicRegex(handlerTopic))];
-    if (matches.length > 0) {
-      logger.debug(`Topic has matched ${handlerTopic}`);
-      handlerFunction(topic, payload, matches[0].slice(1));
-    }
-  }
-}
 
-export function buildTopicRegex(topic: string): RegExp {
-  return new RegExp(
-    topic.replace(/\//g, "\\/").replace(/\+/g, "([^\\/]+)").replace(
-      /\#/g,
-      ".*",
-    ),
-    "g",
-  );
-}
+def handle_incoming_message(topic: str, payload: bytes) -> None:
+    logger.info(f"Received message on topic {topic}")
+    for handler_topic, handler_function in topic_handlers.items():
+        matches = list(build_topic_regex(handler_topic).finditer(topic))
+        if matches:
+            logger.debug(f"Topic has matched {handler_topic}")
+            groups = list(matches[0].groups())
+            handler_function(topic, payload, groups)
 
-export const topicHandlers = {
-  "+/+/version": handleVersionMessage,
-  "+/+/data/+": handleDataMessage,
-};
+
+__all__ = ["estabilish_mqtt_connection", "handle_incoming_message", "topic_handlers", "build_topic_regex"]
