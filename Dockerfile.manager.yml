@@ -4,4 +4,4 @@ COPY . .
 RUN apk add --no-cache python3 py3-pip
 RUN pip install paho-mqtt requests python_http_client
 
-CMD ["python3", "src/index.py"]
+CMD ["python3", "src/index.py", "config.json"]

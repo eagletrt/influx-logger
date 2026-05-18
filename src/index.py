@@ -23,14 +23,19 @@ def main(argv=None):
     logger.info("Configuration succesfully loaded")
 
     cfg = GlobalState.configuration
-    GlobalState.line_repository = LineRepository(
-        cfg["influx_url"],
-        cfg["influx_bucket"],
-        cfg["influx_org"],
-        cfg["influx_token"],
-        "us",
-        5000
-    )
+    try:
+        GlobalState.line_repository = LineRepository(
+            url=cfg["influx_url"],
+            bucket=cfg["influx_bucket"],
+            org=cfg["influx_org"],
+            token=cfg["influx_token"],
+            region="us",
+            port=5000
+        )
+    except Exception:
+        logger.fatal("Cannot estabilish connection with InfluxDB")
+        print(cfg.__str__())
+        sys.exit(1)
 
     logger.debug(f"Configuration: {cfg}")
 

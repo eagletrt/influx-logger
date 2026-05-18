@@ -30,7 +30,6 @@ class Configuration(TypedDict):
     influx_org: str
     excludedNetworks: List[str]
 
-
 class Line(TypedDict):
     measurement: str
     tags: Dict[str, str]
