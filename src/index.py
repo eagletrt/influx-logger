@@ -24,7 +24,12 @@ def main(argv=None):
 
     cfg = GlobalState.configuration
     GlobalState.line_repository = LineRepository(
-        cfg["influx_url"], cfg["influx_bucket"], cfg["influx_org"], cfg["influx_token"], "us", 5000
+        cfg["influx_url"],
+        cfg["influx_bucket"],
+        cfg["influx_org"],
+        cfg["influx_token"],
+        "us",
+        5000
     )
 
     logger.debug(f"Configuration: {cfg}")
