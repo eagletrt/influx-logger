@@ -49,7 +49,6 @@ def main(argv=None):
 
     logger.info("MQTT connection successfully estabilished")
 
-    logger.info("Subscribing to the version topic")
     try:
         client.subscribe("+/+/version")
     except Exception as e:

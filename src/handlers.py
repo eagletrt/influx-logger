@@ -16,8 +16,10 @@ def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
         logger.info(f"Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
         if global_state.connection:
             global_state.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
+            logger.info(f"Commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
         global_state.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
         global_state.version_descriptors[payload_str] = {}
+        logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
     else:
         logger.error(f"Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
 
@@ -48,8 +50,7 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
         # Expect decoder to provide a `decode` method returning a dict-like object
         message_content = decoder.decode(payload)
     except Exception as e:
-        logger.trace(e)
-        logger.error("Cannot deserialized payload with saved descriptor")
+        logger.error("Cannot deserialize payload with saved descriptor")
         return
 
     tags = {
