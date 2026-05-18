@@ -40,7 +40,7 @@ class Line:
 
 
 class LineRepository:
-    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "ns", limit: int = 5000) -> None:
+    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "us", limit: int = 5000) -> None:
         self.lines: List[Line] = []
         self.limit = limit
         self.url = url

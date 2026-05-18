@@ -60,15 +60,7 @@ flowchart LR
 ```
 
 ## Usage
-
-To install dependencies:
-
-```bash
-bun install
 ```
-
-To run:
-
-```bash
-bun run index.ts
+docker compose up --build --remove-orphans
 ```
+**Mosquitto** broker avaible at *8883*

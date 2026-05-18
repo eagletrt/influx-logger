@@ -28,14 +28,13 @@ def main(argv=None):
             url=cfg["influx_url"],
             bucket=cfg["influx_bucket"],
             org=cfg["influx_org"],
-            token=cfg["influx_token"],
-            region="us",
-            port=5000
+            token=cfg["influx_token"]
         )
     except Exception as e:
         logger.fatal("Cannot estabilish connection with InfluxDB")
         logger.fatal("Current configuration: " + str(cfg))
         logger.fatal("Error: " + str(e))
+        logger.fatal("Traceback: " + str(e.with_traceback()))
         sys.exit(1)
 
     logger.debug(f"Configuration: {cfg}")
@@ -44,8 +43,8 @@ def main(argv=None):
     try:
         client = estabilish_mqtt_connection(cfg["mqtt_url"], cfg["mqtt_port"])
         GlobalState.connection = client
-    except Exception:
-        logger.fatal("Cannot estabilish connection with MQTT server")
+    except Exception as e:
+        logger.fatal("Cannot estabilish connection with MQTT server with configuration: " + str(cfg))
         sys.exit(1)
 
     logger.info("MQTT connection successfully estabilished")
