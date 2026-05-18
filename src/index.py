@@ -32,9 +32,10 @@ def main(argv=None):
             region="us",
             port=5000
         )
-    except Exception:
+    except Exception as e:
         logger.fatal("Cannot estabilish connection with InfluxDB")
-        print(cfg.__str__())
+        logger.fatal("Current configuration: " + str(cfg))
+        logger.fatal("Error: " + str(e))
         sys.exit(1)
 
     logger.debug(f"Configuration: {cfg}")

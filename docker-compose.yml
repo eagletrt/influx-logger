@@ -1,13 +1,18 @@
 name: influx-test-env
 services:
-    influxdb:
+    influxdb2:
         build:
             context: .
             dockerfile: Dockerfile.influx.yml
         ports:
             - "8086:8086"
         volumes:
-            - influxdb_data:/var/lib/influxdb
+            - type: volume
+              source: influxdb2-data
+              target: /var/lib/influxdb2
+            - type: volume
+              source: influxdb2-config
+              target: /etc/influxdb
     manager:
         build:
             context: .
@@ -15,6 +20,16 @@ services:
         ports:
             - "8000:8000"
         depends_on:
-            - influxdb
+            - influxdb2
+secrets:
+    influxdb2-admin-username:
+        file: ./.env.influxdb2-admin-username
+    influxdb2-admin-password:
+        file: ./.env.influxdb2-admin-password
+    influxdb2-admin-token:
+        file: ./.env.influxdb2-admin-token
 volumes:
-    influxdb_data:
+    influxdb2-data:
+        driver: local
+    influxdb2-config:
+        driver: local
