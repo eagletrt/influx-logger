@@ -1,6 +1,6 @@
-from .global import global_state
-from .http import download_proto_version
-from .logger import logger
+from src.global_influx import global_state
+from src.http_client import download_proto_version
+from src.logger_utils import logger
 
 
 def get_proto_descriptor(version: str, network: str) -> None:

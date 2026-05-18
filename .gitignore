@@ -176,3 +176,6 @@ dist
 
 # Configuration 
 configuration.json
+
+# Python cache
+__pycache__/

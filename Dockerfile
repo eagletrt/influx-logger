@@ -1,8 +1,7 @@
-FROM oven/bun:slim as modules_installer
-COPY package.json .
-RUN bun install 
+FROM alpine:3.18
+WORKDIR /app
+COPY . .
+RUN apk add --no-cache python3 py3-pip
+RUN pip install paho-mqtt requests python_http_client
 
-FROM modules_installer
-COPY src/ src/
-
-CMD bun run start -- /configuration.json
+CMD ["python3", "src/index.py"]

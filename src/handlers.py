@@ -1,10 +1,10 @@
 from typing import List
 
-from .logger import logger
-from .global import global_state
-from .http import check_commit_existence
-from .proto import get_proto_descriptor
-from .influx import Line
+from src.logger_utils import logger
+from src.http_client import check_commit_existence
+from src.proto import get_proto_descriptor
+from src.influx import Line
+from src.global_influx import global_state
 
 
 def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:

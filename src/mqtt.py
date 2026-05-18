@@ -3,8 +3,8 @@ from typing import Callable, Dict
 
 import paho.mqtt.client as mqtt
 
-from .logger import logger
-from .handlers import handle_data_message, handle_version_message
+from src.logger_utils import logger
+from src.handlers import handle_data_message, handle_version_message
 
 
 def estabilish_mqtt_connection(url: str, port: int = 1883) -> mqtt.Client:

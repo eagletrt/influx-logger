@@ -1,9 +1,9 @@
 import sys
 import json
-from .logger import logger
-from .mqtt import estabilish_mqtt_connection, handle_incoming_message
-from .global import global_state
-from .influx import LineRepository
+from src.logger_utils import logger
+from src.mqtt import estabilish_mqtt_connection, handle_incoming_message
+from src.global_influx import GlobalState
+from src.influx import LineRepository
 
 
 def main(argv=None):
@@ -15,15 +15,15 @@ def main(argv=None):
     config_path = argv[1]
     try:
         with open(config_path, "r") as fh:
-            global_state.configuration = json.load(fh)
+            GlobalState.configuration = json.load(fh)
     except Exception:
         logger.fatal("Given configuration file doesn't exists or doesn't contain a valid json")
         sys.exit(1)
 
     logger.info("Configuration succesfully loaded")
 
-    cfg = global_state.configuration
-    global_state.line_repository = LineRepository(
+    cfg = GlobalState.configuration
+    GlobalState.line_repository = LineRepository(
         cfg["influx_url"], cfg["influx_bucket"], cfg["influx_org"], cfg["influx_token"], "us", 5000
     )
 
@@ -32,7 +32,7 @@ def main(argv=None):
     logger.info(f"Trying connecting to {cfg['mqtt_url']}:{cfg['mqtt_port']}")
     try:
         client = estabilish_mqtt_connection(cfg["mqtt_url"], cfg["mqtt_port"])
-        global_state.connection = client
+        GlobalState.connection = client
     except Exception:
         logger.fatal("Cannot estabilish connection with MQTT server")
         sys.exit(1)
