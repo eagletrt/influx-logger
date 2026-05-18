@@ -8,7 +8,7 @@ from src.logger_utils import logger
 from src.handlers import handle_data_message, handle_version_message
 
 # The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, flags, reason_code, properties):
+def on_connect(client, _userdata, _flags, reason_code, properties=None):
     print(f"Connected with result code {reason_code}")
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
@@ -16,16 +16,16 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    print(msg.topic+" "+str(msg.payload))
+    handle_incoming_message(msg.topic, msg.payload)
 
 def on_log(client, userdata, level, buf):
     logger.debug(f"MQTT: {buf}")
 
 def estabilish_mqtt_connection(url: str, port: int = 1883) -> mqtt.Client:
     mqttc = mqtt.Client()
+    mqttc.on_log = on_log
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
-    mqttc.on_log = on_log
     mqttc.enable_logger(logger)
     retries = 5
     delay = 5  # seconds

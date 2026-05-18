@@ -12,13 +12,17 @@ services:
               target: /var/lib/influxdb2
             - type: volume
               source: influxdb2-config
-              target: /etc/influxdb
+              target: /etc/influxdb2
+        networks:
+            - default
     mosquitto:
         build:
             context: .
             dockerfile: Dockerfile.mosquitto.yml
         ports:
             - "8883:8883"
+        networks:
+            - default
     manager:
         build:
             context: .
@@ -28,6 +32,8 @@ services:
         depends_on:
             - influxdb2
             - mosquitto
+        networks:
+            - default
 secrets:
     influxdb2-admin-username:
         file: ./.env.influxdb2-admin-username
@@ -40,3 +46,6 @@ volumes:
         driver: local
     influxdb2-config:
         driver: local
+networks:
+    default:
+        driver: bridge

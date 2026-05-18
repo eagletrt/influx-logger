@@ -50,12 +50,18 @@ def main(argv=None):
     logger.info("MQTT connection successfully estabilished")
 
     logger.info("Subscribing to the version topic")
-    client.subscribe("+/+/version")
-
-    # wire the message handler
-    client.on_message = lambda client, userdata, msg: handle_incoming_message(msg.topic, msg.payload)
-    client.loop_start()
-
+    try:
+        client.subscribe("+/+/version")
+    except Exception as e:
+        logger.fatal("Cannot subscribe to MQTT topic with configuration: " + str(cfg))
+        logger.fatal("Error: " + str(e))
+        sys.exit(1)
+    try:
+        client.loop_forever()
+    except Exception as e:
+        logger.fatal("Cannot start MQTT loop with configuration: " + str(cfg))
+        logger.fatal("Error: " + str(e))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
