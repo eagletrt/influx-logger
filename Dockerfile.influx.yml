@@ -1,1 +1,14 @@
 FROM influxdb:1.12-alpine
+
+EXPOSE 8086
+
+ENV INFLUXDB_DB=telemetry
+ENV INFLUX_BUCKET=telemetry
+ENV INFLUXDB_ORG=eagletrt
+ENV INFLUXDB_ADMIN_ENABLED=true
+ENV INFLUXDB_HTTP_AUTH_ENABLED=false
+
+COPY influxdb.conf /etc/influxdb/influxdb.conf
+
+CMD ["influxd", "-config", "/etc/influxdb/influxdb.conf"]
+

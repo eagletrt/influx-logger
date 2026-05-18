@@ -1,0 +1,20 @@
+name: influx-test-env
+services:
+    influxdb:
+        build:
+            context: .
+            dockerfile: Dockerfile.influx.yml
+        ports:
+            - "8086:8086"
+        volumes:
+            - influxdb_data:/var/lib/influxdb
+    manager:
+        build:
+            context: .
+            dockerfile: Dockerfile.manager.yml
+        ports:
+            - "8000:8000"
+        depends_on:
+            - influxdb
+volumes:
+    influxdb_data:

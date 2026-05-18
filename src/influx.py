@@ -34,7 +34,8 @@ class Line:
 
         fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
         tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
-        prefix = f"{self.measurement}{"," + tags_str if self.tags else ""}"
+        tags_part = f",{tags_str}" if self.tags else ""
+        prefix = f"{self.measurement}{tags_part}"
         return f"{prefix} {fields_str} {self.timestamp}"
 
 

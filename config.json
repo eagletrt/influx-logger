@@ -1,4 +1,7 @@
 {
   "mqtt_url": "api.eagletrt.it",
-  "mqtt_port": 1883
+  "mqtt_port": 1883,
+  "influx_url": "http://localhost:8086",
+  "influx_bucket": "telemetry",
+  "influx_org": "eagletrt"
 }

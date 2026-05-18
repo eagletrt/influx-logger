@@ -1,7 +1,9 @@
 FROM alpine:3.18
-WORKDIR /app
-COPY . .
 RUN apk add --no-cache python3 py3-pip
 RUN pip install paho-mqtt requests python_http_client
 
-CMD ["python3", "src/index.py", "config.json"]
+WORKDIR /app
+COPY ./src /app/src
+COPY config.json /app/config.json
+
+CMD ["python3", "-m", "src.index", "config.json"]
