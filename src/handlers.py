@@ -50,7 +50,7 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
         # Expect decoder to provide a `decode` method returning a dict-like object
         message_content = decoder.decode(payload)
     except Exception as e:
-        logger.error("Cannot deserialize payload with saved descriptor")
+        logger.error(f"Cannot deserialize payload with saved descriptor: {e}")
         return
 
     tags = {

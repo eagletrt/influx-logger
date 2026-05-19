@@ -16,6 +16,7 @@ services:
         networks:
             - default
     mosquitto:
+        hostname: mosquitto
         build:
             context: .
             dockerfile: Dockerfile.mosquitto.yml
