@@ -15,18 +15,14 @@ def on_connect(client, _userdata, _flags, reason_code, properties=None):
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    logger.debug(f"MQTT Connection: Received message on topic {msg.topic}")
+    #logger.debug(f"MQTT Connection: Received message on topic {msg.topic}")
     try:
         handle_incoming_message(msg.topic, msg.payload)
     except Exception as e:
         logger.exception(f"MQTT Connection: Caught exception in on_message: {e}")
 
-def on_log(client, userdata, level, buf):
-    logger.debug(f"MQTT Connection: {buf}")
-
 def estabilish_mqtt_connection(url: str, port: int = 1883) -> mqtt.Client:
     mqttc = mqtt.Client()
-    mqttc.on_log = on_log
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
     mqttc.enable_logger(logger)
@@ -60,11 +56,10 @@ topic_handlers: Dict[str, Callable] = {
 
 
 def handle_incoming_message(topic: str, payload: bytes) -> None:
-    logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
+    #logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
     for handler_topic, handler_function in topic_handlers.items():
         matches = list(build_topic_regex(handler_topic).finditer(topic))
         if matches:
-            logger.debug(f"MQTT Connection: Topic has matched {handler_topic}")
             groups = list(matches[0].groups())
             handler_function(topic, payload, groups)
 

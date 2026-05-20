@@ -2,6 +2,8 @@ from typing import Dict, Any, List
 
 from .logger_utils import logger
 import requests
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 
 LineFieldType = (str, int, float, bool)
@@ -21,7 +23,7 @@ class Line:
 
     @staticmethod
     def from_object(obj: Dict[str, Any], measurement: str, tags: Dict[str, str]) -> "Line":
-        logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
+        #logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
         timestamp = obj.get("_innerTimestamp")
 
         for key in Line.possible_timestamp_keys:
@@ -45,7 +47,7 @@ class Line:
             for k, v in obj.items()
             if k not in {"_innerTimestamp", "_timestamp", "timestamp", "innerTimestamp"}
         }
-        #logger.info(f"Handler: Measurement '{measurement}' and timestamp {timestamp_value}")
+        #logger.info(f"Influx Connection: Measurement '{measurement}' and timestamp {timestamp_value}")
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
     def __str__(self) -> str:
@@ -63,7 +65,7 @@ class Line:
 
 
 class LineRepository:
-    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "us", limit: int = 500) -> None:
+    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "us", limit: int = 5000) -> None:
         self.lines: List[Line] = []
         self.limit = limit
         self.url = url
@@ -72,9 +74,11 @@ class LineRepository:
         self.org = org
         self.timestamp_precision = timestamp_precision
         self.pending_commits_count = 0
+        self.client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
+        self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
 
     def push(self, line: Line) -> None:
-        logger.debug(f"Influx Connection: Lines {len(self.lines)}/{self.limit}: {line}")
+        #logger.debug(f"Influx Connection: Lines {len(self.lines)}/{self.limit}: {line}")
         self.lines.append(line)
         if len(self.lines) >= self.limit:
             self.commit()
@@ -87,13 +91,15 @@ class LineRepository:
         self.pending_commits_count += 1
 
         pack = LineRepository.pack_lines(self.lines)
-        url = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
-
-        resp = requests.post(url, data=pack, headers={"Authorization": f"Token {self.token}"})
-        if not resp.ok:
-            logger.error(f"Failed to commit lines: {resp.text}")
+        #url = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
+        url: str = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
+        try:
+            self.write_api.write(bucket=self.bucket, org=self.org, record=pack, write_precision=self.timestamp_precision)
+        except Exception as e:
+            logger.error(f"Influx Connection: Failed to commit lines: {e}")
+            logger.debug(f"Influx Connection: Lines that failed to commit: {pack}")
         else:
-            logger.info(f"Committed {lines_count} lines")
+            logger.info(f"Influx Connection: Successfully committed {lines_count} lines")
 
         self.pending_commits_count -= 1
 
