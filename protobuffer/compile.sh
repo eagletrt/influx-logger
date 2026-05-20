@@ -14,11 +14,11 @@ echo "[proto] current directory" $DIR_PATH
 cd $DIR_PATH/..
 mkdir -p .generated
 
-echo "[proto] reading proto sources list"
-while IFS= read -r line; do
-  protoc --python_out=.generated $line
-  printf "\33[2K\r" # clear line
-  printf "[proto] gen $line"
-done < $DIR_PATH/.proto_sources.txt
+echo "[proto] compiling checked-in proto sources"
+find external/serializers/proto -name '*.proto' -print | sort | while IFS= read -r line; do
+  protoc -I. --python_out=.generated "$line"
+  printf "\33[2K\r"
+  printf "[proto] gen %s" "$line"
+done
 printf "\n"
 echo "[proto] done generating"
