@@ -16,7 +16,10 @@ def on_connect(client, _userdata, _flags, reason_code, properties=None):
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
     logger.info(f"Received message on topic {msg.topic}")
-    handle_incoming_message(msg.topic, msg.payload)
+    try:
+        handle_incoming_message(msg.topic, msg.payload)
+    except Exception as e:
+        logger.exception(f"Caught exception in on_message: {e}")
 
 def on_log(client, userdata, level, buf):
     logger.debug(f"MQTT: {buf}")
@@ -57,6 +60,7 @@ topic_handlers: Dict[str, Callable] = {
 
 
 def handle_incoming_message(topic: str, payload: bytes) -> None:
+    logger.debug(f"Handling incoming message on topic: {topic}")
     for handler_topic, handler_function in topic_handlers.items():
         matches = list(build_topic_regex(handler_topic).finditer(topic))
         if matches:

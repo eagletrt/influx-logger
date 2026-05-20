@@ -1,10 +1,56 @@
-from typing import List
+from typing import Any, Dict, List
 
 from src.logger_utils import logger
 from src.http_client import check_commit_existence
 from src.proto import get_proto_descriptor
 from src.influx import Line
 from src.global_influx import global_state
+
+
+def _unwrap_values(values: Any) -> Any:
+    if isinstance(values, dict):
+        return values.get("values")
+    return values
+
+
+def _expand_columnar_record(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    timestamps = _unwrap_values(record.get("timestamp"))
+    values_map = record.get("valuesMap", {})
+
+    if not isinstance(timestamps, list):
+        raise ValueError("Missing or invalid timestamp")
+    if not isinstance(values_map, dict):
+        raise ValueError("Missing or invalid values map")
+
+    rows: List[Dict[str, Any]] = []
+    for index, timestamp in enumerate(timestamps):
+        row: Dict[str, Any] = {"timestamp": timestamp}
+
+        for field_name, field_values in values_map.items():
+            values = _unwrap_values(field_values)
+            if isinstance(values, list) and index < len(values):
+                row[field_name] = values[index]
+
+        rows.append(row)
+
+    return rows
+
+
+def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
+    if isinstance(record, dict) and "valuesMap" in record and "timestamp" in record:
+        for row in _expand_columnar_record(record):
+            line = Line.from_object(row, measurement, tags)
+            if global_state.line_repository:
+                global_state.line_repository.push(line)
+        return
+
+    if not isinstance(record, dict):
+        logger.warn(f"Invalid object received from device for measurement '{measurement}'")
+        return
+
+    line = Line.from_object(record, measurement, tags)
+    if global_state.line_repository:
+        global_state.line_repository.push(line)
 
 
 def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
@@ -59,18 +105,22 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
         "network": network,
     }
 
-    for measurement, records in message_content.items():
-        for record in records:
-            valid_object = all(
-                isinstance(v, (str, int, float, bool)) for v in record.values()
-            )
-            if not valid_object:
-                logger.warn("Invalid object received from device")
-                break
+    if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
+        message_content = message_content["valuesPack"]
 
-            line = Line.from_object(record, measurement, tags)
-            if global_state.line_repository:
-                global_state.line_repository.push(line)
+    for measurement, records in message_content.items():
+        if isinstance(records, list):
+            for record in records:
+                try:
+                    _push_record(measurement, record, tags)
+                except ValueError as e:
+                    logger.error(f"Skipping invalid record for measurement '{measurement}': {e}")
+            continue
+
+        try:
+            _push_record(measurement, records, tags)
+        except ValueError as e:
+            logger.error(f"Skipping invalid record for measurement '{measurement}': {e}")
 
 
 __all__ = ["handle_version_message", "handle_data_message"]
