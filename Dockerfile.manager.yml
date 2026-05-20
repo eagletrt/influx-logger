@@ -4,7 +4,9 @@ RUN pip install paho-mqtt requests python_http_client protobuf grpcio-tools
 
 WORKDIR /app
 COPY ./src /app/src
+COPY ./external /app/external
+COPY protobuffer /app/protobuffer
 COPY config.json /app/config.json
-RUN bash protobuffer/compile.sh
+RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
 
 CMD ["python3", "-m", "src.index", "config.json"]

@@ -2,4 +2,6 @@ node_modules
 bun.lockb
 configuration.json
 .git/
+.venv/
 __pycache__/
+.generated/
