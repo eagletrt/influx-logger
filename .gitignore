@@ -180,5 +180,8 @@ configuration.json
 # Python
 .venv/
 __pycache__/
+*.pyc
+**/*.pyc
 # Generated files
 .generated/
+**/__pycache__/
