@@ -8,6 +8,7 @@ LineFieldType = (str, int, float, bool)
 
 
 class Line:
+    possible_timestamp_keys = ["_inner_timestamp", "_innerTimestamp", "_timestamp", "timestamp", "innerTimestamp"]
     def __init__(self, measurement: str, tags: Dict[str, str], fields: Dict[str, Any], timestamp: int) -> None:
         self.measurement = measurement
         self.tags = tags
@@ -23,16 +24,13 @@ class Line:
         logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
         timestamp = obj.get("_innerTimestamp")
 
-        if timestamp is None:
-            timestamp = obj.get("_inner_timestamp")
-        if timestamp is None:
-            timestamp = obj.get("_timestamp")
-        if timestamp is None:
-            timestamp = obj.get("timestamp")
-        if timestamp is None:
-            timestamp = obj.get("innerTimestamp")
+        for key in Line.possible_timestamp_keys:
+            if timestamp is not None:
+                break
+            timestamp = obj.get(key)
 
         if timestamp is None:
+            logger.error(f"Handler: Missing timestamp in object: {Line.obj_to_str(obj)}")
             raise ValueError("Missing timestamp")
 
         if isinstance(timestamp, str):
@@ -47,7 +45,7 @@ class Line:
             for k, v in obj.items()
             if k not in {"_innerTimestamp", "_timestamp", "timestamp", "innerTimestamp"}
         }
-
+        #logger.info(f"Handler: Measurement '{measurement}' and timestamp {timestamp_value}")
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
     def __str__(self) -> str:
