@@ -58,7 +58,8 @@ def main(argv=None):
     try:
         client.loop_forever()
     except Exception as e:
-        logger.fatal("Cannot start MQTT loop with configuration: " + str(cfg))
+        logger.fatal("MQTT loop interrupted")
+        logger.info("Configuration: " + str(cfg))
         sys.exit(1)
 
 if __name__ == "__main__":
