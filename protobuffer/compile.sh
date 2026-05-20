@@ -15,7 +15,7 @@ cd $DIR_PATH/..
 mkdir -p .generated
 
 echo "[proto] compiling checked-in proto sources"
-find external/serializers/proto -name '*.proto' -print | sort | while IFS= read -r line; do
+find external/can/proto/ -name '*.proto' -print | sort | while IFS= read -r line; do
   python3 -m grpc_tools.protoc -I. --python_out=.generated --proto_path=. "$line"
   printf "\33[2K\r"
   printf "[proto] gen %s" "$line"

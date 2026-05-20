@@ -16,6 +16,7 @@ class Line:
 
     @staticmethod
     def from_object(obj: Dict[str, Any], measurement: str, tags: Dict[str, str]) -> "Line":
+        logger.debug(f"Creating Line from object: {obj.__str__} with measurement: {measurement} and tags: {tags}")
         timestamp = obj.get("_innerTimestamp")
         if timestamp is None:
             timestamp = obj.get("_timestamp")
