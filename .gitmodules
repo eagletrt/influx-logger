@@ -1,7 +1,3 @@
 [submodule "external/serializers"]
 	path = external/serializers
 	url = git@github.com:eagletrt/telemetry-serializers.git
-[submodule "external/can"]
-	path = external/can
-	url = git@github.com:eagletrt/can.git
-	branch = build-evo
