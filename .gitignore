@@ -177,5 +177,8 @@ dist
 # Configuration 
 configuration.json
 
-# Python cache
+# Python
+.venv/
 __pycache__/
+# Generated files
+.generated/

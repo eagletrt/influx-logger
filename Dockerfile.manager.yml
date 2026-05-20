@@ -1,9 +1,10 @@
 FROM alpine:3.18
-RUN apk add --no-cache python3 py3-pip
+RUN apk add --no-cache python3 py3-pip bash
 RUN pip install paho-mqtt requests python_http_client protobuf grpcio-tools
 
 WORKDIR /app
 COPY ./src /app/src
 COPY config.json /app/config.json
+RUN bash protobuffer/compile.sh
 
 CMD ["python3", "-m", "src.index", "config.json"]
