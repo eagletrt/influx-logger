@@ -19,7 +19,7 @@ def on_message(client, userdata, msg):
     try:
         handle_incoming_message(msg.topic, msg.payload)
     except Exception as e:
-        logger.exception(f"Caught exception in on_message: {e}")
+        logger.exception(f"MQTT Connection: Caught exception in on_message: {e}")
 
 def on_log(client, userdata, level, buf):
     logger.debug(f"MQTT Connection: {buf}")
