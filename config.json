@@ -1,5 +1,5 @@
 {
-  "mqtt_url": "localhost",
+  "mqtt_url": "mosquitto",
   "mqtt_port": 8883,
   "influx_url": "http://localhost:8086",
   "influx_bucket": "telemetry",

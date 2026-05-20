@@ -15,9 +15,16 @@ class Line:
         self.timestamp = timestamp
 
     @staticmethod
+    def obj_to_str( obj: Dict[str, Any]) -> str:
+        return ", ".join(f"{k}={v}" for k, v in obj.items())
+
+    @staticmethod
     def from_object(obj: Dict[str, Any], measurement: str, tags: Dict[str, str]) -> "Line":
-        logger.debug(f"Creating Line from object: {obj.__str__} with measurement: {measurement} and tags: {tags}")
+        logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
         timestamp = obj.get("_innerTimestamp")
+
+        if timestamp is None:
+            timestamp = obj.get("_inner_timestamp")
         if timestamp is None:
             timestamp = obj.get("_timestamp")
         if timestamp is None:
@@ -26,14 +33,14 @@ class Line:
             timestamp = obj.get("innerTimestamp")
 
         if timestamp is None:
-            raise ValueError("Missing or invalid timestamp")
+            raise ValueError("Missing timestamp")
 
         if isinstance(timestamp, str):
             timestamp_value = int(timestamp)
         elif isinstance(timestamp, (int, float)):
             timestamp_value = int(timestamp)
         else:
-            raise ValueError("Missing or invalid timestamp")
+            raise ValueError("Invalid timestamp")
 
         fields = {
             k: v
