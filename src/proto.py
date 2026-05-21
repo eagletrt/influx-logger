@@ -149,10 +149,10 @@ def get_proto_descriptor(version: str, network: str) -> None:
         descriptor_raw = download_proto_version(version, network)
     except Exception as c:
         logger.trace(c)
-        logger.error(f"Proto descriptor for network '{network}' (version {version}) cannot be downloaded")
+        logger.error(f"Proto: descriptor for network '{network}' (version {version}) cannot be downloaded")
         return
 
-    logger.info("Descriptor successfully downloaded")
+    logger.info("Proto: Descriptor successfully downloaded")
 
     try:
         decoder = _build_decoder(descriptor_raw, network)
@@ -162,10 +162,10 @@ def get_proto_descriptor(version: str, network: str) -> None:
         global_state.version_descriptors[version][network] = decoder
     except Exception as e:
         logger.trace(e)
-        logger.error(f"Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
+        logger.error(f"Proto: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
         return
 
-    logger.info("Descriptor successfully parsed and is now ready for deserialize data")
+    logger.info("Proto: Descriptor successfully parsed and is now ready for deserialize data")
 
 
 __all__ = ["get_proto_descriptor"]

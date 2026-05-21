@@ -1,6 +1,7 @@
 name: influx-test-env
 services:
     influxdb2:
+        hostname: influxdb
         build:
             context: .
             dockerfile: Dockerfile.influx.yml

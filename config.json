@@ -1,9 +1,9 @@
 {
   "mqtt_url": "mosquitto",
   "mqtt_port": 8883,
-  "influx_url": "http://localhost:8086",
+  "influx_url": "http://influxdb:8086",
   "influx_bucket": "telemetry",
   "influx_org": "eagletrt",
-  "influx_token": "influxdb-token",
+  "influx_token": "PhdokCSl4Cie3rtmZVOfTJFD3Dmmyg2N_c07q5PeGCyqQ3S3bqXR7miZ5wUcRrKpXlEsavCqQ67IdX418JZ9OQ==",
   "timestamp_precision": "us"
 }

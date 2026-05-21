@@ -18,7 +18,7 @@ def _trace(self, message, *args, **kws):
 logging.Logger.trace = _trace
 
 
-level_name = "TRACE" if os.getenv("NODE_ENV") == "development" else "DEBUG"
+level_name = "TRACE" if os.getenv("NODE_ENV") == "development" else "INFO"
 level = logging.getLevelName(level_name)
 
 logger = logging.getLogger("influx_logger")
