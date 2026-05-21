@@ -5,7 +5,13 @@ import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 
-LineFieldType = (str, int, float, bool)
+_INFLUX_INT64_MAX = 2**63 - 1
+_TIMESTAMP_PRECISION_FACTORS = {
+    "ns": 1,
+    "us": 1_000,
+    "ms": 1_000_000,
+    "s": 1_000_000_000,
+}
 
 
 class Line:
@@ -31,7 +37,7 @@ class Line:
             timestamp = obj.get(key)
 
         if timestamp is None:
-            logger.error(f"Handler: Missing timestamp in object: {Line.obj_to_str(obj)}")
+            #logger.error(f"Handler: Missing timestamp in object: {Line.obj_to_str(obj)}")
             raise ValueError("Missing timestamp")
 
         if isinstance(timestamp, str):
@@ -44,21 +50,32 @@ class Line:
         fields = {
             k: v
             for k, v in obj.items()
-            if k not in {"_innerTimestamp", "_timestamp", "timestamp", "innerTimestamp"}
+            if k not in Line.possible_timestamp_keys
         }
         #logger.info(f"Influx Connection: Measurement '{measurement}' and timestamp {timestamp_value}")
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
+
+    @staticmethod
+    def _normalize_timestamp(timestamp: int, timestamp_precision: str) -> int:
+        factor = _TIMESTAMP_PRECISION_FACTORS.get(timestamp_precision)
+        if factor is None:
+            return timestamp
+
+        normalized = timestamp // factor
+        if normalized > _INFLUX_INT64_MAX:
+            raise ValueError(f"Timestamp {timestamp} is out of range for InfluxDB")
+        return normalized
     
-    def to_point(self) -> influxdb_client.Point:
+    def to_point(self, timestamp_precision: str = "ns") -> influxdb_client.Point:
         p = influxdb_client.Point(self.measurement)
         for k, v in self.tags.items():
             p.tag(k, v)
         for k, v in self.fields.items():
-            if isinstance(v, LineFieldType):
-                p.field(k, v)
+            if isinstance(v, bytes):
+                p.field(k, v.decode("utf-8", errors="replace"))
             else:
-                logger.warn(f"Influx Connection: Unsupported field type for key '{k}': {type(v)}, skipping field")
-        p.time(self.timestamp)
+                p.field(k, str(v))
+        p.time(self._normalize_timestamp(self.timestamp, timestamp_precision))
         return p
 
     def __str__(self) -> str:
@@ -98,7 +115,7 @@ class LineRepository:
 
     def push(self, line: Line) -> None:
         #logger.debug(f"Influx Connection: Lines {len(self.lines)}/{self.limit}: {line}")
-        self.points.append(line.to_point())
+        self.points.append(line.to_point(self.timestamp_precision))
         #logger.debug(f"Influx Connection: Lines {len(self.points)}/{self.limit}")
         if len(self.points) >= self.limit:
             logger.info(f"Influx Connection: Line limit reached ({self.limit}), committing lines")
@@ -107,7 +124,7 @@ class LineRepository:
 
     def commit(self) -> None:
         lines_count = len(self.points)
-        logger.info(f"Committing {lines_count} lines")
+        #logger.info(f"Influx Connection: Committing {lines_count} lines")
         self.pending_commits_count += 1
 
         pack = LineRepository.pack_lines(self.points)

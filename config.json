@@ -4,6 +4,6 @@
   "influx_url": "http://influxdb:8086",
   "influx_bucket": "telemetry",
   "influx_org": "eagletrt",
-  "influx_token": "PhdokCSl4Cie3rtmZVOfTJFD3Dmmyg2N_c07q5PeGCyqQ3S3bqXR7miZ5wUcRrKpXlEsavCqQ67IdX418JZ9OQ==",
+  "influx_token": "vnneQbkKaU1V8UaEhn36veaRsC672EZ9AFgQ198wjgEvVp1IeM_APrrrFH7inVJWesoYtL9BjsnKkCOJw6O0VA==",
   "timestamp_precision": "us"
 }

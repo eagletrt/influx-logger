@@ -114,13 +114,15 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
                 try:
                     _push_record(measurement, record, tags)
                 except ValueError as e:
-                    logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                    #logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                    pass
             continue
         else:
             try:
                 _push_record(measurement, records, tags)
             except ValueError as e:
-                logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                #logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                pass
 
 
 __all__ = ["handle_version_message", "handle_data_message"]
