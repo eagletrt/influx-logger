@@ -75,7 +75,7 @@ class Line:
                 p.field(k, v.decode("utf-8", errors="replace"))
             else:
                 p.field(k, str(v))
-        p.time(self._normalize_timestamp(self.timestamp, timestamp_precision))
+        p.time(self.timestamp, write_precision=timestamp_precision)
         return p
 
     def __str__(self) -> str:
