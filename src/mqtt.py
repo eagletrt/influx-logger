@@ -25,7 +25,6 @@ def estabilish_mqtt_connection(url: str, port: int = 1883) -> mqtt.Client:
     mqttc = mqtt.Client()
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
-    mqttc.enable_logger(logger)
     retries = 5
     delay = 5  # seconds
 

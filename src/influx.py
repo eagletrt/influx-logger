@@ -110,7 +110,7 @@ class LineRepository:
             retry_interval=5_000,  # Retry every 5 seconds if the write fails
             max_retries=3,  # Maximum number of retries
         )
-        self.write_api = self.client.write_api(write_options=self.write_options)
+        self.write_api: influxdb_client.client.write_api.WriteApi = self.client.write_api(write_options=self.write_options)
 
 
     def push(self, line: Line) -> None:
