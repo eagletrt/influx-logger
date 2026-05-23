@@ -1,5 +1,6 @@
 import sys
 import json
+import mongo_connection
 from src.logger_utils import logger
 from src.mqtt import estabilish_mqtt_connection, handle_incoming_message
 from src.global_influx import global_state
@@ -23,6 +24,21 @@ def main(argv=None):
     logger.info("Configuration succesfully loaded")
 
     cfg = global_state.configuration
+    # Connect to MongoDB
+    try:
+        mongo_connection.get_mongo_client()
+        client, db = mongo_connection.connect(
+            url=cfg["mongo_url"],
+            port=cfg["mongo_port"],
+            username=cfg["mongo_username"],
+            password=cfg["mongo_password"],
+            db_name=cfg["mongo_db"]
+        )
+    except Exception as e:
+        logger.fatal("Cannot estabilish connection with MongoDB with configuration: " + str(cfg))
+        logger.fatal("Error: " + str(e))
+        sys.exit(1)
+
     try:
         global_state.line_repository = LineRepository(
             url=cfg["influx_url"],
