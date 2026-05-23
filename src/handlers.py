@@ -1,11 +1,12 @@
 from typing import Any, Dict, List
 
-import mongo_connection
 from src.logger_utils import logger
 from src.http_client import check_commit_existence
 from src.proto import get_proto_descriptor
 from src.influx import Line
 from src.global_influx import global_state
+from src.logger_utils import logger
+from src.mongo_connection import push_line
 
 
 def _unwrap_values(values: Any) -> Any:
@@ -43,7 +44,7 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
             line = Line.from_object(row, measurement, tags)
             if global_state.line_repository:
                 global_state.line_repository.push(line)
-                mongo_connection.push_line(line)
+                push_line(line)
         return
 
     if not isinstance(record, dict):
@@ -53,7 +54,7 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
     line = Line.from_object(record, measurement, tags)
     if global_state.line_repository:
         global_state.line_repository.push(line)
-        mongo_connection.push_line(line)
+        push_line(line)
 
 def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     vehicle_id, device_id = ids

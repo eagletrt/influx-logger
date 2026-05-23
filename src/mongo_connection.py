@@ -2,11 +2,10 @@
 
 Provides get_mongo_client and get_mongo_db helpers.
 """
-from typing import List, Optional, Tuple
-import os
+from typing import Any, List, Optional, Tuple
 
-from external.serializers.py.lapcounter.lapcounter import Line
-from logger_utils import logger
+from src.influx import Line
+from src.logger_utils import logger
 
 try:
     from pymongo import MongoClient
@@ -17,23 +16,35 @@ except Exception:  # pragma: no cover - runtime dependency
 limit: int = 5000
 lines: List[object] = []
 
-_connection: Optional[Tuple["MongoClient", object]] = None
+_connection: Tuple[Any, object] = None
+_connection_settings: Optional[Tuple[str, int, str, str, str]] = None
 
-def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple["MongoClient", object]:
+
+def _build_uri(url: str, port: int, username: str, password: str, db_name: str) -> str:
+    return f"mongodb://{username}:{password}@{url}:{port}/{db_name}"
+
+def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple[Any, object]:
     global _connection
+    global _connection_settings
     if _connection is not None:
         return _connection
-    """Connect to MongoDB and return (client, db) tuple."""
     if MongoClient is None:
         raise RuntimeError("pymongo is not installed")
 
-    uri = f"mongodb://{username}:{password}@{url}:{port}/{db_name}"
-    client = MongoClient(uri)
+    _connection_settings = (url, port, username, password, db_name)
+    uri = _build_uri(url, port, username, password, db_name)
+    logger.info(f"URI: {uri}")
+    client = MongoClient(
+        uri,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000,
+    )
     db = client[db_name]
     _connection = (client, db)
     return _connection
 
-def get_mongo_client(uri: Optional[str] = None, **kwargs) -> "MongoClient":
+def get_mongo_client(uri: str, **kwargs) -> Any:
     """Return a pymongo.MongoClient instance.
 
     uri: MongoDB connection string. If not provided, reads MONGO_URI env var.
@@ -42,21 +53,27 @@ def get_mongo_client(uri: Optional[str] = None, **kwargs) -> "MongoClient":
     if MongoClient is None:
         raise RuntimeError("pymongo is not installed")
 
-    uri = uri or os.getenv("MONGO_URI")
+    uri = uri
     if not uri:
         raise ValueError("MongoDB URI not provided (argument or MONGO_URI env)")
 
-    client = MongoClient(uri, **kwargs)
+    client = MongoClient(
+        uri,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000,
+        **kwargs,
+    )
     return client
 
 
-def get_mongo_db(uri: Optional[str] = None, db_name: Optional[str] = None, **kwargs) -> Tuple["MongoClient", object]:
+def get_mongo_db(uri: str, db_name:str, **kwargs) -> Tuple[Any, object]:
     """Return (client, db) tuple.
 
     db_name: name of the database. If not provided, reads MONGO_DB env var.
     """
     client = get_mongo_client(uri, **kwargs)
-    db_name = db_name or os.getenv("MONGO_DB")
+    db_name = db_name
     if not db_name:
         raise ValueError("MongoDB database name not provided (argument or MONGO_DB env)")
 
@@ -77,7 +94,12 @@ def commit() -> None:
         return
 
     try:
-        _connection = _connection or get_mongo_db()
+        if _connection is None:
+            if _connection_settings is None:
+                logger.error("Mongo Connection: No MongoDB connection configured, skipping commit")
+                return
+            _connection = connect(*_connection_settings)
+
         collection = _connection[1]["telemetry_lines"]
         docs = []
         for line in lines:
@@ -88,10 +110,22 @@ def commit() -> None:
                 "timestamp": line.timestamp,
             }
             docs.append(doc)
-        collection.insert_many(docs)
+        try:
+            collection.insert_many(docs)
+        except Exception as first_error:
+            logger.warning(
+                f"Mongo Connection: Initial commit failed, retrying once: {first_error}"
+            )
+            if _connection_settings is None:
+                raise
+            _connection = connect(*_connection_settings)
+            collection = _connection[1]["telemetry_lines"]
+            collection.insert_many(docs)
+
+        logger.info(f"Mongo Connection: Committed {len(lines)} lines to MongoDB")
         lines = []
     except Exception as e:
-        logger.fatal(f"Error committing lines to MongoDB: {e}")
+        logger.error(f"Mongo Connection: Error committing lines to MongoDB: {e}")
 
 
 __all__ = ["get_mongo_client", "get_mongo_db", "push_line", "commit"]

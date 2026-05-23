@@ -5,5 +5,10 @@
   "influx_bucket": "telemetry",
   "influx_org": "eagletrt",
   "influx_token": "jeMi7zS5rJIK_5CHaYmNDOr0PjBEASbuCgPZ3PuHwR48z1xcx1u6G3Z8VQT1AVKAIwhOLv0c1AAsls4dE60xmA==",
-  "timestamp_precision": "us"
+  "timestamp_precision": "us",
+  "mongo_url": "mongodb",
+  "mongo_port": 27017,
+  "mongo_username": "admin",
+  "mongo_password": "password",
+  "mongo_db": "telemetry"
 }

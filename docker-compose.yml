@@ -25,6 +25,15 @@ services:
             - "8883:8883"
         networks:
             - default
+    mongodb:
+        hostname: mongodb
+        build:
+            context: .
+            dockerfile: Dockerfile.mongo.yml
+        ports:
+            - "27017:27017"
+        networks:
+            - default
     manager:
         build:
             context: .
@@ -34,6 +43,7 @@ services:
         depends_on:
             - influxdb2
             - mosquitto
+            - mongodb
         networks:
             - default
 secrets:
