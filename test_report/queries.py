@@ -5,8 +5,8 @@ def generate_benchmark_queries(
     bucket: str, 
     start_time_iso: str, 
     cutoff_timestamp: int, 
-    target_vehicle: str = "vehicle_01",
-    target_field: str = "speed",
+    target_vehicle: str = "influx-test-vehicle",
+    target_field: str = "_value",
     threshold_value: int = 100
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -20,11 +20,11 @@ def generate_benchmark_queries(
                 {"$match": {"timestamp": {"$gte": cutoff_timestamp}}},
                 {"$count": "count"}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> count()
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> count()
+                        '''
         },
 
         # 2. Filter by Tag (Find all data for a specific vehicle)
@@ -36,12 +36,12 @@ def generate_benchmark_queries(
                 }},
                 {"$count": "count"}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}")
-                  |> count()
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}")
+                                    |> count()
+                        '''
         },
 
         # 3. Filter by Tag and Field Value (e.g., high speed events for a specific vehicle)
@@ -50,16 +50,14 @@ def generate_benchmark_queries(
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
                     "vehicle-id": target_vehicle,
-                    target_field: {"$gte": threshold_value}
+                    target_field: {"$gt": threshold_value}
                 }},
                 {"$count": "count"}
             ],
             "influx": f'''
                 from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}")
-                  |> filter(fn: (r) => r._field == "{target_field}")
-                  |> filter(fn: (r) => r._value >= {threshold_value})
+                  |> range(start: time(v: "{start_time_iso}"))
+                  |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}" and r._field == "{target_field}" and r._value > {threshold_value})
                   |> count()
             '''
         },
@@ -76,12 +74,12 @@ def generate_benchmark_queries(
                     "average_value": {"$avg": f"${target_field}"}
                 }}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> filter(fn: (r) => r._field == "{target_field}")
-                  |> mean()
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> filter(fn: (r) => r._field == "{target_field}")
+                                    |> mean()
+                        '''
         },
 
         # 5. Group By Tag: Calculate Max value grouped by device-id
@@ -96,13 +94,13 @@ def generate_benchmark_queries(
                     "max_value": {"$max": f"${target_field}"}
                 }}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> filter(fn: (r) => r._field == "{target_field}")
-                  |> group(columns: ["device-id"])
-                  |> max()
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> filter(fn: (r) => r._field == "{target_field}")
+                                    |> group(columns: ["device-id"])
+                                    |> max()
+                        '''
         },
 
         # 6. Time-Bucketing / Downsampling: Average value grouped into 1-minute windows
@@ -125,13 +123,13 @@ def generate_benchmark_queries(
                 }},
                 {"$sort": {"_id": 1}}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> filter(fn: (r) => r._field == "{target_field}")
-                  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
-                  |> yield(name: "mean")
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> filter(fn: (r) => r._field == "{target_field}")
+                                    |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
+                                    |> yield(name: "mean")
+                        '''
         },
         
         # 7. Unique Devices (Cardinality check)
@@ -141,12 +139,12 @@ def generate_benchmark_queries(
                 {"$group": {"_id": "$device-id"}},
                 {"$count": "unique_devices"}
             ],
-            "influx": f'''
-                from(bucket: "{bucket}")
-                  |> range(start: {start_time_iso})
-                  |> keep(columns: ["device-id"])
-                  |> distinct(column: "device-id")
-                  |> count()
-            '''
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> keep(columns: ["device-id"])
+                                    |> distinct(column: "device-id")
+                                    |> count()
+                        '''
         }
     }

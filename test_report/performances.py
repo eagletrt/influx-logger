@@ -101,3 +101,27 @@ class Performances:
             "time_unit": self.time_unit
         }
         return j
+    
+    def save_all(self, file:str = "performances.json") -> None:
+        with open(file, "w") as f:
+            json.dump({name: performance.to_json() for name, performance in self.performances.items()}, f, indent=2)
+    
+    @staticmethod
+    def load_from_file(file:str = "performances.json") -> 'Performances':
+        with open(file, "r") as f:
+            data = json.load(f)
+            performances = Performances()
+            for name, performance_data in data.items():
+                performance_queries = PerformanceQueries()
+                for query_data in performance_data["queries"]:
+                    query_performance = QueryPerformance(
+                        influx_time=query_data["influx_time"],
+                        mongo_time=query_data["mongo_time"]
+                    )
+                    performance_queries.add(query_performance)
+                performance_queries.influx_mean_time = float(performance_data["influx_mean_time"])
+                performance_queries.mongo_mean_time = float(performance_data["mongo_mean_time"])
+                performance_queries.influx_advantage = float(performance_data["influx_advantage"])
+                performances.performances[name] = performance_queries
+            performances.update_overall_advantage()
+            return performances
