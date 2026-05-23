@@ -32,6 +32,8 @@ services:
             dockerfile: Dockerfile.mongo.yml
         ports:
             - "27017:27017"
+        volumes:
+            - mongodb-data:/data/db
         networks:
             - default
     manager:
@@ -57,6 +59,8 @@ volumes:
     influxdb2-data:
         driver: local
     influxdb2-config:
+        driver: local
+    mongodb-data:
         driver: local
 networks:
     default:

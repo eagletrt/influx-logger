@@ -21,7 +21,10 @@ _connection_settings: Optional[Tuple[str, int, str, str, str]] = None
 
 
 def _build_uri(url: str, port: int, username: str, password: str, db_name: str) -> str:
-    return f"mongodb://{username}:{password}@{url}:{port}/{db_name}"
+    auth_part = ""
+    if username and password:
+        auth_part = f"{username}:{password}@"
+    return f"mongodb://{auth_part}{url}:{port}/{db_name}"
 
 def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple[Any, object]:
     global _connection
