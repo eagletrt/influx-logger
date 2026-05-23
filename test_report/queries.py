@@ -14,43 +14,13 @@ def generate_benchmark_queries(
     Each entry contains a 'mongo' pipeline and an 'influx' Flux query.
     """
     return {
-        # 1. Basic Count (Baseline)
-        "1_basic_count": {
-            "mongo": [
-                {"$match": {"timestamp": {"$gte": cutoff_timestamp}}},
-                {"$count": "count"}
-            ],
-                        "influx": f'''
-                                from(bucket: "{bucket}")
-                                    |> range(start: time(v: "{start_time_iso}"))
-                                    |> count()
-                        '''
-        },
-
-        # 2. Filter by Tag (Find all data for a specific vehicle)
-        "2_filter_by_tag": {
-            "mongo": [
-                {"$match": {
-                    "timestamp": {"$gte": cutoff_timestamp},
-                    "vehicle-id": target_vehicle
-                }},
-                {"$count": "count"}
-            ],
-                        "influx": f'''
-                                from(bucket: "{bucket}")
-                                    |> range(start: time(v: "{start_time_iso}"))
-                                    |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}")
-                                    |> count()
-                        '''
-        },
-
         # 3. Filter by Tag and Field Value (e.g., high speed events for a specific vehicle)
         "3_filter_by_value": {
             "mongo": [
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
-                    "vehicle-id": target_vehicle,
-                    target_field: {"$gt": threshold_value}
+                    "tags.vehicle-id": target_vehicle,
+                    f"fields.{target_field}": {"$gt": threshold_value}
                 }},
                 {"$count": "count"}
             ],
@@ -67,11 +37,11 @@ def generate_benchmark_queries(
             "mongo": [
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
-                    target_field: {"$exists": True}
+                    f"fields.{target_field}": {"$exists": True}
                 }},
                 {"$group": {
                     "_id": None,
-                    "average_value": {"$avg": f"${target_field}"}
+                    "average_value": {"$avg": f"$fields.{target_field}"}
                 }}
             ],
                         "influx": f'''
@@ -87,11 +57,11 @@ def generate_benchmark_queries(
             "mongo": [
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
-                    target_field: {"$exists": True}
+                    f"fields.{target_field}": {"$exists": True}
                 }},
                 {"$group": {
-                    "_id": "$device-id",
-                    "max_value": {"$max": f"${target_field}"}
+                    "_id": "$tags.device-id",
+                    "max_value": {"$max": f"$fields.{target_field}"}
                 }}
             ],
                         "influx": f'''
@@ -110,7 +80,7 @@ def generate_benchmark_queries(
             "mongo": [
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
-                    target_field: {"$exists": True}
+                    f"fields.{target_field}": {"$exists": True}
                 }},
                 {"$group": {
                     "_id": {
@@ -119,7 +89,7 @@ def generate_benchmark_queries(
                             {"$mod": ["$timestamp", 60000000]} # Assuming microseconds timestamp (60s * 1M us)
                         ]
                     },
-                    "average_value": {"$avg": f"${target_field}"}
+                    "average_value": {"$avg": f"$fields.{target_field}"}
                 }},
                 {"$sort": {"_id": 1}}
             ],
@@ -136,15 +106,16 @@ def generate_benchmark_queries(
         "7_unique_devices": {
             "mongo": [
                 {"$match": {"timestamp": {"$gte": cutoff_timestamp}}},
-                {"$group": {"_id": "$device-id"}},
+                {"$group": {"_id": "$tags.device-id"}},
                 {"$count": "unique_devices"}
             ],
-                        "influx": f'''
-                                from(bucket: "{bucket}")
-                                    |> range(start: time(v: "{start_time_iso}"))
-                                    |> keep(columns: ["device-id"])
-                                    |> distinct(column: "device-id")
-                                    |> count()
-                        '''
+            "influx": f'''
+                from(bucket: "{bucket}")
+                    |> range(start: time(v: "{start_time_iso}"))
+                    |> filter(fn: (r) => exists r["device-id"] and r["device-id"] != "")
+                    |> keep(columns: ["device-id"])
+                    |> distinct(column: "device-id")
+                    |> count()
+            '''
         }
     }

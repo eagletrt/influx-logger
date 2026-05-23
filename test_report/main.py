@@ -36,7 +36,7 @@ _TIMESTAMP_FACTORS = {
 	"s": 1,
 }
 _INFLUX_METADATA_KEYS = {"result", "table", "_start", "_stop", "_time", "_measurement", "_field"}
-_COUNT_QUERY_NAMES = {"1_basic_count", "2_filter_by_tag", "3_filter_by_value", "7_unique_devices"}
+_COUNT_QUERY_NAMES = {"1_basic_count", "2_filter_by_tag", "3_filter_by_value"}
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
@@ -98,6 +98,11 @@ def _influx_query_results(client: influxdb_client.InfluxDBClient, org: str, base
 def _normalize_query_results(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> tuple[Any, Any]:
 	if query_name in _COUNT_QUERY_NAMES:
 		mongo_count = sum(int(row["count"]) for row in mongo_rows if "count" in row)
+		influx_count = sum(int(row["_value"]) for row in influx_rows if "_value" in row)
+		return mongo_count, influx_count
+
+	if query_name == "7_unique_devices":
+		mongo_count = sum(int(row["unique_devices"]) for row in mongo_rows if "unique_devices" in row)
 		influx_count = sum(int(row["_value"]) for row in influx_rows if "_value" in row)
 		return mongo_count, influx_count
 

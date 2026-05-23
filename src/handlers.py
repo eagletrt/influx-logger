@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 
-from src.committed_bytes import add_line, add_bytes, get_committed_bytes, pretty_print_committed_bytes
 from src.logger_utils import logger
 from src.http_client import check_commit_existence
 from src.proto import get_proto_descriptor
@@ -8,6 +7,7 @@ from src.influx import Line
 from src.global_influx import global_state
 from src.logger_utils import logger
 from src.mongo_connection import push_line
+import src.committed_bytes as bytes_tracker
 
 
 def _unwrap_values(values: Any) -> Any:
@@ -46,18 +46,18 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
             if global_state.line_repository:
                 global_state.line_repository.push(line)
                 push_line(line)
-                add_line(line)
-        return
-
-    if not isinstance(record, dict):
+                bytes_tracker.add_line(line)
+    elif not isinstance(record, dict):
         logger.warn(f"Handler: Invalid object received from device for measurement '{measurement}'")
-        return
-
-    line = Line.from_object(record, measurement, tags)
-    if global_state.line_repository:
-        global_state.line_repository.push(line)
-        push_line(line)
-        add_line(line)
+    else:
+        line = Line.from_object(record, measurement, tags)
+        if global_state.line_repository:
+            global_state.line_repository.push(line)
+            push_line(line)
+            bytes_tracker.add_line(line)
+    if bytes_tracker.is_max_bytes_reached():
+        logger.info("Handler: Maximum committed bytes reached, stopping further processing of incoming data")
+        exit(0)
 
 def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     vehicle_id, device_id = ids

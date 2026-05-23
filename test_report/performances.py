@@ -158,7 +158,7 @@ class Performances:
         plt.show()
     
     @staticmethod
-    def short_keys(keys, length: int = 10) -> list[str]:
+    def short_keys(keys, length: int = 25) -> list[str]:
         return [s if len(s) <= length else s[:length-3] + "..." for s in keys]
 
     def plot_overall(self, file_to_save: str = "") -> None:
