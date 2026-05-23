@@ -157,6 +157,10 @@ class Performances:
         plt.tight_layout()
         plt.show()
     
+    @staticmethod
+    def short_keys(keys, length: int = 10) -> list[str]:
+        return [s if len(s) <= length else s[:length-3] + "..." for s in keys]
+
     def plot_overall(self, file_to_save: str = "") -> None:
         if not self.performances:
             print("No performances to plot")
@@ -173,7 +177,7 @@ class Performances:
         plt.title("Overall Performance Comparison")
         plt.xlabel("Query")
         plt.ylabel(f"Mean Time ({self.time_unit})")
-        plt.xticks(x, list(self.performances.keys()), rotation=45, ha='right')
+        plt.xticks(x, Performances.short_keys(list(self.performances.keys())), rotation=45, ha='right')
         plt.legend()
         plt.grid(axis='y')
         plt.tight_layout()
