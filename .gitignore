@@ -185,3 +185,5 @@ __pycache__/
 # Generated files
 .generated/
 **/__pycache__/
+performances.json
+*.png

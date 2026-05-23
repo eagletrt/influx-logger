@@ -35,6 +35,8 @@ _TIMESTAMP_FACTORS = {
 	"ms": 1_000,
 	"s": 1,
 }
+_INFLUX_METADATA_KEYS = {"result", "table", "_start", "_stop", "_time", "_measurement", "_field"}
+_COUNT_QUERY_NAMES = {"1_basic_count", "2_filter_by_tag", "3_filter_by_value", "7_unique_devices"}
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
@@ -66,6 +68,105 @@ def _find_numeric_value(values: Iterable[Any], key: str) -> int | None:
 	return None
 
 
+def _canonicalize_value(value: Any) -> Any:
+	if isinstance(value, datetime):
+		return value.astimezone(timezone.utc).isoformat()
+	if isinstance(value, dict):
+		return {key: _canonicalize_value(inner_value) for key, inner_value in value.items()}
+	if isinstance(value, list):
+		return [_canonicalize_value(inner_value) for inner_value in value]
+	return value
+
+
+def _epoch_microseconds(value: Any) -> int:
+	if isinstance(value, datetime):
+		return int(value.astimezone(timezone.utc).timestamp() * 1_000_000)
+	if isinstance(value, (int, float)):
+		return int(value)
+	raise ValueError(f"Unsupported timestamp value: {value!r}")
+
+
+def _mongo_query_results(collection: Any, pipeline: list) -> list[dict[str, Any]]:
+	return [dict(document) for document in collection.aggregate(pipeline)]
+
+
+def _influx_query_results(client: influxdb_client.InfluxDBClient, org: str, base_query: str) -> list[dict[str, Any]]:
+	tables = client.query_api().query(org=org, query=base_query)
+	return [dict(record.values) for table in tables for record in table.records]
+
+
+def _normalize_query_results(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> tuple[Any, Any]:
+	if query_name in _COUNT_QUERY_NAMES:
+		mongo_count = sum(int(row["count"]) for row in mongo_rows if "count" in row)
+		influx_count = sum(int(row["_value"]) for row in influx_rows if "_value" in row)
+		return mongo_count, influx_count
+
+	if query_name == "4_aggregate_average":
+		mongo_values = [float(row["average_value"]) for row in mongo_rows if "average_value" in row]
+		influx_values = [float(row["_value"]) for row in influx_rows if "_value" in row]
+		return mongo_values, influx_values
+
+	if query_name == "5_group_by_max":
+		mongo_normalized = sorted(
+			(
+				{
+					"group": _canonicalize_value(row.get("_id")),
+					"value": _canonicalize_value(row.get("max_value")),
+				}
+				for row in mongo_rows
+				if "_id" in row and "max_value" in row
+			),
+			key=lambda item: json.dumps(item, sort_keys=True),
+		)
+		influx_normalized = sorted(
+			(
+				{
+					"group": _canonicalize_value(row.get("device-id")),
+					"value": _canonicalize_value(row.get("_value")),
+				}
+				for row in influx_rows
+				if "device-id" in row and "_value" in row
+			),
+			key=lambda item: json.dumps(item, sort_keys=True),
+		)
+		return mongo_normalized, influx_normalized
+
+	if query_name == "6_time_bucketing_1m":
+		mongo_normalized = sorted(
+			(
+				{
+					"group": _epoch_microseconds(row.get("_id")),
+					"value": _canonicalize_value(row.get("average_value")),
+				}
+				for row in mongo_rows
+				if "_id" in row and "average_value" in row
+			),
+			key=lambda item: (item["group"], json.dumps(item["value"], sort_keys=True, default=str)),
+		)
+		influx_normalized = sorted(
+			(
+				{
+					"group": _epoch_microseconds(row.get("_time")),
+					"value": _canonicalize_value(row.get("_value")),
+				}
+				for row in influx_rows
+				if "_time" in row and "_value" in row
+			),
+			key=lambda item: (item["group"], json.dumps(item["value"], sort_keys=True, default=str)),
+		)
+		return mongo_normalized, influx_normalized
+
+	return (
+		[_canonicalize_value(row) for row in mongo_rows],
+		[_canonicalize_value({key: value for key, value in row.items() if key not in _INFLUX_METADATA_KEYS}) for row in influx_rows],
+	)
+
+
+def _query_results_match(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> bool:
+	mongo_normalized, influx_normalized = _normalize_query_results(query_name, mongo_rows, influx_rows)
+	return mongo_normalized == influx_normalized
+
+
 def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
 	explain = collection.database.command(
 		"explain",
@@ -82,7 +183,7 @@ def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
 	return duration
 
 def print_results(records: Iterable[Any]) -> None:
-	if log:
+	if log == True:
 		for record in records:
 			print(record)
 
@@ -117,7 +218,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 		token=config["influx_token"],
 		org=config["influx_org"],
 	)
-
+	error_count = 0
 	try:
 		collection = mongo_db["telemetry_lines"]
 		now = datetime.now(timezone.utc)
@@ -135,14 +236,30 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 				target_field="rpm",
 			)
 			for test_name, q in queries.items():
-				for _ in range(repeat_count):
-					mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
-					influx_time_ms = _influx_query_time_ms(
-						influx_client,
-						config["influx_org"],
-						q["influx"],
-					)
-					performances.add(f"{query_name}_{test_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
+				try:
+					for _ in range(repeat_count):
+						mongo_rows = _mongo_query_results(collection, q["mongo"])
+						influx_rows = _influx_query_results(
+							influx_client,
+							config["influx_org"],
+							q["influx"],
+						)
+						if not _query_results_match(test_name, mongo_rows, influx_rows):
+							mongo_normalized, influx_normalized = _normalize_query_results(test_name, mongo_rows, influx_rows)
+							raise ValueError(
+								f"MongoDB and InfluxDB returned different results for {query_name}_{test_name}: "
+								f"mongo={mongo_normalized!r}, influx={influx_normalized!r}"
+							)
+						mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
+						influx_time_ms = _influx_query_time_ms(
+							influx_client,
+							config["influx_org"],
+							q["influx"],
+						)
+						performances.add(f"{query_name}_{test_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
+				except Exception as e:
+					error_count += 1
+					print(f"{error_count}: query {query_name}_{test_name} failed: {e}", file=sys.stderr)
 	finally:
 		influx_client.close()
 		mongo_client.close()
@@ -156,9 +273,7 @@ def main(argv: list[str] | None = None) -> Performances:
 	repeat_count = 50
 	config = _load_config(config_path)
 	performances = build_performances(config, repeat_count)
-	for name, performance in performances.performances.items():
-		print(f"\n{name}:\n{performance}")
-	print(performances)
+	print(performances.__str__())
 	performances.save_all()
 	return performances
 
