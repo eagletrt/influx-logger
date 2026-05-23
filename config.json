@@ -4,7 +4,7 @@
   "influx_url": "http://influxdb:8086",
   "influx_bucket": "telemetry",
   "influx_org": "eagletrt",
-  "influx_token": "XQ94rK5UWmtOicwvzaJOmWgEPhc0erElKWUyZI_6I1lvn1WG2kSHrkbELBLhGtnMsXIapLoQs1aAuMratS0o6A==",
+  "influx_token": "GSEfe6Exv2Uq2WWrrY6nQ4hAe1clCoscxrQHHSMUEGTcs7zC95kS8Q9NesAZfvfL0BZkHsICkqwzDQ2isuvtNg==",
   "timestamp_precision": "us",
   "mongo_url": "mongodb",
   "mongo_port": 27017,

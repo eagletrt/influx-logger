@@ -21,6 +21,22 @@ class Line:
         self.tags = tags
         self.fields = fields
         self.timestamp = timestamp
+    
+    def get_size_in_bytes(self) -> int:
+        return len(self.to_line_protocol().encode("utf-8"))
+    
+    def to_line_protocol(self) -> str:
+        def field_to_str(k, v):
+            if isinstance(v, str):
+                return f'{k}="{v}"'
+            else:
+                return f"{k}={v}"
+
+        fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
+        tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
+        tags_part = f",{tags_str}" if self.tags else ""
+        prefix = f"{self.measurement}{tags_part}"
+        return f"{prefix} {fields_str} {self.timestamp}"
 
     @staticmethod
     def obj_to_str( obj: Dict[str, Any]) -> str:

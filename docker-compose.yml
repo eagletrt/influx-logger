@@ -46,6 +46,10 @@ services:
             - influxdb2
             - mosquitto
             - mongodb
+        volumes:
+            - type: volume
+              source: manager-logs
+              target: /committed_bytes.log
         networks:
             - default
 secrets:
@@ -61,6 +65,8 @@ volumes:
     influxdb2-config:
         driver: local
     mongodb-data:
+        driver: local
+    manager-logs:
         driver: local
 networks:
     default:

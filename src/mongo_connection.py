@@ -18,6 +18,8 @@ lines: List[object] = []
 
 _connection: Tuple[Any, object] = None
 _connection_settings: Optional[Tuple[str, int, str, str, str]] = None
+_BSON_INT64_MIN = -(2**63)
+_BSON_INT64_MAX = 2**63 - 1
 
 
 def _build_uri(url: str, port: int, username: str, password: str, db_name: str) -> str:
@@ -25,6 +27,22 @@ def _build_uri(url: str, port: int, username: str, password: str, db_name: str) 
     if username and password:
         auth_part = f"{username}:{password}@"
     return f"mongodb://{auth_part}{url}:{port}/{db_name}"
+
+
+def _sanitize_bson_value(value: Any) -> Any:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if _BSON_INT64_MIN <= value <= _BSON_INT64_MAX:
+            return value
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _sanitize_bson_value(inner_value) for key, inner_value in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_bson_value(inner_value) for inner_value in value]
+    if isinstance(value, tuple):
+        return [_sanitize_bson_value(inner_value) for inner_value in value]
+    return value
 
 def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple[Any, object]:
     global _connection
@@ -112,7 +130,7 @@ def commit() -> None:
                 "fields": line.fields,
                 "timestamp": line.timestamp,
             }
-            docs.append(doc)
+            docs.append(_sanitize_bson_value(doc))
         try:
             collection.insert_many(docs)
         except Exception as first_error:

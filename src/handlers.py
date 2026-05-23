@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 
+from src.committed_bytes import add_line, add_bytes, get_committed_bytes, pretty_print_committed_bytes
 from src.logger_utils import logger
 from src.http_client import check_commit_existence
 from src.proto import get_proto_descriptor
@@ -45,6 +46,7 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
             if global_state.line_repository:
                 global_state.line_repository.push(line)
                 push_line(line)
+                add_line(line)
         return
 
     if not isinstance(record, dict):
@@ -55,6 +57,7 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
     if global_state.line_repository:
         global_state.line_repository.push(line)
         push_line(line)
+        add_line(line)
 
 def handle_version_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     vehicle_id, device_id = ids
