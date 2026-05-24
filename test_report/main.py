@@ -5,8 +5,9 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
-from test_report.queries import generate_benchmark_queries
+from test_report.queries import adjust_query_windows, generate_benchmark_queries, QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP
 import influxdb_client
+from test_report.logger_utils import logger
 
 CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
@@ -18,17 +19,7 @@ from test_report.mongoconnection import connect
 log = False
 
 DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "config.json"
-QUERY_WINDOWS = {
-	"last_5_minutes": timedelta(minutes=5),
-	"last_1_hour": timedelta(hours=1),
-	"last_24_hours": timedelta(hours=24),
-	"one_week_ago": timedelta(days=7),
-	"week_ago_to_3_days_ago": timedelta(days=7) + timedelta(days=-3),
-	# Some others random windows int the past
-	"last_30_minutes": timedelta(minutes=30) + timedelta(seconds=-15),
-	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
-	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
-}
+
 _TIMESTAMP_FACTORS = {
 	"ns": 1_000_000_000,
 	"us": 1_000_000,
@@ -190,7 +181,7 @@ def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
 def print_results(records: Iterable[Any]) -> None:
 	if log == True:
 		for record in records:
-			print(record)
+			logger.info(f"Record: {json.dumps(record, indent=2, default=str)}")
 
 def _influx_query_time_ms(client: influxdb_client.InfluxDBClient, org: str, base_query: str) -> int:
 	flux_query = f'''
@@ -224,12 +215,14 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 		org=config["influx_org"],
 	)
 	error_count = 0
+	success_count = 0
 	try:
 		collection = mongo_db["telemetry_lines"]
 		now = datetime.now(timezone.utc)
 		precision = config.get("timestamp_precision", "us")
+		query_windows = adjust_query_windows(QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP)
 
-		for query_name, window in QUERY_WINDOWS.items():
+		for query_name, window in query_windows.items():
 			cutoff_timestamp = _timestamp_cutoff(now, window, precision)
 			influx_start = now - window
 			influx_start_iso = influx_start.isoformat().replace("+00:00", "Z")
@@ -251,9 +244,13 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 						)
 						if not _query_results_match(test_name, mongo_rows, influx_rows):
 							mongo_normalized, influx_normalized = _normalize_query_results(test_name, mongo_rows, influx_rows)
+							if type(mongo_normalized) != int:
+								mongo_normalized:int = len(mongo_normalized)
+							if type(influx_normalized) != int:
+								influx_normalized:int = len(influx_normalized)
 							raise ValueError(
-								f"MongoDB and InfluxDB returned different results for {query_name}_{test_name}: "
-								f"mongo={mongo_normalized!r}, influx={influx_normalized!r}"
+								f"MongoDB and InfluxDB returned different results: "
+								f"mongo_count={mongo_normalized}, influx_count={influx_normalized}"
 							)
 						mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
 						influx_time_ms = _influx_query_time_ms(
@@ -264,7 +261,10 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 						performances.add(f"{query_name}_{test_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
 				except Exception as e:
 					error_count += 1
-					print(f"{error_count}: query {query_name}_{test_name} failed: {e}", file=sys.stderr)
+					logger.error(f"{error_count:02d}/{error_count+success_count:02d}: query {query_name}_{test_name} failed: {e}")
+				else:
+					success_count += 1
+					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {query_name}_{test_name} completed successfully")
 	finally:
 		influx_client.close()
 		mongo_client.close()
@@ -278,7 +278,7 @@ def main(argv: list[str] | None = None) -> Performances:
 	repeat_count = 50
 	config = _load_config(config_path)
 	performances = build_performances(config, repeat_count)
-	print(performances.__str__())
+	logger.info(f"Performances: {performances.__str__()}")
 	performances.save_all()
 	return performances
 

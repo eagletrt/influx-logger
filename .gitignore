@@ -184,3 +184,4 @@ __pycache__/
 **/__pycache__/
 *.png
 performances.json
+output.log

@@ -1,5 +1,43 @@
-from datetime import datetime
+from datetime import timedelta, datetime, timezone
 from typing import Any, Dict
+import re
+
+LAST_KNOWN_TIMESTAMP = "2026-05-24T0:00:00Z"
+
+QUERY_WINDOWS = {
+	"last_5_minutes": timedelta(minutes=5),
+	"last_1_hour": timedelta(hours=1),
+	"last_24_hours": timedelta(hours=24),
+	"one_week_ago": timedelta(days=7),
+	"week_ago_to_3_days_ago": timedelta(days=7) + timedelta(days=-3),
+	# Some others random windows int the past
+	"last_30_minutes": timedelta(minutes=30) + timedelta(seconds=-15),
+	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
+	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
+    "last_3_days": timedelta(days=3) + timedelta(hours=-1),
+}
+
+def adjust_query_windows(windows: Dict[str, timedelta], last_timestamp_iso: str) -> Dict[str, timedelta]:
+    """
+    Adjusts the query windows based on the last known timestamp.
+    If the last known timestamp is in the past, it shifts all windows to be relative to that timestamp.
+    """
+    normalized_iso = last_timestamp_iso.strip().replace("Z", "+00:00")
+    normalized_iso = re.sub(r"T(\d):", r"T0\1:", normalized_iso)
+    try:
+        last_timestamp = datetime.fromisoformat(normalized_iso)
+    except ValueError:
+        last_timestamp = datetime.strptime(normalized_iso, "%Y-%m-%dT%H:%M:%S%z")
+    now = datetime.now(timezone.utc)
+
+    if last_timestamp < now:
+        # Calculate the time difference
+        time_diff = now - last_timestamp
+        # Shift all windows by the time difference
+        adjusted_windows = {name: window + time_diff for name, window in windows.items()}
+        return adjusted_windows
+    else:
+        return windows
 
 def generate_benchmark_queries(
     bucket: str, 
@@ -14,6 +52,30 @@ def generate_benchmark_queries(
     Each entry contains a 'mongo' pipeline and an 'influx' Flux query.
     """
     return {
+        # 1. Simple Time Range Query: Get all records in the last 5 minutes
+        "1_time_range": {
+            "mongo": [
+                {"$match": {"timestamp": {"$gte": cutoff_timestamp}}}
+            ],
+            "influx": f'''
+                from(bucket: "{bucket}")
+                  |> range(start: time(v: "{start_time_iso}"))
+            '''
+        },
+        # 2. Filter by Tag: Get all records for a specific vehicle
+        "2_filter_by_tag": {
+            "mongo": [
+                {"$match": {
+                    "timestamp": {"$gte": cutoff_timestamp},
+                    "tags.vehicle-id": target_vehicle
+                }}
+            ],
+            "influx": f'''
+                from(bucket: "{bucket}")
+                  |> range(start: time(v: "{start_time_iso}"))
+                  |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}")
+            '''
+        },
         # 3. Filter by Tag and Field Value (e.g., high speed events for a specific vehicle)
         "3_filter_by_value": {
             "mongo": [

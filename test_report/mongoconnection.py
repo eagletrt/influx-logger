@@ -5,7 +5,7 @@ Provides get_mongo_client and get_mongo_db helpers.
 from typing import Any, List, Optional, Tuple
 
 from src.influx import Line
-from src.logger_utils import logger
+from test_report.logger_utils import logger
 
 try:
     from pymongo import MongoClient
