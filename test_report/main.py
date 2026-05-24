@@ -258,13 +258,13 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 							config["influx_org"],
 							q["influx"],
 						)
-						performances.add(f"{query_name}_{test_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
+						performances.add(f"{test_name}_{query_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
 				except Exception as e:
 					error_count += 1
-					logger.error(f"{error_count:02d}/{error_count+success_count:02d}: query {query_name}_{test_name} failed: {e}")
+					logger.error(f"{error_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} failed: {e}")
 				else:
 					success_count += 1
-					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {query_name}_{test_name} completed successfully")
+					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} completed successfully")
 	finally:
 		influx_client.close()
 		mongo_client.close()
