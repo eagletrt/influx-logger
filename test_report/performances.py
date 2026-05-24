@@ -3,6 +3,9 @@ from statistics import geometric_mean, mean
 import matplotlib.pyplot as plt
 import math
 
+MONGO_COLOR = "green"
+INFLUX_COLOR = "cyan"
+
 class QueryPerformance:
     def __init__(self, influx_time: int, mongo_time: int, time_unit: str = "ms"):
         self.influx_time: int = influx_time
@@ -70,8 +73,8 @@ class PerformanceQueries:
         mongo_times = [q.mongo_time for q in self.queries]
         x = range(1, len(self.queries) + 1)
         plt.figure(figsize=(10, 5))
-        plt.plot(x, influx_times, label="InfluxDB")
-        plt.plot(x, mongo_times, label="MongoDB")
+        plt.plot(x, influx_times, label="InfluxDB", color=INFLUX_COLOR)
+        plt.plot(x, mongo_times, label="MongoDB", color=MONGO_COLOR)
         plt.title(title)
         plt.xlabel("Query Run")
         plt.ylabel(f"Time ({self.queries[0].time_unit})")
@@ -144,8 +147,8 @@ class Performances:
             influx_times = [q.influx_time for q in performance.queries]
             mongo_times = [q.mongo_time for q in performance.queries]
             x = range(1, len(performance.queries) + 1)
-            ax.plot(x, influx_times, label="InfluxDB", marker='o')
-            ax.plot(x, mongo_times, label="MongoDB", marker='o')
+            ax.plot(x, influx_times, label="InfluxDB", marker='o', color=INFLUX_COLOR)
+            ax.plot(x, mongo_times, label="MongoDB", marker='o', color=MONGO_COLOR)
             ax.set_title(name)
             ax.set_xlabel("Query Run")
             ax.set_ylabel(f"Time ({performance.queries[0].time_unit})")
@@ -179,10 +182,22 @@ class Performances:
         plt.figure(figsize=(10, 5))
         x = range(len(influx_means))
         width = 0.35
-        plt.bar([i - width/2 for i in x], influx_means, width, label="InfluxDB Mean Time", alpha=0.7, edgecolor="black")
-        plt.bar([i + width/2 for i in x], mongo_means, width, label="MongoDB Mean Time", alpha=0.7, edgecolor="black")
+        influx_bars = plt.bar([i - width/2 for i in x], influx_means, width, label="InfluxDB Mean Time", alpha=0.7, edgecolor="black", color="blue")
+        mongo_bars = plt.bar([i + width/2 for i in x], mongo_means, width, label="MongoDB Mean Time", alpha=0.7, edgecolor="black", color="green")
+        for bars in (influx_bars, mongo_bars):
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    height,
+                    f"{height:.1f}",
+                    ha='center',
+                    va='bottom',
+                    fontsize=8,
+                    rotation=0
+                )
         plt.title("Overall Performance Comparison")
-        plt.xlabel("Query")
+        plt.xlabel("Queries")
         plt.ylabel(f"Mean Time ({self.time_unit})")
         plt.xticks(x, Performances.short_keys(list(self.performances.keys())), rotation=45, ha='right')
         y_values = Performances.clean_y_ticks(influx_means, mongo_means)
