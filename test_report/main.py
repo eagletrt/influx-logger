@@ -27,7 +27,22 @@ _TIMESTAMP_FACTORS = {
 	"s": 1,
 }
 _INFLUX_METADATA_KEYS = {"result", "table", "_start", "_stop", "_time", "_measurement", "_field"}
-_COUNT_QUERY_NAMES = {"1_basic_count", "2_filter_by_tag", "3_filter_by_value"}
+_COUNT_QUERY_NAMES = {"3_filter_by_value", "7_unique_devices"}
+
+
+def _safe_int(value: Any) -> int:
+	"""Convert various numeric types (int, float, numeric strings) to int safely."""
+	if isinstance(value, int):
+		return value
+	if isinstance(value, float):
+		return int(value)
+	if isinstance(value, str):
+		try:
+			return int(value)
+		except ValueError:
+			return int(float(value))
+	# fallback: try numeric conversion
+	return int(float(value))
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
@@ -46,7 +61,7 @@ def _find_numeric_value(values: Iterable[Any], key: str) -> int | None:
 		if isinstance(value, dict):
 			if key in value:
 				try:
-					return int(value[key])
+					return _safe_int(value[key])
 				except (TypeError, ValueError):
 					continue
 			nested = _find_numeric_value(value.values(), key)
@@ -88,15 +103,27 @@ def _influx_query_results(client: influxdb_client.InfluxDBClient, org: str, base
 
 def _normalize_query_results(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> tuple[Any, Any]:
 	if query_name in _COUNT_QUERY_NAMES:
-		mongo_count = sum(int(row["count"]) for row in mongo_rows if "count" in row)
-		influx_count = sum(int(row["_value"]) for row in influx_rows if "_value" in row)
-		return mongo_count, influx_count
+		mongo_count = 0
+		for row in mongo_rows:
+			for v in row.values():
+				try:
+					mongo_count += _safe_int(v)
+					break
+				except Exception:
+					continue
 
-	if query_name == "7_unique_devices":
-		mongo_count = sum(int(row["unique_devices"]) for row in mongo_rows if "unique_devices" in row)
-		influx_count = sum(int(row["_value"]) for row in influx_rows if "_value" in row)
+		influx_count = 0
+		for row in influx_rows:
+			if "_value" in row:
+				influx_count += _safe_int(row["_value"])
+			else:
+				for v in row.values():
+					try:
+						influx_count += _safe_int(v)
+						break
+					except Exception:
+						continue
 		return mongo_count, influx_count
-
 	if query_name == "4_aggregate_average":
 		mongo_values = [float(row["average_value"]) for row in mongo_rows if "average_value" in row]
 		influx_values = [float(row["_value"]) for row in influx_rows if "_value" in row]
@@ -152,10 +179,34 @@ def _normalize_query_results(query_name: str, mongo_rows: list[dict[str, Any]], 
 		)
 		return mongo_normalized, influx_normalized
 
-	return (
-		[_canonicalize_value(row) for row in mongo_rows],
-		[_canonicalize_value({key: value for key, value in row.items() if key not in _INFLUX_METADATA_KEYS}) for row in influx_rows],
-	)
+	# If Influx returns per-field rows (contains `_field`), expand Mongo documents
+	# into comparable per-field records so the two sides can be compared meaningfully.
+	if any(isinstance(row, dict) and "_field" in row for row in influx_rows):
+		expanded = []
+		for row in mongo_rows:
+			measurement = row.get("measurement")
+			tags = row.get("tags", {}) or {}
+			fields = row.get("fields", {}) or {}
+			timestamp = row.get("timestamp")
+			for fname, fval in (fields.items() if isinstance(fields, dict) else []):
+				rec = {
+					"_measurement": measurement,
+					"_field": fname,
+					"_value": fval,
+				}
+				# include tags
+				rec.update(tags)
+				# convert numeric microsecond epoch to ISO time if possible
+				try:
+					from datetime import datetime, timezone as _tz
+					if isinstance(timestamp, (int, float)):
+						rec["_time"] = datetime.fromtimestamp(timestamp / 1_000_000, _tz.utc).isoformat()
+				except Exception:
+					pass
+				expanded.append(rec)
+		return [_canonicalize_value(row) for row in expanded], [_canonicalize_value({key: value for key, value in row.items() if key not in _INFLUX_METADATA_KEYS}) for row in influx_rows]
+
+	return [_canonicalize_value(row) for row in mongo_rows], [_canonicalize_value({key: value for key, value in row.items() if key not in _INFLUX_METADATA_KEYS}) for row in influx_rows]
 
 
 def _query_results_match(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> bool:

@@ -15,6 +15,7 @@ QUERY_WINDOWS = {
 	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
 	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
     "last_3_days": timedelta(days=3) + timedelta(hours=-1),
+    "last_1_week": timedelta(days=7) + timedelta(hours=-2),
 }
 
 def adjust_query_windows(windows: Dict[str, timedelta], last_timestamp_iso: str) -> Dict[str, timedelta]:
@@ -31,11 +32,10 @@ def adjust_query_windows(windows: Dict[str, timedelta], last_timestamp_iso: str)
     now = datetime.now(timezone.utc)
 
     if last_timestamp < now:
-        # Calculate the time difference
-        time_diff = now - last_timestamp
-        # Shift all windows by the time difference
-        adjusted_windows = {name: window + time_diff for name, window in windows.items()}
-        return adjusted_windows
+        # If a last-known timestamp is provided in the past, do not expand
+        # or otherwise distort the configured time windows here. Returning
+        # the original windows keeps ranges relative to the current time.
+        return windows
     else:
         return windows
 
@@ -55,7 +55,7 @@ def generate_benchmark_queries(
         # 1. Simple Time Range Query: Get all records in the last 5 minutes
         "1_time_range": {
             "mongo": [
-                {"$match": {"timestamp": {"$gte": cutoff_timestamp}}}
+                {"$match": {"timestamp": {"$gte": cutoff_timestamp}, "fields": {"$ne": {}}}}
             ],
             "influx": f'''
                 from(bucket: "{bucket}")
@@ -67,7 +67,8 @@ def generate_benchmark_queries(
             "mongo": [
                 {"$match": {
                     "timestamp": {"$gte": cutoff_timestamp},
-                    "tags.vehicle-id": target_vehicle
+                    "tags.vehicle-id": target_vehicle,
+                    "fields": {"$ne": {}}
                 }}
             ],
             "influx": f'''
@@ -167,7 +168,7 @@ def generate_benchmark_queries(
         # 7. Unique Devices (Cardinality check)
         "7_unique_devices": {
             "mongo": [
-                {"$match": {"timestamp": {"$gte": cutoff_timestamp}}},
+                {"$match": {"timestamp": {"$gte": cutoff_timestamp}, "fields": {"$ne": {}}}},
                 {"$group": {"_id": "$tags.device-id"}},
                 {"$count": "unique_devices"}
             ],
@@ -177,6 +178,68 @@ def generate_benchmark_queries(
                     |> filter(fn: (r) => exists r["device-id"] and r["device-id"] != "")
                     |> keep(columns: ["device-id"])
                     |> distinct(column: "device-id")
+                    |> count()
+            '''
+        },
+
+        # 8. Complex Query: Average value for a specific vehicle, grouped by 1-minute windows
+        "8_complex_vehicle_time_bucketing": {
+            "mongo": [
+                {"$match": {
+                    "timestamp": {"$gte": cutoff_timestamp},
+                    "tags.vehicle-id": target_vehicle,
+                    f"fields.{target_field}": {"$exists": True}
+                }},
+                {"$group": {
+                    "_id": {
+                        "$subtract": [
+                            "$timestamp",
+                            {"$mod": ["$timestamp", 60000000]} # Assuming microseconds timestamp (60s * 1M us)
+                        ]
+                    },
+                    "average_value": {"$avg": f"$fields.{target_field}"}
+                }},
+                {"$sort": {"_id": 1}}
+            ],
+                        "influx": f'''
+                                from(bucket: "{bucket}")
+                                    |> range(start: time(v: "{start_time_iso}"))
+                                    |> filter(fn: (r) => r["vehicle-id"] == "{target_vehicle}" and r._field == "{target_field}")
+                                    |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
+                                    |> yield(name: "mean")
+                        '''
+        },
+
+        # 9. Existence Check: Count how many records have a specific field present
+        "9_existence_check": {
+            "mongo": [
+                {"$match": {
+                    "timestamp": {"$gte": cutoff_timestamp},
+                    f"fields.{target_field}": {"$exists": True}
+                }},
+                {"$count": "records_with_field"}
+            ],
+            "influx": f'''
+                from(bucket: "{bucket}")
+                    |> range(start: time(v: "{start_time_iso}"))
+                    |> filter(fn: (r) => r._field == "{target_field}")
+                    |> count()
+            '''
+        },
+
+        # 10. Non-Empty Fields: Count how many records have a non-empty fields object
+        "10_non_empty_fields": {
+            "mongo": [
+                {"$match": {
+                    "timestamp": {"$gte": cutoff_timestamp},
+                    "fields": {"$ne": {}}
+                }},
+                {"$count": "records_with_non_empty_fields"}
+            ],
+            "influx": f'''
+                from(bucket: "{bucket}")
+                    |> range(start: time(v: "{start_time_iso}"))
+                    |> filter(fn: (r) => exists r.fields and r.fields != {{}})
                     |> count()
             '''
         }

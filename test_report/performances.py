@@ -129,12 +129,11 @@ class Performances:
         }
         return j
     
-    def plot_all(self, save: bool = False) -> None:
+    def plot_all(self, save: bool = False, cols: int = 5) -> None:
         if not self.performances:
             print("No performances to plot")
             return
         n = len(self.performances)
-        cols = 4
         rows = math.ceil(n / cols) if n > 0 else 1
         fig, axes = plt.subplots(rows, cols, figsize=(10 * cols, 5 * rows), squeeze=False)
         for ax, (name, performance) in zip(axes.flatten(), self.performances.items()):
@@ -161,6 +160,14 @@ class Performances:
     def short_keys(keys, length: int = 25) -> list[str]:
         return [s if len(s) <= length else s[:length-3] + "..." for s in keys]
 
+    @staticmethod
+    def clean_y_ticks(a, b) -> list[float]:
+        # round to 3 significant digits and remove duplicates
+        rounded = sorted(set([math.ceil(v) for v in a + b]))
+        max_v = max(rounded)
+        new_values = [v for v in range(0, max_v + 3) if v <= max_v and v % 2 == 0]
+        return new_values
+
     def plot_overall(self, file_to_save: str = "") -> None:
         if not self.performances:
             print("No performances to plot")
@@ -178,6 +185,8 @@ class Performances:
         plt.xlabel("Query")
         plt.ylabel(f"Mean Time ({self.time_unit})")
         plt.xticks(x, Performances.short_keys(list(self.performances.keys())), rotation=45, ha='right')
+        y_values = Performances.clean_y_ticks(influx_means, mongo_means)
+        plt.yticks(y_values)
         plt.legend()
         plt.grid(axis='y')
         plt.tight_layout()
