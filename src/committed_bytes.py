@@ -43,9 +43,13 @@ def commit() -> None:
     
 def get_committed_bytes() -> int:
     try:
+        tot: int = 0
         with open(file_name, "r") as f:
             lines = f.readlines()
-            return sum(int(line.strip()) for line in lines)
+            tot = sum(int(line.strip()) for line in lines)
+        with open(file_name, "w") as f:
+            f.write(f"{tot}\n")
+        return tot
     except FileNotFoundError:
         logger.error(f"Committed bytes file '{file_name}' not found. Returning 0.")
         return 0
