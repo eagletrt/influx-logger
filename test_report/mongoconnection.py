@@ -16,7 +16,9 @@ except Exception:  # pragma: no cover - runtime dependency
 limit: int = 5000
 lines: List[object] = []
 
-_DEFAULT_MONGO_TIMEOUT_MS = 30000
+_DEFAULT_MONGO_TIMEOUT_MIN = 15
+_DEFAULT_MONGO_TIMEOUT_SEC= _DEFAULT_MONGO_TIMEOUT_MIN * 60
+_DEFAULT_MONGO_TIMEOUT_MS = _DEFAULT_MONGO_TIMEOUT_SEC * 1000
 
 _connection: Tuple[Any, object] = None
 _connection_settings: Optional[Tuple[str, int, str, str, str]] = None

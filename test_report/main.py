@@ -210,16 +210,26 @@ def _normalize_query_results(query_name: str, mongo_rows: list[dict[str, Any]], 
 
 
 def _query_results_match(query_name: str, mongo_rows: list[dict[str, Any]], influx_rows: list[dict[str, Any]]) -> bool:
-	mongo_normalized, influx_normalized = _normalize_query_results(query_name, mongo_rows, influx_rows)
-	return mongo_normalized == influx_normalized
+	try:
+		mongo_normalized, influx_normalized = _normalize_query_results(query_name, mongo_rows, influx_rows)
+		if type(mongo_normalized) == int and type(influx_normalized) == int:
+			return mongo_normalized == influx_normalized
+		return mongo_normalized == influx_normalized
+	except Exception as e:
+		logger.error(f"Error normalizing query results for {query_name}: {e}")
+		return False
 
 
 def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
-	explain = collection.database.command(
-		"explain",
-		{"aggregate": collection.name, "pipeline": pipeline, "cursor": {}},
-		verbosity="executionStats",
-	)
+	try:
+		explain = collection.database.command(
+			"explain",
+			{"aggregate": collection.name, "pipeline": pipeline, "cursor": {}},
+			verbosity="executionStats",
+		)
+	except Exception as e:
+		logger.error(f"MongoDB explain failed: {e}")
+		raise RuntimeError(f"MongoDB explain failed: {e}") from e
 	records = [explain]
 	print_results(records)
 	duration = _find_numeric_value([explain], "executionTimeMillis")
@@ -287,6 +297,12 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 			for test_name, q in queries.items():
 				try:
 					for _ in range(repeat_count):
+						mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
+						influx_time_ms = _influx_query_time_ms(
+							influx_client,
+							config["influx_org"],
+							q["influx"],
+						)
 						mongo_rows = _mongo_query_results(collection, q["mongo"])
 						influx_rows = _influx_query_results(
 							influx_client,
@@ -303,12 +319,6 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 								f"MongoDB and InfluxDB returned different results: "
 								f"mongo_count={mongo_normalized}, influx_count={influx_normalized}"
 							)
-						mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
-						influx_time_ms = _influx_query_time_ms(
-							influx_client,
-							config["influx_org"],
-							q["influx"],
-						)
 						performances.add(f"{test_name}_{query_name}", QueryPerformance(influx_time_ms, mongo_time_ms))
 				except Exception as e:
 					error_count += 1
