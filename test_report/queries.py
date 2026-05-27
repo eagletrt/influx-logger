@@ -2,7 +2,7 @@ from datetime import timedelta, datetime, timezone
 from typing import Any, Dict
 import re
 
-LAST_KNOWN_TIMESTAMP = "2026-05-24T0:00:00Z"
+LAST_KNOWN_TIMESTAMP = "2026-05-27T23:00:00Z"
 
 QUERY_WINDOWS = {
 	"last_5_minutes": timedelta(minutes=5),

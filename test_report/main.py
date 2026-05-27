@@ -328,6 +328,7 @@ def main(argv: list[str] | None = None) -> Performances:
 	config_path = Path(argv[1]) if len(argv) > 1 else DEFAULT_CONFIG_PATH
 	repeat_count = 50
 	config = _load_config(config_path)
+	logger.info(f"Influx config: {config.get('influx', {k: v for k, v in config.items() if str(k).startswith('influx_')})}")
 	performances = build_performances(config, repeat_count)
 	logger.info(f"Performances: {performances.__str__()}")
 	performances.save_all()
