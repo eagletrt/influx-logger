@@ -16,6 +16,8 @@ except Exception:  # pragma: no cover - runtime dependency
 limit: int = 5000
 lines: List[object] = []
 
+_DEFAULT_MONGO_TIMEOUT_MS = 30000
+
 _connection: Tuple[Any, object] = None
 _connection_settings: Optional[Tuple[str, int, str, str, str]] = None
 _BSON_INT64_MIN = -(2**63)
@@ -57,9 +59,9 @@ def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple
     logger.info(f"URI: {uri}")
     client = MongoClient(
         uri,
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
-        socketTimeoutMS=5000,
+        serverSelectionTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        connectTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        socketTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
     )
     db = client[db_name]
     _connection = (client, db)
@@ -80,9 +82,9 @@ def get_mongo_client(uri: str, **kwargs) -> Any:
 
     client = MongoClient(
         uri,
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
-        socketTimeoutMS=5000,
+        serverSelectionTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        connectTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        socketTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
         **kwargs,
     )
     return client
