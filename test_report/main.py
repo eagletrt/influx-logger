@@ -9,6 +9,11 @@ from test_report.queries import adjust_query_windows, generate_benchmark_queries
 import influxdb_client
 from test_report.logger_utils import logger
 
+try:
+	from pymongo.errors import AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError
+except Exception:  # pragma: no cover - pymongo may be unavailable in some environments
+	AutoReconnect = NetworkTimeout = ServerSelectionTimeoutError = None
+
 CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
 	sys.path.insert(0, str(CURRENT_DIR))
@@ -19,6 +24,7 @@ from test_report.mongoconnection import connect
 log = False
 
 DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "config.json"
+_MONGO_TIMEOUT_FALLBACK_MS = 30 * 60 * 1000
 
 _TIMESTAMP_FACTORS = {
 	"ns": 1_000_000_000,
@@ -28,6 +34,10 @@ _TIMESTAMP_FACTORS = {
 }
 _INFLUX_METADATA_KEYS = {"result", "table", "_start", "_stop", "_time", "_measurement", "_field"}
 _COUNT_QUERY_NAMES = {"3_filter_by_value", "7_unique_devices"}
+
+_MONGO_TIMEOUT_EXCEPTIONS = tuple(
+	error for error in (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError) if error is not None
+)
 
 
 def _safe_int(value: Any) -> int:
@@ -220,6 +230,17 @@ def _query_results_match(query_name: str, mongo_rows: list[dict[str, Any]], infl
 		return False
 
 
+def _is_mongo_timeout_error(error: BaseException) -> bool:
+	current_error: BaseException | None = error
+	while current_error is not None:
+		if _MONGO_TIMEOUT_EXCEPTIONS and isinstance(current_error, _MONGO_TIMEOUT_EXCEPTIONS):
+			return True
+		if "timed out" in str(current_error).lower():
+			return True
+		current_error = current_error.__cause__ or current_error.__context__
+	return False
+
+
 def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
 	try:
 		explain = collection.database.command(
@@ -297,7 +318,15 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 			for test_name, q in queries.items():
 				try:
 					for _ in range(repeat_count):
-						mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
+						try:
+							mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
+						except Exception as mongo_error:
+							if not _is_mongo_timeout_error(mongo_error):
+								raise
+							mongo_time_ms = _MONGO_TIMEOUT_FALLBACK_MS
+							logger.warning(
+								f"MongoDB timed out for {test_name}_{query_name}; using {mongo_time_ms} ms"
+							)
 						influx_time_ms = _influx_query_time_ms(
 							influx_client,
 							config["influx_org"],
