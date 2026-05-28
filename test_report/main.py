@@ -356,9 +356,10 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 					success_count += 1
 					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} completed successfully")
 	finally:
+		logger.info(f"Completed with {success_count} successful queries and {error_count} errors")
 		influx_client.close()
 		mongo_client.close()
-
+		logger.info(f"MongoDB and InfluxDB connections closed")
 	return performances
 
 
@@ -371,6 +372,7 @@ def main(argv: list[str] | None = None) -> Performances:
 	performances = build_performances(config, repeat_count)
 	logger.info(f"Performances: {performances.__str__()}")
 	performances.save_all()
+	logger.info("Performance results saved")
 	return performances
 
 

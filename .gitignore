@@ -174,11 +174,14 @@ dist
 # Finder (MacOS) folder config
 .DS_Store
 
+config.json
+
 # Python
 .venv/
 __pycache__/
 *.pyc
 **/*.pyc
+
 # Generated files
 .generated/
 **/__pycache__/
