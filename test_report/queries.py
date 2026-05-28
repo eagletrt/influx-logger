@@ -5,17 +5,16 @@ import re
 LAST_KNOWN_TIMESTAMP = "2026-05-27T23:00:00Z"
 
 QUERY_WINDOWS = {
+    "last_30_minutes": timedelta(minutes=30) + timedelta(seconds=-15),
+	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
+	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
+    "last_3_days": timedelta(days=3) + timedelta(hours=-1),
+	"week_ago_to_3_days_ago": timedelta(days=7) + timedelta(days=-3),
+    "30sec": timedelta(seconds=30),
 	"last_5_minutes": timedelta(minutes=5),
 	"last_1_hour": timedelta(hours=1),
 	"last_24_hours": timedelta(hours=24),
 	"one_week_ago": timedelta(days=7),
-	"week_ago_to_3_days_ago": timedelta(days=7) + timedelta(days=-3),
-	# Some others random windows int the past
-	"last_30_minutes": timedelta(minutes=30) + timedelta(seconds=-15),
-	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
-	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
-    "last_3_days": timedelta(days=3) + timedelta(hours=-1),
-    "30sec": timedelta(seconds=30),
 }
 
 def adjust_query_windows(windows: Dict[str, timedelta], last_timestamp_iso: str) -> Dict[str, timedelta]:
