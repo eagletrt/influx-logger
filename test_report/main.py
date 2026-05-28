@@ -355,6 +355,11 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 				else:
 					success_count += 1
 					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} completed successfully")
+					try:
+						performances.save_all("partial_results.json")
+						logger.info("Partial results saved to partial_results.json")
+					except Exception as e:
+						logger.error(f"Failed to save partial results: {e}")
 	finally:
 		logger.info(f"Completed with {success_count} successful queries and {error_count} errors")
 		influx_client.close()
