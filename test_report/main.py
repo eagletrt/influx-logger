@@ -8,6 +8,8 @@ from typing import Any, Iterable
 from test_report.queries import adjust_query_windows, generate_benchmark_queries, QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP
 import influxdb_client
 from test_report.logger_utils import logger
+from performances import Performances, QueryPerformance
+from test_report.mongoconnection import connect
 
 try:
 	from pymongo.errors import AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError
@@ -18,9 +20,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
 	sys.path.insert(0, str(CURRENT_DIR))
 
-from performances import Performances, QueryPerformance
-from test_report.mongoconnection import connect
-
+REPEAT_COUNT:int = 25
 log = False
 
 DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "config.json"
@@ -366,7 +366,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 def main(argv: list[str] | None = None) -> Performances:
 	argv = argv or sys.argv
 	config_path = Path(argv[1]) if len(argv) > 1 else DEFAULT_CONFIG_PATH
-	repeat_count = 50
+	repeat_count = REPEAT_COUNT
 	config = _load_config(config_path)
 	logger.info(f"Influx config: {config.get('influx', {k: v for k, v in config.items() if str(k).startswith('influx_')})}")
 	performances = build_performances(config, repeat_count)
