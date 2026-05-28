@@ -15,7 +15,7 @@ QUERY_WINDOWS = {
 	"last_2_hours": timedelta(hours=2) + timedelta(minutes=-30),
 	"last_12_hours": timedelta(hours=12) + timedelta(minutes=-45),
     "last_3_days": timedelta(days=3) + timedelta(hours=-1),
-    "last_1_week": timedelta(days=7) + timedelta(hours=-2),
+    "30sec": timedelta(seconds=30),
 }
 
 def adjust_query_windows(windows: Dict[str, timedelta], last_timestamp_iso: str) -> Dict[str, timedelta]:
