@@ -174,8 +174,6 @@ dist
 # Finder (MacOS) folder config
 .DS_Store
 
-config.json
-
 # Python
 .venv/
 __pycache__/
@@ -186,5 +184,5 @@ __pycache__/
 .generated/
 **/__pycache__/
 *.png
-performances.json
-output.log
+*.json
+*.log
