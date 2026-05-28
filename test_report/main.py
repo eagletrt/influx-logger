@@ -8,7 +8,7 @@ from typing import Any, Iterable
 from test_report.queries import adjust_query_windows, generate_benchmark_queries, QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP
 import influxdb_client
 from test_report.logger_utils import logger
-from performances import Performances, QueryPerformance
+from test_report.performances import Performances, QueryPerformance
 from test_report.mongoconnection import connect
 
 try:
@@ -33,7 +33,7 @@ _TIMESTAMP_FACTORS = {
 	"s": 1,
 }
 _INFLUX_METADATA_KEYS = {"result", "table", "_start", "_stop", "_time", "_measurement", "_field"}
-_COUNT_QUERY_NAMES = {"3_filter_by_value", "7_unique_devices"}
+_COUNT_QUERY_NAMES = {}
 
 _MONGO_TIMEOUT_EXCEPTIONS = tuple(
 	error for error in (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError) if error is not None
