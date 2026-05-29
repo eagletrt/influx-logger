@@ -360,11 +360,13 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 						logger.info("Partial results saved to partial_results.json")
 					except Exception as e:
 						logger.error(f"Failed to save partial results: {e}")
+		logger.info(f"All queries completed: {success_count} successful, {error_count} errors")
 	finally:
 		logger.info(f"Completed with {success_count} successful queries and {error_count} errors")
 		influx_client.close()
+		logger.info(f"InfluxDB connection closed")
 		mongo_client.close()
-		logger.info(f"MongoDB and InfluxDB connections closed")
+		logger.info(f"MongoDB connection closed")
 	return performances
 
 
@@ -375,9 +377,11 @@ def main(argv: list[str] | None = None) -> Performances:
 	config = _load_config(config_path)
 	logger.info(f"Influx config: {config.get('influx', {k: v for k, v in config.items() if str(k).startswith('influx_')})}")
 	performances = build_performances(config, repeat_count)
-	logger.info(f"Performances: {performances.__str__()}")
+	logger.info("Benchmarking completed")
+	logger.info(f"Performances: {performances}")
+	logger.info("Saving performance results...")
 	performances.save_all()
-	logger.info("Performance results saved")
+	logger.info("Performance results saved!")
 	return performances
 
 
