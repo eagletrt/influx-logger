@@ -168,7 +168,13 @@ class Performances:
         # round to 3 significant digits and remove duplicates
         rounded = sorted(set([math.ceil(v) for v in a + b]))
         max_v = max(rounded)
-        new_values = [v for v in range(0, max_v + 3) if v <= max_v and v % 2 == 0]
+        while max_v % 10 != 0:
+            max_v += 1
+        # return 10 values from 0 to max_v equally distant (include both endpoints)
+        if max_v <= 0:
+            return [0.0]
+        # produce 10 points including 0 and max_v
+        new_values = [round(i * max_v / 9, 3) for i in range(10)]
         return new_values
 
     def plot_overall(self, file_to_save: str = "") -> None:

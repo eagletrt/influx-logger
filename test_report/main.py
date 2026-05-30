@@ -24,7 +24,9 @@ REPEAT_COUNT:int = 25
 log = False
 
 DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "config.json"
-_MONGO_TIMEOUT_FALLBACK_MS = 30 * 60 * 1000
+
+TIMEOUT_MINUTES = 30
+TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000
 
 _TIMESTAMP_FACTORS = {
 	"ns": 1_000_000_000,
@@ -241,6 +243,10 @@ def _is_mongo_timeout_error(error: BaseException) -> bool:
 	return False
 
 
+def _is_timeout_error(error: BaseException) -> bool:
+	return _is_mongo_timeout_error(error) or "timed out" in str(error).lower()
+
+
 def _mongo_query_time_ms(collection: Any, pipeline: list) -> int:
 	try:
 		explain = collection.database.command(
@@ -286,6 +292,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 	performances = Performances()
 	mongo_client, mongo_db = connect(
 		url=config["mongo_url"],
+		timeout=TIMEOUT_MS,
 		port=config["mongo_port"],
 		username=config.get("mongo_username", ""),
 		password=config.get("mongo_password", ""),
@@ -295,6 +302,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 		url=config["influx_url"],
 		token=config["influx_token"],
 		org=config["influx_org"],
+		timeout=TIMEOUT_MS,
 	)
 	error_count = 0
 	success_count = 0
@@ -318,27 +326,62 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 			for test_name, q in queries.items():
 				try:
 					for _ in range(repeat_count):
+						query_timed_out = False
 						try:
 							mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
 						except Exception as mongo_error:
-							if not _is_mongo_timeout_error(mongo_error):
+							if not _is_timeout_error(mongo_error):
 								raise
-							mongo_time_ms = _MONGO_TIMEOUT_FALLBACK_MS
+							mongo_time_ms = TIMEOUT_MS
+							query_timed_out = True
 							logger.warning(
 								f"MongoDB timed out for {test_name}_{query_name}; using {mongo_time_ms} ms"
 							)
-						influx_time_ms = _influx_query_time_ms(
-							influx_client,
-							config["influx_org"],
-							q["influx"],
-						)
-						mongo_rows = _mongo_query_results(collection, q["mongo"])
-						influx_rows = _influx_query_results(
-							influx_client,
-							config["influx_org"],
-							q["influx"],
-						)
-						if not _query_results_match(test_name, mongo_rows, influx_rows):
+						try:
+							influx_time_ms = _influx_query_time_ms(
+									influx_client,
+									config["influx_org"],
+									q["influx"],
+								)
+						except Exception as influx_error:
+							logger.error(f"InfluxDB query failed for {test_name}_{query_name}: {influx_error}")
+							if _is_timeout_error(influx_error):
+								influx_time_ms = TIMEOUT_MS
+								query_timed_out = True
+								logger.warning(
+									f"InfluxDB timed out for {test_name}_{query_name}; using {influx_time_ms} ms"
+								)
+							else:
+								influx_time_ms = None
+						mongo_rows: list[dict[str, Any]] = []
+						influx_rows: list[dict[str, Any]] = []
+						try:
+							mongo_rows = _mongo_query_results(collection, q["mongo"])
+						except Exception as mongo_error:
+							if not _is_timeout_error(mongo_error):
+								raise
+							mongo_time_ms = TIMEOUT_MS
+							query_timed_out = True
+							logger.warning(
+								f"MongoDB timed out for {test_name}_{query_name}; using {mongo_time_ms} ms"
+							)
+						try:
+							influx_rows = _influx_query_results(
+								influx_client,
+								config["influx_org"],
+								q["influx"],
+							)
+						except Exception as influx_error:
+							logger.error(f"InfluxDB query failed for {test_name}_{query_name}: {influx_error}")
+							if _is_timeout_error(influx_error):
+								influx_time_ms = TIMEOUT_MS
+								query_timed_out = True
+								logger.warning(
+									f"InfluxDB timed out for {test_name}_{query_name}; using {influx_time_ms} ms"
+								)
+							else:
+								raise
+						if not query_timed_out and not _query_results_match(test_name, mongo_rows, influx_rows):
 							mongo_normalized, influx_normalized = _normalize_query_results(test_name, mongo_rows, influx_rows)
 							if type(mongo_normalized) != int:
 								mongo_normalized:int = len(mongo_normalized)

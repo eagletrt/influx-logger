@@ -16,10 +16,6 @@ except Exception:  # pragma: no cover - runtime dependency
 limit: int = 5000
 lines: List[object] = []
 
-_DEFAULT_MONGO_TIMEOUT_MIN = 15
-_DEFAULT_MONGO_TIMEOUT_SEC= _DEFAULT_MONGO_TIMEOUT_MIN * 60
-_DEFAULT_MONGO_TIMEOUT_MS = _DEFAULT_MONGO_TIMEOUT_SEC * 1000
-
 _connection: Tuple[Any, object] = None
 _connection_settings: Optional[Tuple[str, int, str, str, str]] = None
 _BSON_INT64_MIN = -(2**63)
@@ -48,7 +44,7 @@ def _sanitize_bson_value(value: Any) -> Any:
         return [_sanitize_bson_value(inner_value) for inner_value in value]
     return value
 
-def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple[Any, object]:
+def connect(url:str, port:int, username:str, password:str, db_name:str, timeout:int) -> Tuple[Any, object]:
     global _connection
     global _connection_settings
     if _connection is not None:
@@ -61,15 +57,15 @@ def connect(url:str, port:int, username:str, password:str, db_name:str) -> Tuple
     logger.info(f"URI: {uri}")
     client = MongoClient(
         uri,
-        serverSelectionTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
-        connectTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
-        socketTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        serverSelectionTimeoutMS=timeout,
+        connectTimeoutMS=timeout,
+        socketTimeoutMS=timeout,
     )
     db = client[db_name]
     _connection = (client, db)
     return _connection
 
-def get_mongo_client(uri: str, **kwargs) -> Any:
+def get_mongo_client(uri: str, timeout: int, **kwargs) -> Any:
     """Return a pymongo.MongoClient instance.
 
     uri: MongoDB connection string. If not provided, reads MONGO_URI env var.
@@ -84,20 +80,20 @@ def get_mongo_client(uri: str, **kwargs) -> Any:
 
     client = MongoClient(
         uri,
-        serverSelectionTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
-        connectTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
-        socketTimeoutMS=_DEFAULT_MONGO_TIMEOUT_MS,
+        serverSelectionTimeoutMS=timeout,
+        connectTimeoutMS=timeout,
+        socketTimeoutMS=timeout,
         **kwargs,
     )
     return client
 
 
-def get_mongo_db(uri: str, db_name:str, **kwargs) -> Tuple[Any, object]:
+def get_mongo_db(uri: str, db_name:str, timeout: int, **kwargs) -> Tuple[Any, object]:
     """Return (client, db) tuple.
 
     db_name: name of the database. If not provided, reads MONGO_DB env var.
     """
-    client = get_mongo_client(uri, **kwargs)
+    client = get_mongo_client(uri, timeout=timeout, **kwargs)
     db_name = db_name
     if not db_name:
         raise ValueError("MongoDB database name not provided (argument or MONGO_DB env)")
