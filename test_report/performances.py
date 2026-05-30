@@ -1,6 +1,7 @@
 import json
-from statistics import geometric_mean, mean
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import gmean
 import math
 
 MONGO_COLOR = "green"
@@ -36,12 +37,12 @@ class PerformanceQueries:
 
     def update_advantage(self) -> None:
         if self.queries:
-            self.influx_advantage = mean(q.influx_advantage for q in self.queries)
+            self.influx_advantage = float(np.mean(q.influx_advantage for q in self.queries))
         
     def update_means(self) -> None:
         if self.queries:
-            self.influx_mean_time = float(geometric_mean(q.influx_time for q in self.queries if q.influx_time != 0))
-            self.mongo_mean_time = float(geometric_mean(q.mongo_time for q in self.queries if q.mongo_time != 0))
+            self.influx_mean_time = float(gmean(q.influx_time for q in self.queries if q.influx_time != 0))
+            self.mongo_mean_time = float(gmean(q.mongo_time for q in self.queries if q.mongo_time != 0))
             self.update_advantage()
 
     def add(self, query: QueryPerformance) -> None:
@@ -94,7 +95,7 @@ class Performances:
 
     def add(self, name: str, query: QueryPerformance) -> None:
         if name not in self.performances:
-            self.performances[name] = PerformanceQueries(query_name=name, query=query)
+            self.performances[name] = PerformanceQueries(query_name=name)
         self.performances[name].add(query)
         self.performances[name].update_advantage()
         self.performances[name].update_means()
@@ -105,8 +106,8 @@ class Performances:
             # compute the arithmetic mean of all individual query influx_advantage values
             total = sum(performance.influx_advantage for performance in self.performances.values())
             self.influx_advantage = float(total) / len(self.performances)
-            self.influx_mean_time = float(geometric_mean(performance.influx_mean_time for performance in self.performances.values() if performance.influx_mean_time != 0))
-            self.mongo_mean_time = float(geometric_mean(performance.mongo_mean_time for performance in self.performances.values() if performance.mongo_mean_time != 0))
+            self.influx_mean_time = float(gmean(performance.influx_mean_time for performance in self.performances.values() if performance.influx_mean_time != 0))
+            self.mongo_mean_time = float(gmean(performance.mongo_mean_time for performance in self.performances.values() if performance.mongo_mean_time != 0))
 
     def update_advantage(self) -> None:
         if self.queries:
@@ -116,8 +117,8 @@ class Performances:
         
     def update_means(self) -> None:
         if self.queries:
-            self.influx_mean_time = float(geometric_mean(q.influx_time for q in self.queries if q.influx_time != 0))
-            self.mongo_mean_time = float(geometric_mean(q.mongo_time for q in self.queries if q.mongo_time != 0))
+            self.influx_mean_time = float(gmean(q.influx_time for q in self.queries if q.influx_time != 0))
+            self.mongo_mean_time = float(gmean(q.mongo_time for q in self.queries if q.mongo_time != 0))
             self.update_advantage()
 
     def __str__(self) -> str:
