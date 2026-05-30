@@ -288,6 +288,32 @@ option profiler.enabledProfilers = ["query"]
 		raise RuntimeError("InfluxDB did not return a profiler duration for the benchmark query")
 	return duration_ns // 1_000_000
 
+def get_full_query_count(config: dict[str, Any]) -> int:
+	'''
+	Get the total number of queries which will be tested.
+
+	Returns: int
+		- The total count of queries performed during the benchmarking process.
+	'''
+	query_windows = adjust_query_windows(QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP)
+	now = datetime.now(timezone.utc)
+	precision = config.get("timestamp_precision", "us")
+	bucket = config["influx_bucket"]
+
+	# Sum lengths of generated query dicts for each window instead of iterating
+	total = 0
+	for _, window in query_windows.items():
+		cutoff_timestamp = _timestamp_cutoff(now, window, precision)
+		influx_start_iso = (now - window).isoformat().replace("+00:00", "Z")
+		# Avoid building the full list in memory; count items as they are generated
+		total += sum(1 for _ in generate_benchmark_queries(
+			bucket=bucket,
+			start_time_iso=influx_start_iso,
+			cutoff_timestamp=cutoff_timestamp,
+			target_field="rpm",
+		))
+	return total
+
 def build_performances(config: dict[str, Any], repeat_count: int) -> Performances:
 	performances = Performances()
 	mongo_client, mongo_db = connect(
@@ -311,7 +337,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 		now = datetime.now(timezone.utc)
 		precision = config.get("timestamp_precision", "us")
 		query_windows = adjust_query_windows(QUERY_WINDOWS, LAST_KNOWN_TIMESTAMP)
-
+		total_queries = get_full_query_count(config)
 		for query_name, window in query_windows.items():
 			cutoff_timestamp = _timestamp_cutoff(now, window, precision)
 			influx_start = now - window
@@ -397,7 +423,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 					logger.error(f"{error_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} failed: {e}")
 				else:
 					success_count += 1
-					logger.info(f"{success_count:02d}/{error_count+success_count:02d}: query {test_name}_{query_name} completed successfully")
+					logger.info(f"{success_count:02d}/{total_queries:02d}: query {test_name}_{query_name} completed successfully")
 					try:
 						performances.save_all("partial_results.json")
 						logger.info("Partial results saved to partial_results.json")
