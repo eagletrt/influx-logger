@@ -37,12 +37,14 @@ class PerformanceQueries:
 
     def update_advantage(self) -> None:
         if self.queries:
-            self.influx_advantage = float(np.mean(q.influx_advantage for q in self.queries))
+            self.influx_advantage = float(np.mean([q.influx_advantage for q in self.queries]))
         
     def update_means(self) -> None:
         if self.queries:
-            self.influx_mean_time = float(gmean(q.influx_time for q in self.queries if q.influx_time != 0))
-            self.mongo_mean_time = float(gmean(q.mongo_time for q in self.queries if q.mongo_time != 0))
+            influx_times = [q.influx_time for q in self.queries if q.influx_time != 0]
+            mongo_times = [q.mongo_time for q in self.queries if q.mongo_time != 0]
+            self.influx_mean_time = float(gmean(influx_times)) if influx_times else 0.0
+            self.mongo_mean_time = float(gmean(mongo_times)) if mongo_times else 0.0
             self.update_advantage()
 
     def add(self, query: QueryPerformance) -> None:
@@ -106,8 +108,18 @@ class Performances:
             # compute the arithmetic mean of all individual query influx_advantage values
             total = sum(performance.influx_advantage for performance in self.performances.values())
             self.influx_advantage = float(total) / len(self.performances)
-            self.influx_mean_time = float(gmean(performance.influx_mean_time for performance in self.performances.values() if performance.influx_mean_time != 0))
-            self.mongo_mean_time = float(gmean(performance.mongo_mean_time for performance in self.performances.values() if performance.mongo_mean_time != 0))
+            influx_means = [
+                performance.influx_mean_time
+                for performance in self.performances.values()
+                if performance.influx_mean_time != 0
+            ]
+            mongo_means = [
+                performance.mongo_mean_time
+                for performance in self.performances.values()
+                if performance.mongo_mean_time != 0
+            ]
+            self.influx_mean_time = float(gmean(influx_means)) if influx_means else 0.0
+            self.mongo_mean_time = float(gmean(mongo_means)) if mongo_means else 0.0
 
     def update_advantage(self) -> None:
         if self.queries:
@@ -161,7 +173,7 @@ class Performances:
         plt.show()
     
     @staticmethod
-    def short_keys(keys, length: int = 25) -> list[str]:
+    def short_keys(keys, length: int = 3) -> list[str]:
         return [s if len(s) <= length else s[:length-3] + "..." for s in keys]
 
     @staticmethod
@@ -197,7 +209,7 @@ class Performances:
                 plt.text(
                     bar.get_x() + bar.get_width() / 2,
                     height,
-                    f"{height:.1f}",
+                    f"{height:.0f}",
                     ha='center',
                     va='bottom',
                     fontsize=8,
