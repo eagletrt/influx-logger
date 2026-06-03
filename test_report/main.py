@@ -25,7 +25,7 @@ log = False
 
 DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "config.json"
 
-TIMEOUT_MINUTES = 45
+TIMEOUT_MINUTES = 60
 TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000
 
 _TIMESTAMP_FACTORS = {
@@ -357,7 +357,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 							mongo_time_ms = _mongo_query_time_ms(collection, q["mongo"])
 						except Exception as mongo_error:
 							if not _is_timeout_error(mongo_error):
-								raise
+								raise mongo_error
 							mongo_time_ms = TIMEOUT_MS
 							query_timed_out = True
 							logger.warning(
@@ -378,14 +378,14 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 									f"InfluxDB timed out for {test_name}_{query_name}; using {influx_time_ms} ms"
 								)
 							else:
-								influx_time_ms = None
+								influx_time_ms = TIMEOUT_MS
 						mongo_rows: list[dict[str, Any]] = []
 						influx_rows: list[dict[str, Any]] = []
 						try:
 							mongo_rows = _mongo_query_results(collection, q["mongo"])
 						except Exception as mongo_error:
 							if not _is_timeout_error(mongo_error):
-								raise
+								raise mongo_error
 							mongo_time_ms = TIMEOUT_MS
 							query_timed_out = True
 							logger.warning(
@@ -406,7 +406,7 @@ def build_performances(config: dict[str, Any], repeat_count: int) -> Performance
 									f"InfluxDB timed out for {test_name}_{query_name}; using {influx_time_ms} ms"
 								)
 							else:
-								raise
+								raise influx_error
 						if not query_timed_out and not _query_results_match(test_name, mongo_rows, influx_rows):
 							mongo_normalized, influx_normalized = _normalize_query_results(test_name, mongo_rows, influx_rows)
 							if type(mongo_normalized) != int:
