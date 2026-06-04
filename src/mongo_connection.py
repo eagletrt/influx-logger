@@ -106,6 +106,7 @@ def get_mongo_db(uri: str, db_name:str, **kwargs) -> Tuple[Any, object]:
 def push_line(line: "Line") -> None:
     """Push a Line to list of pending lines to be committed to MongoDB."""
     global lines
+    return
     lines.append(line)
     if len(lines) >= limit:
         commit()

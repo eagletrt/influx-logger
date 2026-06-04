@@ -27,18 +27,18 @@ def main(argv=None):
 
     cfg = global_state.configuration
     # Connect to MongoDB
-    try:
-        mongo_connection.connect(
-            url=cfg["mongo_url"],
-            port=cfg["mongo_port"],
-            username=cfg["mongo_username"],
-            password=cfg["mongo_password"],
-            db_name=cfg["mongo_db"]
-        )
-    except Exception as e:
-        logger.fatal("Cannot estabilish connection with MongoDB with configuration: " + str(cfg))
-        logger.fatal("Error: " + str(e))
-        sys.exit(1)
+    #try:
+    #    mongo_connection.connect(
+    #        url=cfg["mongo_url"],
+    #        port=cfg["mongo_port"],
+    #        username=cfg["mongo_username"],
+    #        password=cfg["mongo_password"],
+    #        db_name=cfg["mongo_db"]
+    #    )
+    #except Exception as e:
+    #    logger.fatal("Cannot estabilish connection with MongoDB with configuration: " + str(cfg))
+    #    logger.fatal("Error: " + str(e))
+    #    sys.exit(1)
 
     try:
         global_state.line_repository = LineRepository(
