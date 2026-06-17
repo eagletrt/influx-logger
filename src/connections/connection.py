@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
 
 class Connection(ABC):
+    """
+    Abstract base class for managing connections to different services.
+    This class provides a common interface for establishing and checking the status of connections.
+    Subclasses should implement the connect method to handle specific connection logic for different services.
+    Attributes:
+        connection: The actual connection object to the service.
+        url: The URL of the service to connect to.
+        port: The port of the service to connect to.
+    """
     def __init__(self, url: str = None, port: int = None):
         self.connection = None
         self.url = url

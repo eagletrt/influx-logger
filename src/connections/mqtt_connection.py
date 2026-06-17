@@ -1,6 +1,13 @@
 from connections.connection import Connection
 
 class MQTTConnection(Connection):
+    """
+    This class manages the connection to an MQTT broker.
+    It extends the abstract Connection class and implements the connect method to establish a connection to the MQTT broker using the provided URL and port.
+    Attributes:
+        broker: The URL of the MQTT broker to connect to.
+        port: The port of the MQTT broker to connect to.
+    """
     def __init__(self, url:str, port:int = 1883):
         super().__init__(url=url, port=port)
 

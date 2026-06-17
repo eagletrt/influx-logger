@@ -4,6 +4,14 @@ from logger_utils import logger
 from connections.connection import Connection
 
 class InfluxConnection(Connection):
+    """
+    This class manages the connection to an InfluxDB service.
+    It extends the abstract Connection class and implements the connect method to establish a connection to InfluxDB using the provided URL, token, organization, and bucket.
+    Attributes:
+        token: The authentication token for the InfluxDB service.
+        org: The organization name for the InfluxDB service.
+        bucket: The bucket name for the InfluxDB service.
+    """
     def __init__(self, url, token, org, bucket, port:int = 8086):
         super().__init__(url=url, port=port)
         self.token: str = token
