@@ -1,4 +1,4 @@
-from connections.connection import Connection
+from src.connections.connection import Connection
 
 class MQTTConnection(Connection):
     """
