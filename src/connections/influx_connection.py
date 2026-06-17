@@ -12,7 +12,7 @@ class InfluxConnection(Connection):
         org: The organization name for the InfluxDB service.
         bucket: The bucket name for the InfluxDB service.
     """
-    def __init__(self, url, token, org, bucket, port:int = 8086):
+    def __init__(self, url: str, token: str, org: str, bucket: str, port: int = 8086):
         super().__init__(url=url, port=port)
         self.token: str = token
         self.org: str = org

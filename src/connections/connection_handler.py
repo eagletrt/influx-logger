@@ -1,21 +1,22 @@
 from connections.influx_connection import InfluxConnection
 from connections.mqtt_connection import MQTTConnection
+from configuration import Configuration
 
 class ConnectionHandler:
     """
     This class handles the connections to InfluxDB and MQTT broker.
     It provides methods to start and stop the connections, as well as to check their status.
     """
-    def __init__(self, config):
-        self.influx_connection = InfluxConnection(
+    def __init__(self, config: Configuration):
+        self.influx_connection: InfluxConnection = InfluxConnection(
             url=config.influx_url,
             token=config.influx_token,
             org=config.influx_org,
             bucket=config.influx_bucket,
             port=config.influx_port
         )
-        self.mqtt_connection = MQTTConnection(
-            broker=config.mqtt_url,
+        self.mqtt_connection: MQTTConnection = MQTTConnection(
+            url=config.mqtt_url,
             port=config.mqtt_port
         )
 

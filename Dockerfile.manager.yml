@@ -7,7 +7,7 @@ RUN apk add --no-cache python3 py3-pip bash python3-dev && \
     #upgrade pip
     pip install --upgrade pip && \
     #install dependencies
-    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client
+    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine
 
 ENV PATH="/opt/venv/bin:$PATH"
 

@@ -12,9 +12,9 @@ class Connection(ABC):
     """
     def __init__(self, url: str = None, port: int = None):
         self.connection = None
-        self.url = url
-        self.port = port
-    
+        self.url: str = url
+        self.port: int = port
+
     @abstractmethod
     def connect(self) -> bool:
         """

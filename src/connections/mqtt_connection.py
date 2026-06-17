@@ -8,7 +8,7 @@ class MQTTConnection(Connection):
         broker: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
     """
-    def __init__(self, url:str, port:int = 1883):
+    def __init__(self, url: str, port: int = 1883):
         super().__init__(url=url, port=port)
 
     def connect(self) -> bool:
