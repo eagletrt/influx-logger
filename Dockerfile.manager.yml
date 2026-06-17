@@ -1,6 +1,13 @@
 FROM alpine:3.18
-RUN apk add --no-cache python3 py3-pip bash
-RUN pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client
+RUN apk add --no-cache python3 py3-pip bash python3-dev && \
+    #create pyenv
+    python3 -m venv /opt/venv && \
+    #activate pyenv
+    . /opt/venv/bin/activate && \
+    #upgrade pip
+    pip install --upgrade pip && \
+    #install dependencies
+    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client
 
 WORKDIR /app
 COPY ./src /app/src
