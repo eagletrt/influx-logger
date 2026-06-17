@@ -1,10 +1,9 @@
 import time
 import re
-from typing import Callable, Dict
-
 import paho.mqtt.client as mqtt
-from src.global_influx import global_state
 
+from typing import Callable, Dict
+from src.global_influx import global_state
 from src.logger_utils import logger
 from src.handlers import handle_data_message, handle_version_message
 

@@ -9,12 +9,12 @@ RUN apk add --no-cache python3 py3-pip bash python3-dev && \
     #install dependencies
     pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client
 
+ENV PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
 COPY ./src /app/src
 COPY ./external /app/external
 COPY protobuffer /app/protobuffer
 RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
-
-MOUNT config.json /app/config.json
 
 CMD ["python3", "-m", "src.index", "config.json"]

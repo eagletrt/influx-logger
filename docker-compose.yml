@@ -31,6 +31,8 @@ services:
             dockerfile: Dockerfile.manager.yml
         ports:
             - "8000:8000"
+        volumes:
+            - ./config.json:/app/config.json:ro
         depends_on:
             - influxdb2
             - mosquitto
@@ -43,6 +45,8 @@ secrets:
         file: ./.env.influxdb2-admin-password
     influxdb2-admin-token:
         file: ./.env.influxdb2-admin-token
+    manager-config:
+        file: ./config.json
 volumes:
     influxdb2-data:
         driver: local
