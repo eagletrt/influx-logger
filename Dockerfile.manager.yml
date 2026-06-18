@@ -15,9 +15,9 @@ RUN apk add --no-cache python3 py3-pip bash python3-dev && \
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
-COPY ./src /app/src
-COPY ./external /app/external
 COPY protobuffer /app/protobuffer
 RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
+COPY ./src /app/src
+COPY ./external /app/external
 
 CMD ["python3", "-m", "src.main", "config.json"]
