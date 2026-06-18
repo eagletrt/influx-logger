@@ -3,7 +3,7 @@ import re
 import paho.mqtt.client as mqtt
 
 from typing import Callable, Dict
-from src.global_influx import global_state
+from handler.global_influx import global_state
 from src.logger_utils import logger
 from src.handlers import handle_data_message, handle_version_message
 

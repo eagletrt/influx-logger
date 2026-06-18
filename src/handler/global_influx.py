@@ -16,7 +16,7 @@ initialization to keep imports lightweight.
 from typing import Any, Dict, Optional, List, TypedDict
 
 try:
-    from .influx import LineRepository
+    from ..influx import LineRepository
 except Exception:  # pragma: no cover - keep import optional for static checks
     LineRepository = Any  # type: ignore
 

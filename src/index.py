@@ -2,7 +2,7 @@ import sys
 import json
 from src.logger_utils import logger
 from src.mqtt import estabilish_mqtt_connection, handle_incoming_message
-from src.global_influx import global_state
+from handler.global_influx import global_state
 from src.influx import LineRepository
 
 
