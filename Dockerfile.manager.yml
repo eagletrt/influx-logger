@@ -7,7 +7,10 @@ RUN apk add --no-cache python3 py3-pip bash python3-dev && \
     #upgrade pip
     pip install --upgrade pip && \
     #install dependencies
-    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine pydot
+    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine pydot && \
+    # cleanup
+    apk del --no-cache py3-pip python3-dev && \
+    rm -rf /var/cache/apk/* 
 
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -17,4 +20,4 @@ COPY ./external /app/external
 COPY protobuffer /app/protobuffer
 RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
 
-CMD ["python3", "-m", "src.index", "config.json"]
+CMD ["python3", "-m", "src.main", "config.json"]

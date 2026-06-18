@@ -3,5 +3,10 @@ bun.lockb
 configuration.json
 .git/
 .venv/
-__pycache__/
 .generated/
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
