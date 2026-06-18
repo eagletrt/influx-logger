@@ -1,4 +1,5 @@
 import sys
+from xml.sax import handler
 
 from src.handler.handler_fsm import HandlerFSM
 from src.utils.configuration import Configuration
@@ -16,8 +17,7 @@ def main(argv=None):
     logger.info(f"Configuration loaded from {conf}: {configuration}")
 
     handler:HandlerFSM = HandlerFSM(configuration)
-    HandlerFSM.draw()
-    #handler.start()
+    handler.start()
 
 if __name__ == "__main__":
     main()
