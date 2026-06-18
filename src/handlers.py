@@ -1,10 +1,10 @@
 from typing import Any, Dict, List
 
-from src.logger_utils import logger
+from utils.logger_utils import logger
 from src.http_client import check_commit_existence
-from src.proto import get_proto_descriptor
+from parser.proto import get_proto_descriptor
 from src.influx import Line
-from handler.global_influx import global_state
+from global_influx import global_state
 
 
 def _unwrap_values(values: Any) -> Any:

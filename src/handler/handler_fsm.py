@@ -1,7 +1,7 @@
 from statemachine import StateMachine, State
 from threading import Thread
 
-from src.logger_utils import logger
+from utils.logger_utils import logger
 from utils.configuration import Configuration
 from parser.parser import Parser
 from src.influx_logger import InfluxLogger

@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 
-from .logger_utils import logger
+from .utils.logger_utils import logger
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 

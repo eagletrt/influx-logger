@@ -3,8 +3,8 @@ import re
 import paho.mqtt.client as mqtt
 
 from typing import Callable, Dict
-from handler.global_influx import global_state
-from src.logger_utils import logger
+from global_influx import global_state
+from utils.logger_utils import logger
 from src.handlers import handle_data_message, handle_version_message
 
 # The callback for when the client receives a CONNACK response from the server.

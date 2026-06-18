@@ -6,17 +6,13 @@ import sys
 class _TraceLevel:
     TRACE = 5
 
-
 logging.addLevelName(_TraceLevel.TRACE, "TRACE")
-
 
 def _trace(self, message, *args, **kws):
     if self.isEnabledFor(_TraceLevel.TRACE):
         self._log(_TraceLevel.TRACE, message, args, **kws)
 
-
 logging.Logger.trace = _trace
-
 
 level_name = "TRACE" if os.getenv("NODE_ENV") == "development" else "INFO"
 level = logging.getLevelName(level_name)

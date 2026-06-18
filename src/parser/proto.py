@@ -1,6 +1,6 @@
-from handler.global_influx import global_state
+from global_influx import global_state
 from src.http_client import download_proto_version
-from src.logger_utils import logger
+from utils.logger_utils import logger
 import importlib.util
 import os
 import tempfile
