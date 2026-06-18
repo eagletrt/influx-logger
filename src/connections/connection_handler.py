@@ -2,31 +2,48 @@ from src.connections.influx_connection import InfluxConnection
 from src.connections.mqtt_connection import MQTTConnection
 from src.utils.configuration import Configuration
 
+
 class ConnectionHandler:
     """
     This class handles the connections to InfluxDB and MQTT broker.
     It provides methods to start and stop the connections, as well as to check their status.
     """
-    def __init__(self, config: Configuration):
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ConnectionHandler, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, config: Configuration = None):
+        if self._initialized:
+            return
+
         self.influx_connection: InfluxConnection = InfluxConnection(
             url=config.influx_url,
             token=config.influx_token,
             org=config.influx_org,
             bucket=config.influx_bucket,
             port=config.influx_port
-        )
+        ) if config else None
         self.mqtt_connection: MQTTConnection = MQTTConnection(
             url=config.mqtt_url,
             port=config.mqtt_port
-        )
+        ) if config else None
+        self._initialized = True
 
     def start_connections(self):
-        self.influx_connection.connect()
-        self.mqtt_connection.connect()
+        if self.influx_connection:
+            self.influx_connection.connect()
+        if self.mqtt_connection:
+            self.mqtt_connection.connect()
 
     def stop_connections(self):
-        self.influx_connection.disconnect()
-        self.mqtt_connection.disconnect()
+        if self.influx_connection:
+            self.influx_connection.disconnect()
+        if self.mqtt_connection:
+            self.mqtt_connection.disconnect()
 
     def are_both_connected(self) -> bool:
         """
@@ -34,4 +51,6 @@ class ConnectionHandler:
         Returns:
             bool: True if both connections are established, False otherwise.
         """
-        return self.influx_connection.is_connected() and self.mqtt_connection.is_connected()
+        if self.influx_connection and self.mqtt_connection:
+            return self.influx_connection.is_connected() and self.mqtt_connection.is_connected()
+        return False
