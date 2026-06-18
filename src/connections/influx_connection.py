@@ -18,6 +18,26 @@ class InfluxConnection(Connection):
         self.org: str = org
         self.bucket: str = bucket
 
+    def disconnect(self) -> bool:
+        """
+        Disconnects from the InfluxDB service.
+        Logs the success or failure of the disconnection attempt.
+        Returns:
+            bool: True if the disconnection was successful, False otherwise.
+        """
+        try:
+            if self.connection:
+                self.connection.close()
+                self.connection = None
+                logger.info(f"influx-connection: Successfully disconnected from InfluxDB at {self.url}:{self.port}")
+                return True
+            else:
+                logger.warning(f"influx-connection: No active connection to disconnect from InfluxDB at {self.url}:{self.port}")
+                return False
+        except Exception as e:
+            logger.error(f"influx-connection: Failed to disconnect from InfluxDB at {self.url}:{self.port}: {e}")
+            return False
+
     def connect(self) -> bool:
         """
         Establishes a connection to the InfluxDB service using the provided URL, token, organization, and bucket.
@@ -37,3 +57,11 @@ class InfluxConnection(Connection):
         except Exception as e:
             logger.error(f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}")
             return False
+        
+    def is_connected(self) -> bool:
+        """
+        Checks if the connection to the InfluxDB service is established.
+        Returns:
+            bool: True if the connection is established, False otherwise.
+        """
+        return super().is_connected() and self.connection.ping()

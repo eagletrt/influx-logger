@@ -1,7 +1,0 @@
-from src.connections.connection_handler import ConnectionHandler
-from src.utils.configuration import Configuration
-
-class InfluxLogger:
-    def __init__(self, config: Configuration):
-        self.config: Configuration = config
-        self.connection_handler: ConnectionHandler = ConnectionHandler(config)

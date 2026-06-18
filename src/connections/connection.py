@@ -25,6 +25,16 @@ class Connection(ABC):
         """
         raise NotImplementedError("Subclasses must implement the connect method.")
     
+    @abstractmethod
+    def disconnect(self) -> bool:
+        """
+        Disconnects from the specified service.
+        This method should be implemented by subclasses to handle the specific disconnection logic for different services.
+        Returns:
+            bool: True if the disconnection was successful, False otherwise.
+        """
+        raise NotImplementedError("Subclasses must implement the disconnect method.")
+    
     def is_connected(self) -> bool:
         """
         Checks if the connection to the specified service is established.

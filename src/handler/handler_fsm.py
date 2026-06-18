@@ -1,12 +1,14 @@
-from concurrent.futures import thread
+from asyncio import sleep
 
 from statemachine import StateMachine, State
 from threading import Thread
 
+# Info about FSM at https://github.com/fgmacedo/python-statemachine
+
+from connections.connection_handler import ConnectionHandler
 from src.utils.logger_utils import logger
 from src.utils.configuration import Configuration
 from src.parser.parser import Parser
-from src.influx_logger import InfluxLogger
 
 class HandlerFSM(Thread, StateMachine):
     """
@@ -44,51 +46,129 @@ class HandlerFSM(Thread, StateMachine):
         | idling.to(final)
     )
 
-    #TODO: https://github.com/fgmacedo/python-statemachine
-
     def __init__(self, config: Configuration):
         StateMachine.__init__(self)
         Thread.__init__(self)
         self.name = "HandlerFSM"
         self.parser: Parser = Parser()
-        self.influx_logger: InfluxLogger = InfluxLogger(config)
+        self.config: Configuration = config
+        self.handler: ConnectionHandler = ConnectionHandler(self.config)
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
         HandlerFSM(Configuration("localhost",1883,"localhost", 8086, "", "", ""))._graph().write_png(filename)
 
     def are_both_connected(self) -> bool:
-        #return self.influx_logger.connection_handler.are_both_connected()
-        return False
+        """
+        Check if both InfluxDB and MQTT connections are established.
+
+        Returns:
+            bool: True if both connections are established, False otherwise.
+        """
+        return self.handler.are_both_connected()
 
     def on_connection(self):
+        """
+        Event triggered when a connection is established. It checks if both connections are established and transitions to the appropriate state.
+        If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
+        If neither connection is established, it remains in the idle state and continues to check for both connections.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} -  on_connection event triggered")
-        raise NotImplementedError("Method not implemented yet")
     
     def on_disconnection(self):
+        """
+        Event triggered when a disconnection occurs. It checks if both connections are still established and transitions to the appropriate state.
+        If both connections are still established, it remains in the running state. If one or both connections are lost, it transitions to the idle state and continues to check for both connections.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - on_disconnection event triggered")
-        raise NotImplementedError("Method not implemented yet")
     
     def on_finish(self):
+        """
+        Event triggered when the finish event is called. It transitions to the final state and performs any necessary cleanup operations.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - on_finish event triggered")
-        raise NotImplementedError("Method not implemented yet")
     
     def on_enter_start(self):
+        """
+        Method called when entering the start state. It initializes the connections and prepares the handler for operation.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering start state")
-        #TODO: implement method
-    
+        self.do_start()
+
     def on_enter_idle(self):
+        """
+        Method called when entering the idle state. It starts the connections and waits for both connections to be established before transitioning to the running state.
+        If both connections are not established, it remains in the idle state and continues to check for both connections.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering idle state")
-        #TODO: implement method
+        self.do_idle()
     
     def on_enter_run(self):
+        """
+        Method called when entering the running state. It starts the handler's main operation, which involves processing incoming data and logging it to InfluxDB.
+        If either connection is lost while in the running state, it transitions back to the idle state and continues to check for both connections.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering running state")
-        #TODO: implement method
+        self.do_run()
 
     def on_enter_stop(self):
+        """
+        Method called when entering the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
+        """
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering stop state")
-        #TODO: implement method
+        self.do_stop()
+
+    def do_start(self):
+        """
+        Method to start the FSM. It triggers the init event to transition from the start state to the idle state and begins the FSM operation.
+        """
+        self.handler.set(self.config)
+
+    def do_idle(self):
+        """
+        Method to handle the idle state. It triggers the connection event to check for both connections and transition to the appropriate state based on the connection status.
+        If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
+        If neither connection is established, it remains in the idle state and continues to check for both connections.
+        """
+        self.handler.start_connections()
+        while not self.are_both_connected():
+            sleep(1)
+            self.handler.start_connections()
+            logger.info(f"HandlerFSM {self.name} {self.state_field} - Waiting for both connections to be established")
+        self.send('connection')
+
+    def do_run(self):
+        """
+        Method to handle the running state. It performs the main operation of the handler, which involves processing incoming data and logging it to InfluxDB.
+        If either connection is lost while in the running state, it triggers the disconnection event to transition back to the idle state and continues to check for both connections.
+        """
+        while self.are_both_connected():
+            sleep(1) # TODO: improve
+        self.send('disconnection')
+
+    def do_stop(self):
+        """
+        Method to handle the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
+        """
+        self.handler.stop_connections()
+        logger.info(f"HandlerFSM {self.name} {self.state_field} - Connections stopped, handler in finale state")
+
+    def do_state(self):
+        """
+        Method to handle the current state of the FSM. It checks the current state and calls the appropriate method to handle that state.
+        This method is called in the run method to continuously check and handle the current state of the FSM.
+        """
+        if self.state_field == self.starting:
+            self.do_start()
+        elif self.state_field == self.idling:
+            self.do_idle()
+        elif self.state_field == self.running:
+            self.do_run()
+        else:
+            self.do_stop()
 
     def run(self):
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Thread started")
-        raise NotImplementedError("Method not implemented yet")
+        while self.state != self.final:
+            self.do_state()
+        logger.info(f"HandlerFSM {self.name} {self.state_field} - Thread finished")
