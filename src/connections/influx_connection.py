@@ -1,6 +1,6 @@
 import influxdb_client
 
-from utils.logger_utils import logger
+from src.utils.logger_utils import logger
 from src.connections.connection import Connection
 
 class InfluxConnection(Connection):

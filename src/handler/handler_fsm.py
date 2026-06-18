@@ -1,12 +1,14 @@
+from concurrent.futures import thread
+
 from statemachine import StateMachine, State
 from threading import Thread
 
-from utils.logger_utils import logger
-from utils.configuration import Configuration
-from parser.parser import Parser
+from src.utils.logger_utils import logger
+from src.utils.configuration import Configuration
+from src.parser.parser import Parser
 from src.influx_logger import InfluxLogger
 
-class HandlerFSM(StateMachine, Thread):
+class HandlerFSM(Thread, StateMachine):
     """
     This class implements a finite state machine (FSM) to manage the states and transitions of the handler.
     It extends the StateMachine class from the statemachine library and the Thread class from the threading library.
@@ -21,31 +23,32 @@ class HandlerFSM(StateMachine, Thread):
         stop: The final state of the FSM when the handler is stopped.
     """
     # Finite State Machine states
-    start: State = State('start', initial=True)
-    idle: State = State('idle')
-    run: State = State('run')
-    stop: State = State('stop', final=True)
+    # ing form is used due to conflicts with Thread reserved words
+    starting: State = State('start', initial=True)
+    idling: State = State('idle')
+    running: State = State('run')
+    final: State = State('stop', final=True)
 
     # Events
-    init = start.to(idle)
+    init = starting.to(idling)
     connection = (
-        idle.to(idle, unless=['are_both_connected'])
-        | idle.to(run, cond=['are_both_connected'])
+        idling.to(idling, unless=['are_both_connected'])
+        | idling.to(running, cond=['are_both_connected'])
     )
     disconnection = (
-        run.to(idle)
-        | idle.to(idle)
+        running.to(idling)
+        | idling.to(idling)
     )
     finish = (
-        run.to(stop)
-        | idle.to(stop)
+        running.to(final)
+        | idling.to(final)
     )
 
     #TODO: https://github.com/fgmacedo/python-statemachine
 
     def __init__(self, config: Configuration):
-        super().__init__()
-        super(Thread, self).__init__()
+        StateMachine.__init__(self)
+        Thread.__init__(self)
         self.name = "HandlerFSM"
         self.parser: Parser = Parser()
         self.influx_logger: InfluxLogger = InfluxLogger(config)
@@ -79,9 +82,13 @@ class HandlerFSM(StateMachine, Thread):
         #TODO: implement method
     
     def on_enter_run(self):
-        logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering run state")
+        logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering running state")
         #TODO: implement method
 
     def on_enter_stop(self):
         logger.info(f"HandlerFSM {self.name} {self.state_field} - Entering stop state")
         #TODO: implement method
+
+    def run(self):
+        logger.info(f"HandlerFSM {self.name} {self.state_field} - Thread started")
+        raise NotImplementedError("Method not implemented yet")

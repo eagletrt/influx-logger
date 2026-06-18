@@ -1,6 +1,6 @@
 from src.connections.influx_connection import InfluxConnection
 from src.connections.mqtt_connection import MQTTConnection
-from utils.configuration import Configuration
+from src.utils.configuration import Configuration
 
 class ConnectionHandler:
     """

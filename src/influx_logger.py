@@ -1,5 +1,5 @@
 from src.connections.connection_handler import ConnectionHandler
-from utils.configuration import Configuration
+from src.utils.configuration import Configuration
 
 class InfluxLogger:
     def __init__(self, config: Configuration):
