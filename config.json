@@ -1,10 +1,10 @@
 {
-  "mqtt_url": "mosquitto",
+  "mqtt_url": "localhost",
   "mqtt_port": 8883,
   "influx_url": "http://influxdb",
   "influx_port": 8086,
   "influx_bucket": "telemetry",
   "influx_org": "eagletrt",
-  "influx_token": "jeMi7zS5rJIK_5CHaYmNDOr0PjBEASbuCgPZ3PuHwR48z1xcx1u6G3Z8VQT1AVKAIwhOLv0c1AAsls4dE60xmA==",
+  "influx_token": "rQl2gbiH3-X1cUAE31Ii3uFWqy17NntoOhJz7nHnz4ne9s0FjmFVNGgTQ5tq6xSqdLkzhFgoCSQplTqhA0xdIg==",
   "timestamp_precision": "us"
 }

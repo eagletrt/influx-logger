@@ -1,6 +1,5 @@
 import json
 
-
 class Configuration:
     def __init__(self, mqtt_url: str, mqtt_port: int, influx_url: str, influx_port: int, influx_token: str, influx_org: str, influx_bucket: str, excluded_networks: list = None):
         self.mqtt_url = mqtt_url

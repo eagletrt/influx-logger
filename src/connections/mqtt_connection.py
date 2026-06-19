@@ -1,3 +1,5 @@
+import paho.mqtt.client as mqtt
+
 from src.connections.connection import Connection
 from src.utils.logger_utils import logger
 
@@ -11,6 +13,15 @@ class MQTTConnection(Connection):
     """
     def __init__(self, url: str, port: int = 1883):
         super().__init__(url=url, port=port)
+        self.connected = False
+
+    def on_connect(self, client, _userdata, _flags, reason_code, properties=None):
+        logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
+        self.connected = True
+
+    def on_disconnect(self, client, _userdata, reason_code, properties=None):
+        logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
+        self.connected = False
 
     def connect(self) -> bool:
         """
@@ -20,10 +31,11 @@ class MQTTConnection(Connection):
             bool: True if the connection was successful, False otherwise.
         """
         try:
-            import paho.mqtt.client as mqtt
             self.connection = mqtt.Client()
+            self.connection.on_connect = self.on_connect
+            self.connection.on_disconnect = self.on_disconnect
             self.connection.connect(self.url, self.port)
-            logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
+            self.on_connect(self.connection, None, None, 0)  # Manually trigger the on_connect callback to update the connection state
             return True
         except Exception as e:
             logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
@@ -40,13 +52,12 @@ class MQTTConnection(Connection):
             if self.connection:
                 self.connection.disconnect()
                 self.connection = None
+                self.on_disconnect(None, None, 0)  # Manually trigger the on_disconnect callback to update the connection state
                 logger.info(f"mqtt-connection: Successfully disconnected from MQTT broker at {self.url}:{self.port}")
                 return True
-            else:
-                logger.warning(f"mqtt-connection: No active connection to disconnect from MQTT broker at {self.url}:{self.port}")
-                return False
         except Exception as e:
             logger.error(f"mqtt-connection: Failed to disconnect from MQTT broker at {self.url}:{self.port}: {e}")
+            self.connected = False
             return False
         
     def is_connected(self) -> bool:
@@ -55,4 +66,5 @@ class MQTTConnection(Connection):
         Returns:
             bool: True if the connection is established, False otherwise.
         """
-        return super().is_connected() and self.connection.is_connected()
+        print(f"[{self.connected}]")
+        return super().is_connected() and self.connected

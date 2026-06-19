@@ -64,4 +64,43 @@ class InfluxConnection(Connection):
         Returns:
             bool: True if the connection is established, False otherwise.
         """
-        return super().is_connected() and self.connection.ping()
+        # Ensure base connection object exists first
+        if not super().is_connected():
+            return False
+
+        # Use the safe ping helper which normalizes client behavior.
+        try:
+            return bool(self.ping())
+        except Exception:
+            return False
+
+    def ping(self):
+        """Perform a safe ping/health check against the underlying client.
+
+        Many InfluxDB client implementations either return a truthy value,
+        return None on success, or raise on failure. Normalize that behavior
+        so callers can rely on a boolean-like result (or non-None when used
+        directly in tests).
+
+        Returns:
+            Any: The raw client response when available, True when the client
+                 returned None but the call succeeded, or None on failure/no
+                 connection.
+        """
+        if not self.connection:
+            return None
+
+        # Prefer a direct ping() method if available
+        ping_fn = getattr(self.connection, 'ping', None)
+        try:
+            if callable(ping_fn):
+                ping_fn()
+                return True
+
+            # Fall back to a health() method if present
+            health_fn = getattr(self.connection, 'health', None)
+            if callable(health_fn):
+                health_fn()
+                return True
+        except Exception:
+            return None
