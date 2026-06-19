@@ -176,6 +176,7 @@ dist
 
 # Configuration 
 configuration.json
+config.json
 
 # Python
 .venv/
