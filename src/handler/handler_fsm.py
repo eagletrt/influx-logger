@@ -1,4 +1,4 @@
-from asyncio import sleep
+from time import sleep
 
 from statemachine import StateMachine, State
 from threading import Thread, Condition
@@ -141,8 +141,8 @@ class HandlerFSM(Thread, StateMachine):
         """
         self.handler.start_connections()
         while not self.are_both_connected():
-            #Sleep 1 second before checking again to avoid busy waiting
-            sleep(1) # TODO: fix it. It appears to be a busy wait.
+            logger.info(f"{self.name} {self.current_state} - W")
+            sleep(1)
             self.handler.start_connections()
             logger.info(f"{self.name} {self.current_state} - Waiting for both connections to be established")
         self.send('connection')
