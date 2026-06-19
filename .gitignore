@@ -186,3 +186,4 @@ __pycache__/
 # Generated files
 .generated/
 **/__pycache__/
+*.log

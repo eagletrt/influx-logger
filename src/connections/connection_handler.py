@@ -21,19 +21,22 @@ class ConnectionHandler:
             cls._instance = super(ConnectionHandler, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Configuration = None):
+    def __init__(self, config: Configuration = None, on_state_change=None):
         if self._initialized:
             return
+        self.on_state_change = on_state_change
         self.set(config) if config else None
         self._initialized = True
 
-    def set(self, config: Configuration = None) -> None:
+    def set(self, config: Configuration = None, on_state_change=None) -> None:
         """
         Set the configuration for InfluxDB and MQTT connections.
         This method allows updating the connection settings after the ConnectionHandler instance has been created.
         Args:
             config (Configuration): An instance of the Configuration class containing the new connection settings.
         """
+        if on_state_change is not None:
+            self.on_state_change = on_state_change
         self.influx_connection = InfluxConnection(
             url=config.influx_url,
             token=config.influx_token,
@@ -43,7 +46,8 @@ class ConnectionHandler:
         ) if config else None
         self.mqtt_connection = MQTTConnection(
             url=config.mqtt_url,
-            port=config.mqtt_port
+            port=config.mqtt_port,
+            on_state_change=self.on_state_change
         ) if config else None
 
     def start_connections(self) -> None:
@@ -56,6 +60,7 @@ class ConnectionHandler:
             return
         self.influx_connection.connect()
         self.mqtt_connection.connect()
+        self.__notify_state_change()
 
     def stop_connections(self) -> None:
         """
@@ -67,6 +72,7 @@ class ConnectionHandler:
             return
         self.influx_connection.disconnect()
         self.mqtt_connection.disconnect()
+        self.__notify_state_change()
 
     def are_both_connected(self) -> bool:
         """
@@ -75,3 +81,7 @@ class ConnectionHandler:
             bool: True if both connections are established, False otherwise.
         """
         return self.influx_connection and self.mqtt_connection and self.influx_connection.is_connected() and self.mqtt_connection.is_connected()
+
+    def __notify_state_change(self) -> None:
+        if callable(self.on_state_change):
+            self.on_state_change()

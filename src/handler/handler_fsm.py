@@ -1,7 +1,7 @@
 from asyncio import sleep
 
 from statemachine import StateMachine, State
-from threading import Thread
+from threading import Thread, Condition
 
 # Info about FSM at https://github.com/fgmacedo/python-statemachine
 
@@ -52,7 +52,15 @@ class HandlerFSM(Thread, StateMachine):
         self.name = "HandlerFSM"
         self.parser: Parser = Parser()
         self.config: Configuration = config
-        self.handler: ConnectionHandler = ConnectionHandler(self.config)
+        self.__connection_condition: Condition = Condition()
+        self.handler: ConnectionHandler = ConnectionHandler(
+            self.config,
+            on_state_change=self.__notify_connection_change,
+        )
+
+    def __notify_connection_change(self) -> None:
+        with self.__connection_condition:
+            self.__connection_condition.notify_all()
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
@@ -133,7 +141,8 @@ class HandlerFSM(Thread, StateMachine):
         """
         self.handler.start_connections()
         while not self.are_both_connected():
-            sleep(1)
+            #Sleep 1 second before checking again to avoid busy waiting
+            sleep(1) # TODO: fix it. It appears to be a busy wait.
             self.handler.start_connections()
             logger.info(f"{self.name} {self.current_state} - Waiting for both connections to be established")
         self.send('connection')
@@ -143,8 +152,9 @@ class HandlerFSM(Thread, StateMachine):
         Method to handle the running state. It performs the main operation of the handler, which involves processing incoming data and logging it to InfluxDB.
         If either connection is lost while in the running state, it triggers the disconnection event to transition back to the idle state and continues to check for both connections.
         """
-        while self.are_both_connected():
-            self.wait()
+        with self.__connection_condition:
+            while self.are_both_connected():
+                self.__connection_condition.wait()
         self.send('disconnection')
 
     def do_stop(self):
