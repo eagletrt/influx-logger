@@ -75,7 +75,8 @@ class InfluxConnection(Connection):
             return False
 
     def ping(self):
-        """Perform a safe ping/health check against the underlying client.
+        """
+        Perform a safe ping/health check against the underlying client.
 
         Many InfluxDB client implementations either return a truthy value,
         return None on success, or raise on failure. Normalize that behavior

@@ -1,6 +1,5 @@
 import unittest
 
-from src.connections import connection
 from src.connections.influx_connection import InfluxConnection
 from src.utils.configuration import Configuration
 
