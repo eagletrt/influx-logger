@@ -12,11 +12,34 @@ class InfluxConnection(Connection):
         org: The organization name for the InfluxDB service.
         bucket: The bucket name for the InfluxDB service.
     """
-    def __init__(self, url: str, token: str, org: str, bucket: str, port: int = 8086):
+    def __init__(self, url: str, token: str, org: str, bucket: str, port: int = 8086, on_state_change=None):
+        """
+        Initializes the InfluxConnection instance with the provided URL, token, organization, bucket, and port.
+        Args:
+            url (str): The URL of the InfluxDB service.
+            token (str): The authentication token for the InfluxDB service.
+            org (str): The organization name for the InfluxDB service.
+            bucket (str): The bucket name for the InfluxDB service.
+            port (int, optional): The port of the InfluxDB service. Defaults to 8086.
+            on_state_change (callable, optional): A callback function to be called when the connection state changes. Defaults to None.
+        """
         super().__init__(url=url, port=port)
         self.token: str = token
         self.org: str = org
         self.bucket: str = bucket
+        self.on_state_change = on_state_change
+
+    def __notify_state_change(self) -> None:
+        if callable(self.on_state_change):
+            self.on_state_change()
+
+    def on_connect(self):
+        logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
+        self.__notify_state_change()
+
+    def on_disconnect(self):
+        logger.info(f"influx-connection: Disconnected from InfluxDB at {self.url}:{self.port}")
+        self.__notify_state_change()
 
     def disconnect(self) -> bool:
         """
@@ -29,7 +52,7 @@ class InfluxConnection(Connection):
             if self.connection:
                 self.connection.close()
                 self.connection = None
-                logger.info(f"influx-connection: Successfully disconnected from InfluxDB at {self.url}:{self.port}")
+                self.on_disconnect()
                 return True
             else:
                 logger.warning(f"influx-connection: No active connection to disconnect from InfluxDB at {self.url}:{self.port}")

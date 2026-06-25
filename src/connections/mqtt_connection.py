@@ -62,7 +62,6 @@ class MQTTConnection(Connection):
                 self.connection.loop_stop()
                 self.connection.disconnect()
                 self.connection = None
-                logger.info(f"mqtt-connection: Successfully disconnected from MQTT broker at {self.url}:{self.port}")
                 return True
         except Exception as e:
             logger.error(f"mqtt-connection: Failed to disconnect from MQTT broker at {self.url}:{self.port}: {e}")
