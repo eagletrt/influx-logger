@@ -43,6 +43,8 @@ class MQTTConnection(Connection):
             self.connection.on_disconnect = self.on_disconnect
             self.connection.connect(self.url, self.port)
             self.connection.loop_start()
+            self.connected = True
+            logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True
         except Exception as e:
             logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
@@ -73,4 +75,5 @@ class MQTTConnection(Connection):
         Returns:
             bool: True if the connection is established, False otherwise.
         """
+        print(f"super().is_connected(): {super().is_connected()}, self.connected: {self.connected}")
         return super().is_connected() and self.connected
