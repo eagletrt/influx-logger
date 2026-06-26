@@ -13,7 +13,6 @@ class MQTTConnection(Connection):
     """
     def __init__(self, url: str, port: int = 1883, on_state_change=None):
         super().__init__(url=url, port=port)
-        self.connected = False
         self.on_state_change = on_state_change
 
     def __notify_state_change(self) -> None:
@@ -22,12 +21,10 @@ class MQTTConnection(Connection):
 
     def on_connect(self, client, _userdata, _flags, reason_code, properties=None):
         logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
-        self.connected = True
         self.__notify_state_change()
 
     def on_disconnect(self, client, _userdata, reason_code, properties=None):
         logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
-        self.connected = False
         self.__notify_state_change()
 
     def connect(self) -> bool:
@@ -43,7 +40,6 @@ class MQTTConnection(Connection):
             self.connection.on_disconnect = self.on_disconnect
             self.connection.connect(self.url, self.port)
             self.connection.loop_start()
-            self.connected = True
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True
         except Exception as e:
@@ -65,7 +61,6 @@ class MQTTConnection(Connection):
                 return True
         except Exception as e:
             logger.error(f"mqtt-connection: Failed to disconnect from MQTT broker at {self.url}:{self.port}: {e}")
-            self.connected = False
             return False
         
     def is_connected(self) -> bool:
@@ -74,5 +69,12 @@ class MQTTConnection(Connection):
         Returns:
             bool: True if the connection is established, False otherwise.
         """
-        print(f"super().is_connected(): {super().is_connected()}, self.connected: {self.connected}")
-        return super().is_connected() and self.connected
+        if not super().is_connected():
+            return False
+        # Ping the broker to check if the connection is still alive
+        try:
+            self.connection.loop_read()
+            return True
+        except Exception as e:
+            logger.error(f"mqtt-connection: Connection to MQTT broker at {self.url}:{self.port} is not alive: {e}")
+            return False

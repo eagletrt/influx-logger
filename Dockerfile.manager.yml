@@ -17,7 +17,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 COPY protobuffer /app/protobuffer
 RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
-COPY ./src /app/src
 COPY ./external /app/external
+COPY ./src /app/src
 
 CMD ["python3", "-m", "src.main", "config.json"]

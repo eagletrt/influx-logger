@@ -42,7 +42,8 @@ class ConnectionHandler:
             token=config.influx_token,
             org=config.influx_org,
             bucket=config.influx_bucket,
-            port=config.influx_port
+            port=config.influx_port,
+            on_state_change=self.on_state_change
         ) if config else None
         self.mqtt_connection = MQTTConnection(
             url=config.mqtt_url,
@@ -80,7 +81,12 @@ class ConnectionHandler:
         Returns:
             bool: True if both connections are established, False otherwise.
         """
-        return self.influx_connection and self.mqtt_connection and self.influx_connection.is_connected() and self.mqtt_connection.is_connected()
+        return bool(
+            self.influx_connection
+            and self.mqtt_connection
+            and self.influx_connection.is_connected()
+            and self.mqtt_connection.is_connected()
+        )
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
