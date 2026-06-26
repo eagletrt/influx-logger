@@ -1,5 +1,4 @@
 import sys
-from xml.sax import handler
 
 from src.handler.handler_fsm import HandlerFSM
 from src.utils.configuration import Configuration

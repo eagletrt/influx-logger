@@ -59,8 +59,10 @@ class ConnectionHandler:
         if not self.influx_connection and not self.mqtt_connection:
             logger.error("No connections to start. Please provide a valid configuration.")
             return
-        self.influx_connection.connect()
-        self.mqtt_connection.connect()
+        if not self.influx_connection.is_connected():
+            self.influx_connection.connect()
+        if not self.mqtt_connection.is_connected():
+            self.mqtt_connection.connect()
         self.__notify_state_change()
 
     def stop_connections(self) -> None:
