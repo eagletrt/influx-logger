@@ -1,3 +1,4 @@
+from requests import post
 from threading import Thread, Event
 from influxdb_client import InfluxDBClient
 
@@ -102,7 +103,7 @@ class InfluxConnection(Connection):
         except Exception:
             return False
 
-    def ping(self):
+    def ping(self) -> bool:
         """
         Perform a safe ping/health check against the underlying client.
 
@@ -117,11 +118,11 @@ class InfluxConnection(Connection):
                  connection.
         """
         if not self.connection:
-            return None
-
+            return False
         # Prefer a direct ping() method if available
         ping_fn = getattr(self.connection, 'ping', None)
         try:
+            #TODO fix request = post(url=f'http://{self.url}:{self.port}/')
             if callable(ping_fn):
                 ping_fn()
                 return True
@@ -132,7 +133,7 @@ class InfluxConnection(Connection):
                 health_fn()
                 return True
         except Exception:
-            return None
+            return False
 
 class ConnectionChecker(Thread):
     """

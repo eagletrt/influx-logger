@@ -25,13 +25,12 @@ def main(argv=None):
     logger.info(f"Configuration loaded from {conf}: {configuration}")
 
     try:
-        #handler:HandlerFSM = HandlerFSM(configuration)
-        HandlerFSM.draw("handler_fsm.png")
+        handler:HandlerFSM = HandlerFSM(configuration)
         #handler.start()
         #handler.join()
     except KeyboardInterrupt:
         logger.info("Ctrl+C received, stopping handler")
-        #safe_stop(handler)
+        safe_stop(handler)
 
 if __name__ == "__main__":
     main()

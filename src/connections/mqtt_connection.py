@@ -43,6 +43,7 @@ class MQTTConnection(Connection):
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True
         except Exception as e:
+            self.connection = None
             logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
             return False
         
@@ -76,5 +77,5 @@ class MQTTConnection(Connection):
             self.connection.loop_read()
             return True
         except Exception as e:
-            logger.error(f"mqtt-connection: Connection to MQTT broker at {self.url}:{self.port} is not alive: {e}")
+            logger.warn(f"mqtt-connection: Connection to MQTT broker at {self.url}:{self.port} is not alive: {e}")
             return False
