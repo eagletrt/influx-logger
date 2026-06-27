@@ -25,7 +25,7 @@ def main(argv=None):
     logger.info(f"Configuration loaded from {conf}: {configuration}")
 
     try:
-        handler:HandlerFSM = HandlerFSM(configuration)
+        #handler:HandlerFSM = HandlerFSM(configuration)
         HandlerFSM.draw("handler_fsm.png")
         #handler.start()
         #handler.join()
