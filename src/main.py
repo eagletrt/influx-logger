@@ -5,6 +5,17 @@ from src.utils.configuration import Configuration
 from src.utils.logger_utils import logger
 
 
+
+
+def safe_stop(handler: HandlerFSM):
+    """
+    Safely stops the HandlerFSM instance by transitioning to the final state and waiting for the thread to finish.
+    Args:
+        handler (HandlerFSM): The HandlerFSM instance to be stopped.
+    """
+    handler.stop_machine()
+    handler.join()
+
 def main(argv=None):
     argv = argv or sys.argv
     if len(argv) < 2:
@@ -17,6 +28,12 @@ def main(argv=None):
 
     handler:HandlerFSM = HandlerFSM(configuration)
     handler.start()
+
+    try:
+        handler.join()
+    except KeyboardInterrupt:
+        logger.info("Ctrl+C received, stopping handler")
+        safe_stop(handler)
 
 if __name__ == "__main__":
     main()

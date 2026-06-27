@@ -79,7 +79,8 @@ class InfluxConnection(Connection):
                 port=self.port
             )
             logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
-            self.connection_checker.start()  # Start the connection checker thread
+            if not self.connection_checker.is_alive():
+                self.connection_checker.start()  # Start the connection checker thread
             return True
         except Exception as e:
             logger.error(f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}")

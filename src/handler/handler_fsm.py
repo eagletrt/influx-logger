@@ -1,5 +1,4 @@
 from time import sleep
-
 from statemachine import StateMachine, State
 from threading import Thread, Condition
 
@@ -34,8 +33,8 @@ class HandlerFSM(Thread, StateMachine):
     # Events
     init = starting.to(idling)
     connection = (
-        idling.to(idling, unless=['are_both_connected'])
-        | idling.to(running, cond=['are_both_connected'])
+        idling.to(running, cond=['are_both_connected'])
+        |   idling.to(idling)
     )
     disconnection = (
         running.to(idling)
@@ -57,15 +56,24 @@ class HandlerFSM(Thread, StateMachine):
             self.config,
             on_state_change=self.__notify_connection_change,
         )
+        self._event:bool = False
 
     def __notify_connection_change(self) -> None:
-        logger.info(f"{self.name} {self.current_state} - Connection state changed, notifying FSM")
+        logger.info(f"{self.get_log_header()} - Connection state changed, notifying FSM")
         with self.__connection_condition:
             self.__connection_condition.notify_all()
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
         HandlerFSM(Configuration("localhost",1883,"localhost", 8086, "", "", ""))._graph().write_png(filename)
+
+    def get_log_header(self) -> str:
+        """
+        Returns a string containing the name of the FSM and its current state for logging purposes.
+        Returns:
+            str: A string containing the name of the FSM and its current state.
+        """
+        return f"{self.name} {self.current_state}"
 
     def are_both_connected(self) -> bool:
         """
@@ -82,26 +90,26 @@ class HandlerFSM(Thread, StateMachine):
         If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
         If neither connection is established, it remains in the idle state and continues to check for both connections.
         """
-        logger.info(f"{self.name} {self.current_state} - on_connection event triggered")
+        logger.info(f"{self.get_log_header()} - on_connection event triggered")
     
     def on_disconnection(self):
         """
         Event triggered when a disconnection occurs. It checks if both connections are still established and transitions to the appropriate state.
         If both connections are still established, it remains in the running state. If one or both connections are lost, it transitions to the idle state and continues to check for both connections.
         """
-        logger.info(f"{self.name} {self.current_state} - on_disconnection event triggered")
+        logger.info(f"{self.get_log_header()} - on_disconnection event triggered")
     
     def on_finish(self):
         """
         Event triggered when the finish event is called. It transitions to the final state and performs any necessary cleanup operations.
         """
-        logger.info(f"{self.name} {self.current_state} - on_finish event triggered")
+        logger.info(f"{self.get_log_header()} - on_finish event triggered")
     
     def on_enter_start(self):
         """
         Method called when entering the start state. It initializes the connections and prepares the handler for operation.
         """
-        logger.info(f"{self.name} {self.current_state} - Entering start state")
+        logger.info(f"{self.get_log_header()} - Entering start state")
         self.do_start()
 
     def on_enter_idle(self):
@@ -109,7 +117,7 @@ class HandlerFSM(Thread, StateMachine):
         Method called when entering the idle state. It starts the connections and waits for both connections to be established before transitioning to the running state.
         If both connections are not established, it remains in the idle state and continues to check for both connections.
         """
-        logger.info(f"{self.name} {self.current_state} - Entering idle state")
+        logger.info(f"{self.get_log_header()} - Entering idle state")
         self.do_idle()
     
     def on_enter_run(self):
@@ -117,14 +125,14 @@ class HandlerFSM(Thread, StateMachine):
         Method called when entering the running state. It starts the handler's main operation, which involves processing incoming data and logging it to InfluxDB.
         If either connection is lost while in the running state, it transitions back to the idle state and continues to check for both connections.
         """
-        logger.info(f"{self.name} {self.current_state} - Entering running state")
+        logger.info(f"{self.get_log_header()} - Entering running state")
         self.do_run()
 
     def on_enter_stop(self):
         """
         Method called when entering the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
         """
-        logger.info(f"{self.name} {self.current_state} - Entering stop state")
+        logger.info(f"{self.get_log_header()} - Entering stop state")
         self.do_stop()
 
     def do_start(self):
@@ -140,30 +148,37 @@ class HandlerFSM(Thread, StateMachine):
         If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
         If neither connection is established, it remains in the idle state and continues to check for both connections.
         """
-        while not self.are_both_connected():
+        self._event = False
+        while not self._event and not self.are_both_connected():
             self.handler.start_connections()
             with self.__connection_condition:
                 self.__connection_condition.wait(timeout=1.0)
-        logger.info(f"{self.name} {self.current_state} - Both connections established, transitioning to running state")
-        self.send('connection')
+        if self.are_both_connected():
+            logger.info(f"{self.get_log_header()} - Both connections established, transitioning to running state")
+            self.send('connection')
 
     def do_run(self):
         """
         Method to handle the running state. It performs the main operation of the handler, which involves processing incoming data and logging it to InfluxDB.
         If either connection is lost while in the running state, it triggers the disconnection event to transition back to the idle state and continues to check for both connections.
         """
-        while self.are_both_connected():
-            with self.__connection_condition:
-                self.__connection_condition.wait()
-        logger.info(f"{self.name} {self.current_state} - Connection lost, transitioning to idle state")
-        self.send('disconnection')
+        self._event = False
+        while not self._event and self.are_both_connected():
+            # TODO: Implement the main operation of the handler, such as processing incoming data and logging it to InfluxDB
+            print("HandlerFSM is running. Implement the main operation here.")
+            sleep(1)  # Simulate work being done
+            #with self.__connection_condition:
+            #    self.__connection_condition.wait()
+        if not self.are_both_connected():
+            logger.info(f"{self.get_log_header()} - Connection lost, transitioning to idle state")
+            self.send('disconnection')
 
     def do_stop(self):
         """
         Method to handle the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
         """
         self.handler.stop_connections()
-        logger.info(f"{self.name} {self.current_state} - Connections stopped, handler in finale state")
+        logger.info(f"{self.get_log_header()} - Connections stopped, handler in finale state")
 
     def do_state(self):
         """
@@ -179,9 +194,18 @@ class HandlerFSM(Thread, StateMachine):
         else:
             self.do_stop()
 
+    def stop_machine(self):
+        """
+        Method to stop the FSM. It triggers the finish event to transition to the final state and perform any necessary cleanup operations.
+        """
+        self._event = True
+        self.send('finish')
+        with self.__connection_condition:
+            self.__connection_condition.notify_all()
+
     def run(self):
-        logger.info(f"{self.name} {self.current_state} - Thread started")
+        logger.info(f"{self.get_log_header()} - Thread started")
         while self.current_state != self.final:
             self.do_state()
         self.do_stop()
-        logger.info(f"{self.name} {self.current_state} - Thread finished")
+        logger.info(f"{self.get_log_header()} - Thread finished")
