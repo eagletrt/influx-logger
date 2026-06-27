@@ -1,5 +1,6 @@
 from time import sleep
 from statemachine import StateMachine, State
+from statemachine.contrib.diagram import DotGraphMachine
 from threading import Thread, Condition
 
 # Info about FSM at https://github.com/fgmacedo/python-statemachine
@@ -34,7 +35,7 @@ class HandlerFSM(Thread, StateMachine):
     init = starting.to(idling)
     connection = (
         idling.to(running, cond=['are_both_connected'])
-        |   idling.to(idling)
+        |   idling.to(idling, unless=['are_both_connected'])
     )
     disconnection = (
         running.to(idling)
@@ -64,7 +65,7 @@ class HandlerFSM(Thread, StateMachine):
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
-        HandlerFSM(Configuration("localhost",1883,"localhost", 8086, "", "", ""))._graph().write_png(filename)
+        DotGraphMachine(HandlerFSM).get_graph().write_png(filename)
 
     def get_log_header(self) -> str:
         """

@@ -31,7 +31,7 @@ def main(argv=None):
         #handler.join()
     except KeyboardInterrupt:
         logger.info("Ctrl+C received, stopping handler")
-        safe_stop(handler)
+        #safe_stop(handler)
 
 if __name__ == "__main__":
     main()
