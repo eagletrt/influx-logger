@@ -119,19 +119,12 @@ class InfluxConnection(Connection):
         """
         if not self.connection:
             return False
-        # Prefer a direct ping() method if available
-        ping_fn = getattr(self.connection, 'ping', None)
         try:
-            #TODO fix request = post(url=f'http://{self.url}:{self.port}/')
-            if callable(ping_fn):
-                ping_fn()
+            response = post(url=f'{self.url}:{self.port}/')
+            if response.ok:
                 return True
-
-            # Fall back to a health() method if present
-            health_fn = getattr(self.connection, 'health', None)
-            if callable(health_fn):
-                health_fn()
-                return True
+            else:
+                return False
         except Exception:
             return False
 

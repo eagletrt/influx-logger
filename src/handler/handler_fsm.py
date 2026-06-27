@@ -1,4 +1,3 @@
-from time import sleep
 from statemachine import StateMachine, State
 from statemachine.contrib.diagram import DotGraphMachine
 from threading import Thread, Condition
@@ -110,7 +109,6 @@ class HandlerFSM(Thread, StateMachine):
         Method called when entering the start state. It initializes the connections and prepares the handler for operation.
         """
         logger.info(f"{self.get_log_header()} - Entering start state")
-        self.do_start()
 
     def on_enter_idling(self):
         """
@@ -150,6 +148,7 @@ class HandlerFSM(Thread, StateMachine):
         """
         self._event = False
         while not self._event and not self.are_both_connected():
+            logger.info(f"{self.get_log_header()} - Trying connection")
             self.handler.start_connections()
             with self.__connection_condition:
                 self.__connection_condition.wait(timeout=1.0)
@@ -166,7 +165,8 @@ class HandlerFSM(Thread, StateMachine):
         while not self._event and self.are_both_connected():
             # TODO: Implement the main operation of the handler, such as processing incoming data and logging it to InfluxDB
             print("HandlerFSM is running. Implement the main operation here.")
-            sleep(1)  # Simulate work being done
+            with self.__connection_condition:
+                self.__connection_condition.wait(timeout=1)  # Simulate work being done
             #with self.__connection_condition:
             #    self.__connection_condition.wait()
         if not self.are_both_connected():
@@ -205,10 +205,9 @@ class HandlerFSM(Thread, StateMachine):
 
     def run(self):
         logger.info(f"{self.get_log_header()} - Thread started")
-        with self.__connection_condition:
-            self.__connection_condition.notify_all()
-        while self.current_state != self.final:
-            #self.do_state()
-            self.__connection_condition.wait()
-        self.do_stop()
+        while self and self.current_state != self.final:
+            logger.info(f"{self.get_log_header} - Thread running")
+            self.do_state()
+        if self:
+            self.do_stop()
         logger.info(f"{self.get_log_header()} - Thread finished")

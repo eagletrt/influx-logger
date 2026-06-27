@@ -25,6 +25,7 @@ class MQTTConnection(Connection):
 
     def on_disconnect(self, client, _userdata, reason_code, properties=None):
         logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
+        self.connection = None
         self.__notify_state_change()
 
     def connect(self) -> bool:

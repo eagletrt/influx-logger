@@ -26,8 +26,8 @@ def main(argv=None):
 
     try:
         handler:HandlerFSM = HandlerFSM(configuration)
-        #handler.start()
-        #handler.join()
+        handler.start()
+        handler.join()
     except KeyboardInterrupt:
         logger.info("Ctrl+C received, stopping handler")
         safe_stop(handler)
