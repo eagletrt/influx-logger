@@ -54,9 +54,8 @@ class HandlerFSM(Thread, StateMachine):
             on_state_change=self.__notify_connection_change,
         )
         self._event: bool = False
-
-        super(Thread, self).__init__(name=name)
-        super(StateMachine, self).__init__()
+        Thread.__init__(self, name=name)
+        StateMachine.__init__(self)
 
     def __notify_connection_change(self) -> None:
         logger.info(f"{self.get_log_header()} - Connection state changed, notifying FSM")
