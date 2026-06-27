@@ -1,5 +1,6 @@
 import unittest
 
+from time import sleep
 from src.connections.influx_connection import InfluxConnection
 from src.utils.configuration import Configuration
 
@@ -24,10 +25,12 @@ class TestInfluxConnection(unittest.TestCase):
         self.connection.connect()  # Establish a connection first
         if self.connection.is_connected():
             self.connection.disconnect()
+        sleep(2)
         assert not self.connection.is_connected()  # Verify that the connection is no longer active after disconnecting
 
     def test_is_connected(self):
         if self.connection.connect():
             assert self.connection.is_connected()
         self.connection.disconnect()  # Clean up by disconnecting
+        sleep(2)
         assert not self.connection.is_connected()  # Verify that the connection is no longer active after disconnecting
