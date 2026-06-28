@@ -32,6 +32,10 @@ class InfluxConnection(Connection):
         self.connection_checker: ConnectionChecker = ConnectionChecker(self, check_interval=10)
         self.on_state_change = on_state_change
 
+    def __str__(self):
+        #TODO fix
+        return super().__str__()
+
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
             self.on_state_change()
@@ -74,10 +78,9 @@ class InfluxConnection(Connection):
         """
         try:
             self.connection = InfluxDBClient(
-                url=self.url,
+                url=self.get_full_link(),
                 token=self.token,
-                org=self.org,
-                port=self.port
+                org=self.org
             )
             logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
             if not self.connection_checker.is_alive():
@@ -96,12 +99,7 @@ class InfluxConnection(Connection):
         # Ensure base connection object exists first
         if not super().is_connected():
             return False
-
-        # Use the safe ping helper which normalizes client behavior.
-        try:
-            return bool(self.ping())
-        except Exception:
-            return False
+        return self.ping()
 
     def ping(self) -> bool:
         """
@@ -113,19 +111,19 @@ class InfluxConnection(Connection):
         directly in tests).
 
         Returns:
-            Any: The raw client response when available, True when the client
-                 returned None but the call succeeded, or None on failure/no
-                 connection.
+            bool: check weather ther connection is up
         """
-        if not self.connection:
-            return False
         try:
-            response = post(url=f'{self.url}:{self.port}/')
-            if response.ok:
-                return True
-            else:
-                return False
-        except Exception:
+            # List buckets (lightweight operation)
+            self.connection.buckets_api().find_buckets()
+            # Connection is active and authenticated
+            return True
+        except Exception as e:
+            print(e)
+            # Check weather InfluxDB is up
+            health_api = self.connection.health()
+            if health_api.status == "pass":
+                logger.warning("influx-connection: InfluxDB up, but connection down")
             return False
 
 class ConnectionChecker(Thread):

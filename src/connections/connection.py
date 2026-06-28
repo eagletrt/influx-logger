@@ -14,6 +14,17 @@ class Connection(ABC):
         self.connection = None
         self.url: str = url
         self.port: int = port
+    
+    def __str__(self) -> str:
+        return self.get_full_link()
+    
+    def get_full_link(self) -> str:
+        """
+        Get the full link, comprehensive of port.
+        Returns:
+            str: full link
+        """
+        return f"{self.url}:{self.port}"
 
     @abstractmethod
     def connect(self) -> bool:

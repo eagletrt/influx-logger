@@ -206,7 +206,7 @@ class HandlerFSM(Thread, StateMachine):
     def run(self):
         logger.info(f"{self.get_log_header()} - Thread started")
         while self and self.current_state != self.final:
-            logger.info(f"{self.get_log_header} - Thread running")
+            logger.info(f"{self.get_log_header()} - Thread running")
             self.do_state()
         if self:
             self.do_stop()
