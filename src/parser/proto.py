@@ -1,5 +1,4 @@
 from global_influx import global_state
-from src.http_client import download_proto_version
 from utils.logger_utils import logger
 import importlib.util
 import os
@@ -70,19 +69,6 @@ for package_name in [
         for file_name in os.listdir(package_path):
             if file_name.endswith(".py") and file_name != "__init__.py":
                 _load_generated_proto_module(package_name, file_name[:-3])
-
-from external.serializers.py.can import can_frequencies
-
-class _DecoderWrapper:
-    def __init__(self, message_class, json_format_module):
-        self._message_class = message_class
-        self._json_format = json_format_module
-
-    def decode(self, payload: bytes):
-        message = self._message_class()
-        message.ParseFromString(payload)
-        return self._json_format.MessageToDict(message, preserving_proto_field_name=True)
-
 
 def _build_decoder(descriptor_raw: str, network: str):
     try:
@@ -166,6 +152,3 @@ def get_proto_descriptor(version: str, network: str) -> None:
         return
 
     logger.info("Proto: Descriptor successfully parsed and is now ready for deserialize data")
-
-
-__all__ = ["get_proto_descriptor"]
