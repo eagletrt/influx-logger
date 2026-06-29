@@ -1,11 +1,14 @@
+from os import path
+from typing import Any
 from requests import get
 from tempfile import TemporaryDirectory
-from os import path
 
 from src.utils.logger_utils import logger
 
+# TODO: document
 class ProtobuffManager:
-    version_descriptors = None
+    version_descriptors: dict[str, dict[str, Any]]
+    ''' Version descriptors maps version -> network -> protobuf type/object'''
     def __init__(self, cache_folder: str = ".cache"):
         pass
     
