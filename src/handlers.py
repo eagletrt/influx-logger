@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from utils.logger_utils import logger
 from src.http_client import check_commit_existence
-from parser.proto import get_proto_descriptor
+from src.parser.protobuf_manager import ProtobuffManager
 from src.influx import Line
 from global_influx import global_state
 
@@ -45,7 +45,7 @@ def _push_record(measurement: str, record: Any, tags: Dict[str, str]) -> None:
         return
 
     if not isinstance(record, dict):
-        logger.warn(f"Handler: Invalid object received from device for measurement '{measurement}'")
+        logger.warning(f"Handler: Invalid object received from device for measurement '{measurement}'")
         return
 
     line = Line.from_object(record, measurement, tags)
@@ -86,7 +86,7 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     if network not in global_state.version_descriptors.get(version, {}):
         logger.info(f"Handler: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
         try:
-            get_proto_descriptor(version, network)
+            ProtobuffManager.get_proto_descriptor(version, network)
         except Exception:
             logger.error(f"Handler: Error while getting proto, skipping message")
             return

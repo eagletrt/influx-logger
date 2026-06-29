@@ -9,12 +9,6 @@ from importlib.util import spec_from_loader, spec_from_file_location, module_fro
 from src.utils.logger_utils import logger
 
 # TODO: Comments and documentation
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-generated_proto_root = os.path.join(project_root, ".generated/external/serializers/proto")
-
-sys.path.insert(0, project_root)
-sys.path.insert(0, generated_proto_root)
-
 # TODO: improve readability
 def _register_generated_proto_package(package_name: str):
     package_path = os.path.join(generated_proto_root, package_name)
@@ -73,13 +67,16 @@ for package_name in [
 
 # TODO: documentation
 class ProtobuffManager:
-    version_descriptors: dict[str, dict[str, Any]]
-    ''' Version descriptors maps version -> network -> protobuf type/object'''
     def __init__(self, cache_folder: str = ".cache"):
-        pass
-    
-    @staticmethod
-    def get_proto_descriptor(version: str, network: str) -> None:
+        self.version_descriptors: dict[str, dict[str, Any]]
+        ''' Version descriptors maps version -> network -> protobuf type/object'''
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        self.generated_proto_root = os.path.join(project_root, cache_folder, ".generated/external/serializers/proto")
+
+        sys.path.insert(0, self.project_root)
+        sys.path.insert(0, self.generated_proto_root)
+
+    def get_proto_descriptor(self, version: str, network: str) -> None:
         try:
             descriptor_raw = LibCANManager.download_proto_version(version, network)
         except Exception as c:
@@ -92,9 +89,9 @@ class ProtobuffManager:
         try:
             decoder = _DecoderWrapper._build_decoder(descriptor_raw, network)
 
-            if version not in ProtobuffManager.version_descriptors:
-                ProtobuffManager.version_descriptors[version] = {}
-            ProtobuffManager.version_descriptors[version][network] = decoder
+            if version not in self.version_descriptors:
+                self.version_descriptors[version] = {}
+            self.version_descriptors[version][network] = decoder
         except Exception as e:
             logger.trace(e)
             logger.error(f"Proto: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
