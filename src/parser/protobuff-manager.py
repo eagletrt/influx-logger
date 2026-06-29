@@ -78,6 +78,7 @@ class ProtobuffManager:
     def __init__(self, cache_folder: str = ".cache"):
         pass
     
+    @staticmethod
     def get_proto_descriptor(version: str, network: str) -> None:
         try:
             descriptor_raw = LibCANManager.download_proto_version(version, network)
@@ -108,12 +109,14 @@ class LibCANManager:
     CAN_COMMIT_URL = "https://github.com/eagletrt/can/tree/hash"
     def __init__(self):
         pass
-        
+    
+    @staticmethod
     def check_commit_existence(hash: str) -> bool:
         url = LibCANManager.CAN_COMMIT_URL.replace("hash", hash)
         resp = get(url)
         return resp.ok
     
+    @staticmethod
     def download_proto_version(hash: str, network: str) -> str:
         url = LibCANManager.CAN_PROTO_URL.replace("hash", hash).replace("network", network)
         resp = get(url)
