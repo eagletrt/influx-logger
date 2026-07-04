@@ -6,10 +6,10 @@ from src.utils.logger_utils import logger
 from src.parser.protobuf_manager import LibCANManager, ProtobuffManager
 from src.connections.mqtt_connection import MQTTConnection
 
-class MsgHandler:
+class MsgDispatcher:
     topic_handlers: dict[str, Callable] = {
-        "+/+/version": MsgHandler.handle_version_message,
-        "+/+/data/+": MsgHandler.handle_data_message,
+        "+/+/version": MsgDispatcher.handle_version_message,
+        "+/+/data/+": MsgDispatcher.handle_data_message,
     }
 
     def __init__(self, connection: MQTTConnection, excluded_networks: list[str] = []):
@@ -23,8 +23,8 @@ class MsgHandler:
     @staticmethod
     def handle_incoming_message(topic: str, payload: bytes) -> None:
         #logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
-        for handler_topic, handler_function in MsgHandler.topic_handlers.items():
-            matches = list(MsgHandler.build_topic_regex(handler_topic).finditer(topic))
+        for handler_topic, handler_function in MsgDispatcher.topic_handlers.items():
+            matches = list(MsgDispatcher.build_topic_regex(handler_topic).finditer(topic))
             if matches:
                 groups = list(matches[0].groups())
                 handler_function(topic, payload, groups)

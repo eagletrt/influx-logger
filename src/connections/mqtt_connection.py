@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 
 from src.utils.logger_utils import logger
 from src.connections.connection import Connection
-from src.handler.msg_handler import MsgHandler
+from handler.msg_dispatcher import MsgHandler
 
 class MQTTConnection(Connection):
     """
