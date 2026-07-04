@@ -7,7 +7,6 @@ from types import ModuleType
 from grpc_tools import protoc
 from tempfile import TemporaryDirectory
 from google.protobuf import json_format
-from google.protobuf.json_format import MessageToDict
 from google.protobuf.message_factory import GetMessageClass, MessageFactory
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
@@ -15,70 +14,15 @@ from importlib.util import spec_from_loader, spec_from_file_location, module_fro
 
 from src.utils.logger_utils import logger
 
-# TODO: Comments and documentation
-# TODO: improve readability
-def _register_generated_proto_package(package_name: str):
-    package_path = os.path.join(self.generated_proto_root, package_name)
-    if not os.path.isdir(package_path):
-        return
-
-    module = ModuleType(package_name)
-    module.__path__ = [package_path]
-    module.__package__ = package_name
-    module.__file__ = os.path.join(package_path, "__init__.py")
-    module.__spec__ = spec_from_loader(package_name, loader=None, is_package=True)
-    if module.__spec__ is not None:
-        module.__spec__.submodule_search_locations = [package_path]
-
-    sys.modules[package_name] = module
-
-def _load_generated_proto_module(package_name: str, module_name: str):
-    package_path = os.path.join(generated_proto_root, package_name)
-    module_path = os.path.join(package_path, f"{module_name}.py")
-    if not os.path.isfile(module_path):
-        return
-
-    full_name = f"{package_name}.{module_name}"
-    if full_name in sys.modules:
-        return
-
-    spec = spec_from_file_location(full_name, module_path)
-    if spec is None or spec.loader is None:
-        return
-
-    module = module_from_spec(spec)
-    sys.modules[full_name] = module
-    spec.loader.exec_module(module)
-    setattr(sys.modules[package_name], module_name, module)
-
-for package_name in [
-    "actions",
-    "app",
-    "can",
-    "configs",
-    "data",
-    "handcart",
-    "influxlogger",
-    "lapcounter",
-    "mongodb",
-    "sessions",
-    "telemetry",
-    "tpms",
-]:
-    _register_generated_proto_package(package_name)
-    package_path = os.path.join(self.generated_proto_root, package_name)
-    if os.path.isdir(package_path):
-        for file_name in os.listdir(package_path):
-            if file_name.endswith(".py") and file_name != "__init__.py":
-                _load_generated_proto_module(package_name, file_name[:-3])
-
-# TODO: documentation
 class ProtobufManager:
+    '''
+    Manages the retrieval and caching of protobuf descriptors for different versions and networks.
+    '''
     def __init__(self, cache_folder: str = ".cache"):
         self.version_descriptors: dict[str, dict[str, Any]]
         ''' Version descriptors maps version -> network -> protobuf type/object'''
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        self.generated_proto_root = os.path.join(self.project_root, cache_folder, ".generated/external/serializers/proto")
+        self.generated_proto_root = os.path.join(self.project_root, cache_folder, "proto")
         sys.path.insert(0, self.project_root)
         sys.path.insert(0, self.generated_proto_root)
 
@@ -98,9 +42,11 @@ class ProtobufManager:
         logger.info("protobuf_manager: Descriptor successfully downloaded")
         try:
             decoder = _DecoderWrapper.build_decoder(descriptor_raw, network)
-
+            '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
+            # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
                 self.version_descriptors[version] = {}
+            # Store the decoder in the version_descriptors dictionary for the given version and network
             self.version_descriptors[version][network] = decoder
         except Exception as e:
             logger.trace(e)
@@ -169,7 +115,7 @@ class _DecoderWrapper:
     TMP_DIR_PREFIX: str = "influx_proto_"
     '''Temporary directory prefix used for storing temporary .proto files and descriptor sets.'''
 
-    def __init__(self, message_class, json_format_module):
+    def __init__(self, message_class, json_format_module, tmp_dir_prefix: str = TMP_DIR_PREFIX):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
         Args:
@@ -178,6 +124,7 @@ class _DecoderWrapper:
         '''
         self._message_class = message_class
         self._json_format = json_format_module
+        _DecoderWrapper.TMP_DIR_PREFIX = tmp_dir_prefix
 
     def decode(self, payload: bytes) -> dict:
         '''
@@ -266,3 +213,82 @@ class _DecoderWrapper:
             # If GetMessageClass is not available, use MessageFactory to get the message class
             message_class = MessageFactory(pool).GetPrototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
+
+def _register_generated_proto_package(package_name: str) -> None:
+    '''
+    Registers a generated protobuf package in sys.modules to allow for dynamic imports of generated modules.
+    Args:
+        package_name (str): The name of the generated protobuf package to register.
+    '''
+    protobuf_manager = ProtobufManager()
+    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+    '''Path to the generated protobuf package directory'''
+    if not os.path.isdir(package_path):
+        return
+
+    module = ModuleType(package_name)
+    module.__path__ = [package_path]
+    module.__package__ = package_name
+    module.__file__ = os.path.join(package_path, "__init__.py")
+    module.__spec__ = spec_from_loader(package_name, loader=None, is_package=True)
+    if module.__spec__ is not None:
+        module.__spec__.submodule_search_locations = [package_path]
+
+    sys.modules[package_name] = module
+
+def _load_generated_proto_module(package_name: str, module_name: str) -> None:
+    '''
+    Loads a generated protobuf module from the specified package and module name.
+    Args:
+        package_name (str): The name of the generated protobuf package.
+        module_name (str): The name of the generated protobuf module to load.
+    '''
+    protobuf_manager = ProtobufManager()
+    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+    '''Path to the generated protobuf package directory'''
+    module_path = os.path.join(package_path, f"{module_name}.py")
+    '''Path to the generated protobuf module file'''
+    if not os.path.isfile(module_path):
+        return
+    full_name = f"{package_name}.{module_name}"
+    '''Fully qualified name of the generated protobuf module'''
+    if full_name in sys.modules:
+        return
+    spec = spec_from_file_location(full_name, module_path)
+    '''Module spec for the generated protobuf module'''
+    if spec is None or spec.loader is None:
+        return
+    module = module_from_spec(spec)
+    '''Module object for the generated protobuf module'''
+    # Set the module in sys.modules and execute it to load the generated protobuf module
+    sys.modules[full_name] = module
+    # Execute the module to load its contents
+    spec.loader.exec_module(module)
+    # Set the module as an attribute of the package module to allow for dynamic imports
+    setattr(sys.modules[package_name], module_name, module)
+
+for package_name in [
+    "actions",
+    "app",
+    "can",
+    "configs",
+    "data",
+    "handcart",
+    "influxlogger",
+    "lapcounter",
+    "mongodb",
+    "sessions",
+    "telemetry",
+    "tpms",
+]:
+    _register_generated_proto_package(package_name)
+    protobuf_manager = ProtobufManager()
+    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+    '''Path to the generated protobuf package directory'''
+    if os.path.isdir(package_path):
+        for file_name in os.listdir(package_path):
+            if file_name.endswith(".py") and file_name != "__init__.py":
+                _load_generated_proto_module(package_name, file_name[:-3])
