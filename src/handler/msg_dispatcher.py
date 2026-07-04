@@ -3,37 +3,51 @@ from re import Pattern, compile
 
 from influx import LineRepository
 from src.utils.logger_utils import logger
-from src.parser.protobuf_manager import LibCANManager, ProtobuffManager
+from src.parser.protobuf_manager import LibCANManager, ProtobufManager
 from src.connections.mqtt_connection import MQTTConnection
 
 class MsgDispatcher:
-    topic_handlers: dict[str, Callable] = {
-        "+/+/version": MsgDispatcher.handle_version_message,
-        "+/+/data/+": MsgDispatcher.handle_data_message,
-    }
 
-    def __init__(self, connection: MQTTConnection, excluded_networks: list[str] = []):
-        self.protobuff_manager: ProtobuffManager = ProtobuffManager()
+    def __init__(self, connection: MQTTConnection):
+        self.topic_callbacks: dict[str, Callable] = {
+            "+/+/version":  self.handle_version_message,
+            "+/+/data/+":   self.handle_data_message,
+        }
+        self.protobuff_manager: ProtobufManager = ProtobufManager()
         self.mqtt: MQTTConnection = connection
         self.device_versions: dict = {}
-        self.excluded_networks: list[str] = excluded_networks
         # TODO: Remove
         self.line_repository: Optional[LineRepository]
-        
-    @staticmethod
-    def handle_incoming_message(topic: str, payload: bytes) -> None:
+
+    def handle_incoming_message(self, topic: str, payload: bytes) -> None:
+        '''
+        Handles incoming MQTT messages by dispatching them to the appropriate handler based on the topic.
+        Args:
+            topic (str): The topic of the incoming MQTT message.
+            payload (bytes): The payload of the incoming MQTT message.
+        '''
         #logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
-        for handler_topic, handler_function in MsgDispatcher.topic_handlers.items():
-            matches = list(MsgDispatcher.build_topic_regex(handler_topic).finditer(topic))
+        # Iterate through the registered topic handlers and invoke the appropriate handler for the incoming message
+        for handler_topic, handler_function in self.topic_callbacks.items():
+            # Check if the incoming topic matches the handler topic pattern
+            matches = list(self.build_topic_regex(handler_topic).finditer(topic))
+            # If a match is found, extract the groups and call the handler function with the topic, payload, and extracted groups
             if matches:
                 groups = list(matches[0].groups())
                 handler_function(topic, payload, groups)
-    @staticmethod
-    def build_topic_regex(topic: str) -> Pattern:
+
+    def build_topic_regex(self, topic: str) -> Pattern:
+        '''
+        Converts an MQTT topic with wildcards into a regex pattern for matching incoming topics.
+        Args:
+            topic (str): The MQTT topic with wildcards.
+        Returns:
+            Pattern: A compiled regex pattern for matching incoming topics.
+        '''
         pattern = topic.replace("/", "\\/").replace("+", "([^\\/]+)").replace("#", ".*")
         return compile(pattern)
     
-    def handle_version_message(self, _topic: str, payload: bytes, ids: List[str]) -> None:
+    def handle_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         vehicle_id, device_id = ids
         payload_str = payload.decode()
         logger.info(f"Handler: Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
@@ -50,7 +64,7 @@ class MsgDispatcher:
             logger.error(f"Handler: Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
 
 
-    def handle_data_message(self, _topic: str, payload: bytes, ids: List[str]) -> None:
+    def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
             vehicle_id, device_id, network = ids
             key = f"{vehicle_id}/{device_id}"
             if key not in self.device_versions:
@@ -66,7 +80,7 @@ class MsgDispatcher:
             if network not in self.protobuff_manager.version_descriptors.get(version, {}):
                 logger.info(f"Handler: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
                 try:
-                    ProtobuffManager.get_proto_descriptor(version, network)
+                    ProtobufManager.get_proto_descriptor(version, network)
                 except Exception:
                     logger.error(f"Handler: Error while getting proto, skipping message")
                     return

@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from utils.logger_utils import logger
 from src.http_client import check_commit_existence
-from src.parser.protobuf_manager import ProtobuffManager
+from src.parser.protobuf_manager import ProtobufManager
 from src.influx import Line
 from global_influx import global_state
 
@@ -86,7 +86,7 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     if network not in global_state.version_descriptors.get(version, {}):
         logger.info(f"Handler: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
         try:
-            ProtobuffManager.get_proto_descriptor(version, network)
+            ProtobufManager.get_proto_descriptor(version, network)
         except Exception:
             logger.error(f"Handler: Error while getting proto, skipping message")
             return
