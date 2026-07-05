@@ -1,11 +1,10 @@
 from re import Pattern, compile
-from influx import LineRepository
-from typing import Callable, Any, Optional
+from typing import Callable, Any
 
 from src.utils.logger_utils import logger
-from src.parser.parotobuf_manager import parser
+from src.parser.parser import parser
 from src.connections.mqtt_connection import MQTTConnection
-from src.parser.protobuf_manager import LibCANManager, ProtobufManager
+from src.parser.protobuf_manager import LibCANManager
 
 class MsgDispatcher:
     def __init__(self, connection: MQTTConnection):
@@ -13,11 +12,8 @@ class MsgDispatcher:
             "+/+/version":  self.handle_version_message,
             "+/+/data/+":   self.handle_data_message,
         }
-        self.protobuff_manager: ProtobufManager = ProtobufManager()
+        #self.protobuff_manager: ProtobufManager = ProtobufManager()
         self.mqtt: MQTTConnection = connection
-        self.device_versions: dict = {}
-        # TODO: Remove
-        self.line_repository: Optional[LineRepository]
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -65,8 +61,8 @@ class MsgDispatcher:
                 self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
                 logger.info(f"Commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
             try:
-                self.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
-                self.protobuff_manager.version_descriptors[payload_str] = {}
+                self.parser.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
+                parser.protobuf_manager.version_descriptors[payload_str] = {}
                 logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
             except Exception as e:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
@@ -81,57 +77,59 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming data message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
         '''
-        vehicle_id, device_id, network = ids
-        key = f"{vehicle_id}/{device_id}"
-        if key not in self.device_versions:
-            logger.error(f"msg_dispatcher: Device '{key}' started streaming data before sending version. Skipping")
-            return
-        if network in self.excluded_networks:
-            logger.debug(f"msg_dispatcher: Network '{network}' is in the exclusion list. Skipping message")
-            return
-        version = self.device_versions[key]
-        # Check if the network is already registered for the given version, if not, download the .proto descriptor
-        if network not in self.protobuff_manager.version_descriptors.get(version, {}):
-            logger.info(f"msg_dispatcher: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
-            protobuf_manager = ProtobufManager()
-            try:
-                protobuf_manager.download_proto_descriptor(version, network)
-            except Exception:
-                logger.error(f"msg_dispatcher: Error while getting proto, skipping message")
-                return
-        # Deserialize the payload using the appropriate decoder for the given version and network
-        try:
-            # Use the appropriate decoder for the given version and network to deserialize the payload
-            decoder = self.protobuff_manager.version_descriptors[version][network]
-            # Expect decoder to provide a `decode` method returning a dict-like object
-            message_content = decoder.decode(payload)
-        except Exception as e:
-            logger.error(f"msg_dispatcher: Cannot deserialize payload with saved descriptor: {e}")
-            return
-        tags = {
-            "vehicle-id": vehicle_id,
-            "device-id": device_id,
-            "network": network,
-        }
-        # If the message content contains a "valuesPack" key and its value is a dictionary, extract the inner dictionary for processing
-        if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
-            message_content = message_content["valuesPack"]
-        # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
-        for measurement, records in message_content.items():
-            if isinstance(records, list):
-                for record in records:
-                    try:
-                        self._push_record(measurement, record, tags)
-                    except ValueError as e:
-                        #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
-                        pass
-                continue
-            else:
-                try:
-                    self._push_record(measurement, records, tags)
-                except ValueError as e:
-                    #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
-                    pass
+        row_msg: tuple[list[str], bytes] = (ids, payload)
+        parser.add_to_queue(row_msg)
+        #vehicle_id, device_id, network = ids
+        #key = f"{vehicle_id}/{device_id}"
+        #if key not in self.device_versions:
+        #    logger.error(f"msg_dispatcher: Device '{key}' started streaming data before sending version. Skipping")
+        #    return
+        #if network in self.excluded_networks:
+        #    logger.debug(f"msg_dispatcher: Network '{network}' is in the exclusion list. Skipping message")
+        #    return
+        #version = self.device_versions[key]
+        ## Check if the network is already registered for the given version, if not, download the .proto descriptor
+        #if network not in self.protobuff_manager.version_descriptors.get(version, {}):
+        #    logger.info(f"msg_dispatcher: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+        #    protobuf_manager = ProtobufManager()
+        #    try:
+        #        protobuf_manager.download_proto_descriptor(version, network)
+        #    except Exception:
+        #        logger.error(f"msg_dispatcher: Error while getting proto, skipping message")
+        #        return
+        ## Deserialize the payload using the appropriate decoder for the given version and network
+        #try:
+        #    # Use the appropriate decoder for the given version and network to deserialize the payload
+        #    decoder = self.protobuff_manager.version_descriptors[version][network]
+        #    # Expect decoder to provide a `decode` method returning a dict-like object
+        #    message_content = decoder.decode(payload)
+        #except Exception as e:
+        #    logger.error(f"msg_dispatcher: Cannot deserialize payload with saved descriptor: {e}")
+        #    return
+        #tags = {
+        #    "vehicle-id": vehicle_id,
+        #    "device-id": device_id,
+        #    "network": network,
+        #}
+        ## If the message content contains a "valuesPack" key and its value is a dictionary, extract the inner dictionary for processing
+        #if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
+        #    message_content = message_content["valuesPack"]
+        ## Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
+        #for measurement, records in message_content.items():
+        #    if isinstance(records, list):
+        #        for record in records:
+        #            try:
+        #                self._push_record(measurement, record, tags)
+        #            except ValueError as e:
+        #                #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+        #                pass
+        #        continue
+        #    else:
+        #        try:
+        #            self._push_record(measurement, records, tags)
+        #        except ValueError as e:
+        #            #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+        #            pass
 
     def _push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
         # If the record is a dictionary containing "valuesMap" and "timestamp", expand it into multiple rows and push each row to the line repository
