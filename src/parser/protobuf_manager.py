@@ -53,6 +53,63 @@ class ProtobufManager:
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
             return
         logger.info("protobuf_manager: Descriptor successfully parsed and is now ready for deserialize data")
+    
+    @staticmethod
+    def register_generated_proto_package(package_name: str) -> None:
+        '''
+        Registers a generated protobuf package in sys.modules to allow for dynamic imports of generated modules.
+        Args:
+            package_name (str): The name of the generated protobuf package to register.
+        '''
+        protobuf_manager = ProtobufManager()
+        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+        '''Path to the generated protobuf package directory'''
+        if not os.path.isdir(package_path):
+            return
+
+        module = ModuleType(package_name)
+        module.__path__ = [package_path]
+        module.__package__ = package_name
+        module.__file__ = os.path.join(package_path, "__init__.py")
+        module.__spec__ = spec_from_loader(package_name, loader=None, is_package=True)
+        if module.__spec__ is not None:
+            module.__spec__.submodule_search_locations = [package_path]
+
+        sys.modules[package_name] = module
+
+    @staticmethod
+    def load_generated_proto_module(package_name: str, module_name: str) -> None:
+        '''
+        Loads a generated protobuf module from the specified package and module name.
+        Args:
+            package_name (str): The name of the generated protobuf package.
+            module_name (str): The name of the generated protobuf module to load.
+        '''
+        protobuf_manager = ProtobufManager()
+        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+        '''Path to the generated protobuf package directory'''
+        module_path = os.path.join(package_path, f"{module_name}.py")
+        '''Path to the generated protobuf module file'''
+        if not os.path.isfile(module_path):
+            return
+        full_name = f"{package_name}.{module_name}"
+        '''Fully qualified name of the generated protobuf module'''
+        if full_name in sys.modules:
+            return
+        spec = spec_from_file_location(full_name, module_path)
+        '''Module spec for the generated protobuf module'''
+        if spec is None or spec.loader is None:
+            return
+        module = module_from_spec(spec)
+        '''Module object for the generated protobuf module'''
+        # Set the module in sys.modules and execute it to load the generated protobuf module
+        sys.modules[full_name] = module
+        # Execute the module to load its contents
+        spec.loader.exec_module(module)
+        # Set the module as an attribute of the package module to allow for dynamic imports
+        setattr(sys.modules[package_name], module_name, module)
 
 class LibCANManager:
     '''
@@ -214,61 +271,6 @@ class _DecoderWrapper:
             message_class = MessageFactory(pool).GetPrototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
 
-def _register_generated_proto_package(package_name: str) -> None:
-    '''
-    Registers a generated protobuf package in sys.modules to allow for dynamic imports of generated modules.
-    Args:
-        package_name (str): The name of the generated protobuf package to register.
-    '''
-    protobuf_manager = ProtobufManager()
-    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-    '''Path to the generated protobuf package directory'''
-    if not os.path.isdir(package_path):
-        return
-
-    module = ModuleType(package_name)
-    module.__path__ = [package_path]
-    module.__package__ = package_name
-    module.__file__ = os.path.join(package_path, "__init__.py")
-    module.__spec__ = spec_from_loader(package_name, loader=None, is_package=True)
-    if module.__spec__ is not None:
-        module.__spec__.submodule_search_locations = [package_path]
-
-    sys.modules[package_name] = module
-
-def _load_generated_proto_module(package_name: str, module_name: str) -> None:
-    '''
-    Loads a generated protobuf module from the specified package and module name.
-    Args:
-        package_name (str): The name of the generated protobuf package.
-        module_name (str): The name of the generated protobuf module to load.
-    '''
-    protobuf_manager = ProtobufManager()
-    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-    '''Path to the generated protobuf package directory'''
-    module_path = os.path.join(package_path, f"{module_name}.py")
-    '''Path to the generated protobuf module file'''
-    if not os.path.isfile(module_path):
-        return
-    full_name = f"{package_name}.{module_name}"
-    '''Fully qualified name of the generated protobuf module'''
-    if full_name in sys.modules:
-        return
-    spec = spec_from_file_location(full_name, module_path)
-    '''Module spec for the generated protobuf module'''
-    if spec is None or spec.loader is None:
-        return
-    module = module_from_spec(spec)
-    '''Module object for the generated protobuf module'''
-    # Set the module in sys.modules and execute it to load the generated protobuf module
-    sys.modules[full_name] = module
-    # Execute the module to load its contents
-    spec.loader.exec_module(module)
-    # Set the module as an attribute of the package module to allow for dynamic imports
-    setattr(sys.modules[package_name], module_name, module)
-
 for package_name in [
     "actions",
     "app",
@@ -283,7 +285,7 @@ for package_name in [
     "telemetry",
     "tpms",
 ]:
-    _register_generated_proto_package(package_name)
+    ProtobufManager.register_generated_proto_package(package_name)
     protobuf_manager = ProtobufManager()
     '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
     package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
@@ -291,4 +293,4 @@ for package_name in [
     if os.path.isdir(package_path):
         for file_name in os.listdir(package_path):
             if file_name.endswith(".py") and file_name != "__init__.py":
-                _load_generated_proto_module(package_name, file_name[:-3])
+                ProtobufManager.load_generated_proto_module(package_name, file_name[:-3])
