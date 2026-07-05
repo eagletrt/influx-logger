@@ -3,7 +3,7 @@ from influxdb_client.client.write_api import WriteOptions, WriteApi
 
 from connections.influx_connection import InfluxConnection
 from src.influx.influx_manager import InfluxManager
-from utils.timestamp_precision import TimestampPrecision
+from utils.timestamp import TimestampPrecision
 
 class InfluxWriter(InfluxManager):
     """

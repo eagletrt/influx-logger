@@ -1,6 +1,7 @@
 from abc import ABC
+
 from src.connections.influx_connection import InfluxConnection
-from src.utils.timestamp_precision import TimestampPrecision
+from utils.timestamp import TimestampPrecision
 
 
 class InfluxManager(ABC):

@@ -50,3 +50,5 @@ class Parser(Thread):
     def run(self) -> None:
         while not self.stop:
             self.__parse_next_message()
+
+parser: Parser = Parser()
