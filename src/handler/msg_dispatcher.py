@@ -1,13 +1,12 @@
-from typing import Callable, Any, Optional
 from re import Pattern, compile
-
 from influx import LineRepository
+from typing import Callable, Any, Optional
+
 from src.utils.logger_utils import logger
-from src.parser.protobuf_manager import LibCANManager, ProtobufManager
 from src.connections.mqtt_connection import MQTTConnection
+from src.parser.protobuf_manager import LibCANManager, ProtobufManager
 
 class MsgDispatcher:
-
     def __init__(self, connection: MQTTConnection):
         self.topic_callbacks: dict[str, Callable] = {
             "+/+/version":  self.handle_version_message,
