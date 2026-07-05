@@ -1,10 +1,11 @@
-from functools import _Descriptor
 import os
 import sys
+
 from typing import Any
 from requests import get
 from types import ModuleType
 from grpc_tools import protoc
+from functools import _Descriptor
 from tempfile import TemporaryDirectory
 from google.protobuf import json_format
 from google.protobuf.descriptor_pool import DescriptorPool
@@ -26,7 +27,7 @@ class ProtobufManager:
         sys.path.insert(0, self.project_root)
         sys.path.insert(0, self.generated_proto_root)
 
-    def get_proto_descriptor(self, version: str, network: str) -> None:
+    def download_proto_descriptor(self, version: str, network: str) -> None:
         '''
         Retrieves the protobuf descriptor for a given version and network.
         If the descriptor is not already cached, it will be downloaded and parsed.
@@ -242,9 +243,10 @@ class _DecoderWrapper:
         # Keep parity with the original TypeScript implementation, which expects
         # the top-level message type `${network}.Pack`.
         full_name = f"{network}.Pack"
+        message_descriptor: _Descriptor = None
         try:
             # Find the message descriptor for the top-level message type in the DescriptorPool
-            message_descriptor: _Descriptor = pool.FindMessageTypeByName(full_name)
+            message_descriptor = pool.FindMessageTypeByName(full_name)
         except KeyError:
             # If the message type is not found, search for candidates with the name "Pack"
             candidates = [

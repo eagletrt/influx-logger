@@ -86,7 +86,7 @@ def handle_data_message(_topic: str, payload: bytes, ids: List[str]) -> None:
     if network not in global_state.version_descriptors.get(version, {}):
         logger.info(f"Handler: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
         try:
-            ProtobufManager.get_proto_descriptor(version, network)
+            ProtobufManager.download_proto_descriptor(version, network)
         except Exception:
             logger.error(f"Handler: Error while getting proto, skipping message")
             return

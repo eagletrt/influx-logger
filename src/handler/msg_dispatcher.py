@@ -47,88 +47,104 @@ class MsgDispatcher:
         return compile(pattern)
     
     def handle_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+        '''
+        Handles incoming version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Args:
+            _topic (str): The topic of the incoming version message.
+            payload (bytes): The payload of the incoming version message.
+            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+        '''
         vehicle_id, device_id = ids
         payload_str = payload.decode()
-        logger.info(f"Handler: Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
+        logger.info(f"msg_dispatcher: Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
         check = LibCANManager.check_commit_existence(payload_str)
         if check:
-            logger.info(f"Handler: Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
+            logger.info(f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
             if self.mqtt.connection:
                 self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
                 logger.info(f"Commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
-            self.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
-            self.protobuff_manager.version_descriptors[payload_str] = {}
-            logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
+            try:
+                self.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
+                self.protobuff_manager.version_descriptors[payload_str] = {}
+                logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
+            except Exception as e:
+                logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:
-            logger.error(f"Handler: Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
-
+            logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
 
     def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+            '''
+            Handles incoming data messages by deserializing the payload and pushing the records to the line repository.
+            Args:
+                _topic (str): The topic of the incoming data message.
+                payload (bytes): The payload of the incoming data message.
+                ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
+            '''
             vehicle_id, device_id, network = ids
             key = f"{vehicle_id}/{device_id}"
             if key not in self.device_versions:
-                logger.error(f"Handler: Device '{key}' started streaming data before sending version. Skipping")
+                logger.error(f"msg_dispatcher: Device '{key}' started streaming data before sending version. Skipping")
                 return
-
             if network in self.excluded_networks:
-                logger.debug(f"Handler: Network '{network}' is in the exclusion list. Skipping message")
+                logger.debug(f"msg_dispatcher: Network '{network}' is in the exclusion list. Skipping message")
                 return
-
             version = self.device_versions[key]
-
+            # Check if the network is already registered for the given version, if not, download the .proto descriptor
             if network not in self.protobuff_manager.version_descriptors.get(version, {}):
-                logger.info(f"Handler: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+                logger.info(f"msg_dispatcher: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+                protobuf_manager = ProtobufManager()
                 try:
-                    ProtobufManager.get_proto_descriptor(version, network)
+                    protobuf_manager.download_proto_descriptor(version, network)
                 except Exception:
-                    logger.error(f"Handler: Error while getting proto, skipping message")
+                    logger.error(f"msg_dispatcher: Error while getting proto, skipping message")
                     return
-
+            # Deserialize the payload using the appropriate decoder for the given version and network
             try:
+                # Use the appropriate decoder for the given version and network to deserialize the payload
                 decoder = self.protobuff_manager.version_descriptors[version][network]
                 # Expect decoder to provide a `decode` method returning a dict-like object
                 message_content = decoder.decode(payload)
             except Exception as e:
-                logger.error(f"Handler: Cannot deserialize payload with saved descriptor: {e}")
+                logger.error(f"msg_dispatcher: Cannot deserialize payload with saved descriptor: {e}")
                 return
-
             tags = {
                 "vehicle-id": vehicle_id,
                 "device-id": device_id,
                 "network": network,
             }
-
+            # If the message content contains a "valuesPack" key and its value is a dictionary, extract the inner dictionary for processing
             if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
                 message_content = message_content["valuesPack"]
-
+            # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
             for measurement, records in message_content.items():
                 if isinstance(records, list):
                     for record in records:
                         try:
                             self._push_record(measurement, record, tags)
                         except ValueError as e:
-                            #logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                            #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
                             pass
                     continue
                 else:
                     try:
                         self._push_record(measurement, records, tags)
                     except ValueError as e:
-                        #logger.error(f"Handler: Skipping invalid record for measurement '{measurement}': {e}")
+                        #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
                         pass
 
     def _push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
+        # If the record is a dictionary containing "valuesMap" and "timestamp", expand it into multiple rows and push each row to the line repository
         if isinstance(record, dict) and "valuesMap" in record and "timestamp" in record:
             for row in _expand_columnar_record(record):
                 line = Line.from_object(row, measurement, tags)
                 if self.line_repository:
                     self.line_repository.push(line)
             return
-
+        # If the record is not a dictionary, log a warning and return without pushing it to the line repository
         if not isinstance(record, dict):
-            logger.warning(f"Handler: Invalid object received from device for measurement '{measurement}'")
+            logger.warning(f"msg_dispatcher: Invalid object received from device for measurement '{measurement}'")
             return
-
+        # Create a Line object from the record and push it to the line repository if it exists
         line = Line.from_object(record, measurement, tags)
         if self.line_repository:
             self.line_repository.push(line)
