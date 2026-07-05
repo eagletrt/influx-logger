@@ -15,13 +15,13 @@ class Line:
         timestamp (int): Timestamp of the measurement in nanoseconds since epoch.
     '''
     def __init__(self, measurement: str, tags: dict[str, str], fields: dict[str, Any], timestamp: int) -> None:
-        self.measurement = measurement
+        self.measurement:str = measurement
         '''Name of the measurement's signal'''
-        self.tags = tags
+        self.tags:dict[str, str] = tags
         '''Tags associated with the measurement'''
-        self.fields = fields
+        self.fields:dict[str, Any] = fields
         '''Fields containing the actual data values'''
-        self.timestamp = timestamp
+        self.timestamp:int = timestamp
         '''Timestamp of the measurement in nanoseconds since epoch'''
 
     @staticmethod
@@ -76,7 +76,7 @@ class Line:
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
     @staticmethod
-    def _normalize_timestamp(timestamp: int, timestamp_precision: str) -> int:
+    def _normalize_timestamp(timestamp: int, timestamp_precision: str = "ns") -> int:
         '''
         Normalizes a timestamp based on the specified precision.
         Args:
@@ -128,63 +128,3 @@ class Line:
         tags_part = f",{tags_str}" if self.tags else ""
         prefix = f"{self.measurement}{tags_part}"
         return f"{prefix} {fields_str} {self.timestamp}"
-
-
-class LineRepository:
-    def __init__(self, url: str, bucket: str, org: str, token: str, timestamp_precision: str = "us", limit: int = 5_000) -> None:
-        self.points: list[Point] = []
-        self.limit = limit
-        self.url = url
-        self.bucket = bucket
-        self.token = token
-        self.org = org
-        self.timestamp_precision = timestamp_precision
-        self.pending_commits_count = 0
-        
-        self.client = InfluxDBClient(url=url, token=token, org=org)
-        self.write_options = influxdb_client.client.write_api.WriteOptions(
-            batch_size=limit,
-            flush_interval=10_000,  # Flush every 10 seconds
-            retry_interval=5_000,  # Retry every 5 seconds if the write fails
-            max_retries=3,  # Maximum number of retries
-        )
-        self.write_api: influxdb_client.client.write_api.WriteApi = self.client.write_api(write_options=self.write_options)
-
-
-    def push(self, line: Line) -> None:
-        #logger.debug(f"Influx Connection: Lines {len(self.lines)}/{self.limit}: {line}")
-        self.points.append(line.to_point(self.timestamp_precision))
-        #logger.debug(f"Influx Connection: Lines {len(self.points)}/{self.limit}")
-        if len(self.points) >= self.limit:
-            logger.info(f"Influx Connection: Line limit reached ({self.limit}), committing lines")
-            self.commit()
-            self.points = []
-
-    def commit(self) -> None:
-        lines_count = len(self.points)
-        #logger.info(f"Influx Connection: Committing {lines_count} lines")
-        self.pending_commits_count += 1
-
-        pack = LineRepository.pack_lines(self.points)
-        #url = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
-        #url: str = f"{self.url}/api/v2/write?org={self.org}&bucket={self.bucket}&precision={self.timestamp_precision}"
-        #logger.debug(f"Influx Connection: Writing to {url} with precision={self.timestamp_precision}, lines={lines_count}")
-        try:
-            result = self.write_api.write(
-                bucket=self.bucket,
-                org=self.org,
-                record=self.points,
-                write_precision=self.timestamp_precision,
-            )
-        except Exception as e:
-            logger.error(f"Influx Connection: Failed to commit lines: {e}", exc_info=True)
-            logger.debug(f"Influx Connection: Lines that failed to commit: {pack}")
-        else:
-            logger.info(f"Influx Connection: Successfully committed {lines_count} lines")
-            logger.debug(f"Influx Connection: Write API returned: {result}")
-
-        self.pending_commits_count -= 1
-
-    @staticmethod
-    def pack_lines(lines: list[Point]) -> str:
-        return "\n".join(str(line) for line in lines)
