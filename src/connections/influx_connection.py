@@ -82,9 +82,10 @@ class InfluxConnection(Connection):
                 token=self.token,
                 org=self.org
             )
+            self.connection_checker.stop()  # Stop the connection checker thread if it's already running
+            self.connection_checker = ConnectionChecker(self, check_interval=10)  # Create a new connection checker thread
+            self.connection_checker.start()  # Start the connection checker thread
             logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
-            if not self.connection_checker.is_alive():
-                self.connection_checker.start()  # Start the connection checker thread
             return True
         except Exception as e:
             logger.error(f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}")
@@ -119,7 +120,6 @@ class InfluxConnection(Connection):
             # Connection is active and authenticated
             return True
         except Exception as e:
-            print(e)
             # Check weather InfluxDB is up
             health_api = self.connection.health()
             if health_api.status == "pass":
@@ -139,15 +139,16 @@ class ConnectionChecker(Thread):
             check_interval (int, optional): The interval (in seconds) between connection checks. Defaults to 10 seconds.
         """
         super().__init__(name="ConnectionChecker", daemon=True)
-        self.influx_connection = influx_connection
-        self.check_interval = check_interval
-        self._stop_event = Event()
+        self.influx_connection: InfluxConnection = influx_connection
+        self.check_interval: int = check_interval
+        self._stop_event: Event = Event()
 
     def run(self):
         """
         The main loop of the ConnectionChecker thread.
         It checks the connection status at regular intervals and logs the result.
         """
+        self._stop_event.clear()
         if self.influx_connection.is_connected():
             self.influx_connection.on_connect()
         while not self._stop_event.is_set():
@@ -161,3 +162,8 @@ class ConnectionChecker(Thread):
         Stops the ConnectionChecker thread gracefully.
         """
         self._stop_event.set()
+        try:
+            self.daemon = False  # Allow the thread to be joined
+            self.join()  # Wait for the thread to finish
+        except Exception as e:
+            pass

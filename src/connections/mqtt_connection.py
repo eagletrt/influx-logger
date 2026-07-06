@@ -47,13 +47,7 @@ class MQTTConnection(Connection):
             self.connection.on_connect = self.on_connect
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message
-            try:
-                self.connection.connect(self.url, self.port)
-            except Exception as e:
-                print(self.url, self.port)
-                logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
-                raise e
-            #self.connection.connect(self.url, self.port)
+            self.connection.connect(host=self.url, port=self.port)
             self.connection.loop_start()
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True

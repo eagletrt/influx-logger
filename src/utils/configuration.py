@@ -2,14 +2,14 @@ import json
 
 class Configuration:
     def __init__(self, mqtt_url: str, mqtt_port: int, influx_url: str, influx_port: int, influx_token: str, influx_org: str, influx_bucket: str, excluded_networks: list = None):
-        self.mqtt_url = mqtt_url
-        self.mqtt_port = mqtt_port
-        self.influx_url = influx_url
-        self.influx_port = influx_port
-        self.influx_token = influx_token
-        self.influx_org = influx_org
-        self.influx_bucket = influx_bucket
-        self.excluded_networks = excluded_networks or []
+        self.mqtt_url: str = mqtt_url
+        self.mqtt_port: int = int(mqtt_port)
+        self.influx_url: str = influx_url
+        self.influx_port: int = int(influx_port)
+        self.influx_token: str = influx_token
+        self.influx_org: str = influx_org
+        self.influx_bucket: str = influx_bucket
+        self.excluded_networks: list = excluded_networks or []
     
     @staticmethod
     def load_from_file(file_path: str = "config.json") -> 'Configuration':
