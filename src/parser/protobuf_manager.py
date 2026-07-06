@@ -198,7 +198,7 @@ class _DecoderWrapper:
         return self._json_format.MessageToDict(message, preserving_proto_field_name=True)
     
     @staticmethod
-    def build_decoder(descriptor_raw: str, network: str) -> _DecoderWrapper:
+    def build_decoder(descriptor_raw: str, network: str) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
