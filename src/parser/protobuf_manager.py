@@ -5,7 +5,6 @@ from typing import Any
 from requests import get
 from types import ModuleType
 from grpc_tools import protoc
-from functools import _Descriptor
 from tempfile import TemporaryDirectory
 from google.protobuf import json_format
 from google.protobuf.descriptor_pool import DescriptorPool
@@ -243,7 +242,7 @@ class _DecoderWrapper:
         # Keep parity with the original TypeScript implementation, which expects
         # the top-level message type `${network}.Pack`.
         full_name = f"{network}.Pack"
-        message_descriptor: _Descriptor = None
+        message_descriptor = None
         try:
             # Find the message descriptor for the top-level message type in the DescriptorPool
             message_descriptor = pool.FindMessageTypeByName(full_name)

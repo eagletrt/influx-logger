@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 
 from src.utils.logger_utils import logger
 from src.connections.connection import Connection
-from handler.msg_dispatcher import MsgHandler
+from src.handler.msg_dispatcher import MsgDispatcher
 
 class MQTTConnection(Connection):
     """
@@ -31,7 +31,7 @@ class MQTTConnection(Connection):
 
     def on_message(client, userdata, msg):
         try:
-            MsgHandler.handle_incoming_message(msg.topc, msg.payload)
+            MsgDispatcher().handle_incoming_message(msg.topic, msg.payload)
         except Exception as e:
             logger.exception(f"mqtt-connection: Caught exception in on_message: {e}")
 
@@ -47,7 +47,13 @@ class MQTTConnection(Connection):
             self.connection.on_connect = self.on_connect
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message
-            self.connection.connect(self.url, self.port)
+            try:
+                self.connection.connect(self.url, self.port)
+            except Exception as e:
+                print(self.url, self.port)
+                logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
+                raise e
+            #self.connection.connect(self.url, self.port)
             self.connection.loop_start()
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True

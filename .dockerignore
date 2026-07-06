@@ -1,6 +1,7 @@
 node_modules
 bun.lockb
 configuration.json
+config.json
 .git/
 .venv/
 .generated/

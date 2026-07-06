@@ -3,17 +3,16 @@ from typing import Callable, Any
 
 from src.utils.logger_utils import logger
 from src.parser.parser import parser
-from src.connections.mqtt_connection import MQTTConnection
 from src.parser.protobuf_manager import LibCANManager
 
 class MsgDispatcher:
-    def __init__(self, connection: MQTTConnection):
+    def __init__(self):
         self.topic_callbacks: dict[str, Callable] = {
             "+/+/version":  self.handle_version_message,
             "+/+/data/+":   self.handle_data_message,
         }
         #self.protobuff_manager: ProtobufManager = ProtobufManager()
-        self.mqtt: MQTTConnection = connection
+        #self.mqtt: MQTTConnection = connection
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
