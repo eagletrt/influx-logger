@@ -1,4 +1,3 @@
-from requests import post
 from threading import Thread, Event
 from influxdb_client import InfluxDBClient
 
