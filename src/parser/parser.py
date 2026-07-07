@@ -28,7 +28,9 @@ class Parser(Thread):
         '''Flag to indicate whether the parser should stop processing messages.'''
         self.row_queue_not_empty: Condition = Condition(lock=self.__row_message_lock)
         '''Condition variable to signal when the row_messages list is not empty, allowing the parser to start processing messages.'''
-        self.points_increased: Event = Condition()
+        self.__new_points_event_lock__: Lock = Lock()
+        '''Lock to synchronize access to the new points event, ensuring thread safety when signaling that new points have been added to the destination_list.'''
+        self.points_increased: Condition = Condition(lock=self.__new_points_event_lock__)
         '''Event to signal when new points have been added to the destination_list, allowing other threads to wait for new points to be available.'''
 
     def add_to_queue(self, message: tuple[list[str], bytes]) -> None:
@@ -118,7 +120,8 @@ class Parser(Thread):
         """
         with self.__destination_list_lock:
             self.destination_list.append(line)
-        self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+        with self.__new_points_event_lock__:
+            self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
     
     def push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
         '''
@@ -204,9 +207,11 @@ class Parser(Thread):
         If you want to stop the parser gracefully, use the `graceful_stop` method instead, which will wait for the message queue to be empty before stopping.
         '''
         self.stop = True
-        self.row_queue_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
-        self.points_increased.notify_all()  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
-    
+        with self.row_queue_not_empty:
+            self.row_queue_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
+        with self.__new_points_event_lock__:
+            self.points_increased.notify_all()  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
+
     def run(self) -> None:
         while not self.stop:
             self.__parse_next_message()

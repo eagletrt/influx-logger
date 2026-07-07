@@ -1,6 +1,6 @@
 from influxdb_client import Point
 from influxdb_client.client.write_api import WriteOptions, WriteApi
-from threading import Condition
+from threading import Condition, Lock
 
 from src.parser.parser import Parser
 from src.utils.logger_utils import logger
@@ -34,7 +34,8 @@ class InfluxWriter(InfluxManager):
         self.points:list[Point] = None
         self.ready_to_flush_list:list[str] = None
         self.parser: Parser = Parser()
-        self.cond_to_push: Condition = Condition()
+        self.__lock__: Lock = Lock()
+        self.cond_to_push: Condition = Condition(lock=self.__lock__)
 
     def is_list_limit_reached(self, count:int) -> bool:
         return count >= self.write_options.batch_size
@@ -86,8 +87,9 @@ class InfluxWriter(InfluxManager):
             self.parser.start()
         except Exception:
             pass
-        while not super()._stop():
-            self.cond_to_push.wait(lambda: self.check_to_push() or super()._stop())
+        while self.stopped() is False:
+            with self.parser.__new_points_event_lock__:
+                self.parser.points_increased.wait()
             if self.check_to_push():
                 self.push(self.parser.pop_points(self.write_options.batch_size))
         self.parser.graceful_stop()
@@ -96,12 +98,10 @@ class InfluxWriter(InfluxManager):
         super().stop()
         self.parser.graceful_stop()
         self.parser.join()
-        self.cond_to_push.notify_all()
 
     def stop(self) -> None:
         super().stop()
         self.parser.stop_parser()
         self.parser.join()
-        self.cond_to_push.notify_all()
 
 __all__ = ["InfluxWriter"]

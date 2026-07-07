@@ -32,7 +32,7 @@ services:
         ports:
             - "8000:8000"
         volumes:
-            - ./config.json:/app/config.json:ro
+            - ./configuration.json:/app/config.json:ro
         depends_on:
             - influxdb2
             - mosquitto

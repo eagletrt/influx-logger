@@ -1,17 +1,51 @@
 from re import Pattern, compile
-from typing import Callable, Any
+from typing import Callable
 
 from src.utils.logger_utils import logger
-from src.parser.protobuf_manager import LibCANManager
 from src.influx.influx_writer import InfluxWriter
+from src.influx.influx_reader import InfluxReader
+from src.parser.protobuf_manager import LibCANManager
+from src.connections.mqtt_connection import MQTTConnection
 
 class MsgDispatcher:
-    def __init__(self):
+    def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
             "+/+/version":  self.handle_version_message,
             "+/+/data/+":   self.handle_data_message,
         }
-        self.influx_writer: InfluxWriter = InfluxWriter()
+        self.influx_writer: InfluxWriter = influx_writer
+        self.influx_reader: InfluxReader = influx_reader
+        self.mqtt: MQTTConnection = mqtt
+        self.__run_if_set()
+
+    def set(self, influx_writer: InfluxWriter=None, influx_reader: InfluxReader=None, mqtt: MQTTConnection=None) -> None:
+        '''
+        Sets the InfluxWriter instance for the MsgDispatcher.
+        Args:
+            influx_writer (InfluxWriter): The InfluxWriter instance to be used for writing data to InfluxDB.
+        '''
+        if influx_writer is not None:
+            self.influx_writer = influx_writer
+        if influx_reader is not None:
+            self.influx_reader = influx_reader
+        if mqtt is not None:
+            self.mqtt = mqtt
+        self.__run_if_set()
+
+    def __run_if_set(self) -> None:
+        '''
+        Starts the InfluxWriter and InfluxReader threads if they are set.
+        '''
+        if self.influx_writer:
+            try:
+                self.influx_writer.start()
+            except Exception as e:
+                pass
+        if self.influx_reader:
+            try:
+                self.influx_reader.start()
+            except Exception as e:
+                pass
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -30,7 +64,8 @@ class MsgDispatcher:
                 groups = list(matches[0].groups())
                 handler_function(topic, payload, groups)
 
-    def build_topic_regex(self, topic: str) -> Pattern:
+    @staticmethod
+    def build_topic_regex(topic: str) -> Pattern:
         '''
         Converts an MQTT topic with wildcards into a regex pattern for matching incoming topics.
         Args:
@@ -49,6 +84,12 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming version message.
             ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
         '''
+        if not self.mqtt:
+            logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle version message.")
+            return
+        if not self.influx_writer:
+            logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle version message.")
+            return
         vehicle_id, device_id = ids
         payload_str = payload.decode()
         logger.info(f"msg_dispatcher: Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
@@ -59,7 +100,7 @@ class MsgDispatcher:
                 self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
                 logger.info(f"Commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
             try:
-                self.parser.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
+                self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
                 self.influx_writer.parser.protobuf_manager.version_descriptors[payload_str] = {}
                 logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
             except Exception as e:
@@ -75,7 +116,32 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming data message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
         '''
+        if not self.influx_writer:
+            logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle data message.")
+            return
         row_msg: tuple[list[str], bytes] = (ids, payload)
         self.influx_writer.parser.add_to_queue(row_msg)
+
+    def stop(self) -> None:
+        '''
+        Stops the MsgDispatcher by stopping the InfluxWriter and InfluxReader if they are set.
+        '''
+        if self.influx_writer:
+            self.influx_writer.stop()
+            self.influx_writer.join()
+        if self.influx_reader:
+            self.influx_reader.stop()
+            self.influx_reader.join()
+
+    def graceful_stop(self) -> None:
+        '''
+        Gracefully stops the MsgDispatcher by stopping the InfluxWriter and InfluxReader if they are set, and waiting for their threads to finish.
+        '''
+        if self.influx_writer:
+            self.influx_writer.graceful_stop()
+            self.influx_writer.join()
+        if self.influx_reader:
+            self.influx_reader.stop() # TODO: Implement graceful stop for InfluxReader if needed
+            self.influx_reader.join()
         
 __all__ = ["MsgDispatcher"]

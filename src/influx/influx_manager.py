@@ -1,5 +1,5 @@
 from abc import ABC
-from threading import Thread
+from threading import Lock, Thread
 
 from src.utils.timestamp import TimestampPrecision
 from src.connections.influx_connection import InfluxConnection
@@ -19,13 +19,24 @@ class InfluxManager(Thread, ABC):
         super().__init__(name=name, daemon=True)
         self.client:InfluxConnection = client
         self.timestamp_precision:TimestampPrecision = timestamp_precision
-        self._stop:bool = False
+        self.__stop__:bool = False
+        self.__stop_lock__:Lock = Lock()
 
     def stop(self):
         """
         Stops the InfluxManager thread by setting the stop flag to True.
         This method can be called to gracefully stop the thread's execution.
         """
-        self.stop = True
+        with self.__stop_lock__:
+            self.__stop__ = True
+    
+    def stopped(self) -> bool:
+        """
+        Checks if the InfluxManager thread has been stopped.
+        Returns:
+            bool: True if the thread has been stopped, False otherwise.
+        """
+        with self.__stop_lock__:
+            return self.__stop__
 
 __all__ = ["InfluxManager"]

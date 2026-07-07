@@ -2,7 +2,6 @@ import paho.mqtt.client as mqtt
 
 from src.utils.logger_utils import logger
 from src.connections.connection import Connection
-from src.handler.msg_dispatcher import MsgDispatcher
 
 class MQTTConnection(Connection):
     """
@@ -12,28 +11,31 @@ class MQTTConnection(Connection):
         broker: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
     """
-    def __init__(self, url: str, port: int = 1883, on_state_change=None):
+    def __init__(self, url: str, port: int = 1883, on_state_change=None, on_message=None):
         super().__init__(url=url, port=port)
         self.on_state_change = on_state_change
+        self.message_callback = on_message
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
             self.on_state_change()
 
-    def on_connect(self, client, _userdata, _flags, reason_code, properties=None):
+    def on_connect(self, client, _userdata, _flags, reason_code, properties=None) -> None:
         logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
         self.__notify_state_change()
 
-    def on_disconnect(self, client, _userdata, reason_code, properties=None):
+    def on_disconnect(self, client, _userdata, reason_code, properties=None) -> None:
         logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
         self.connection = None
         self.__notify_state_change()
 
-    def on_message(client, userdata, msg):
+    def on_message(self, client, _userdata, msg) -> None:
+        logger.debug(f"mqtt-connection: Received message on topic {msg.topic} with payload {msg.payload}")
         try:
-            MsgDispatcher().handle_incoming_message(msg.topic, msg.payload)
+            if callable(self.message_callback):
+                self.message_callback(msg.topic, msg.payload)
         except Exception as e:
-            logger.exception(f"mqtt-connection: Caught exception in on_message: {e}")
+            logger.error(f"mqtt-connection: Error while handling incoming message on topic {msg.topic}: {e}")
 
     def connect(self) -> bool:
         """

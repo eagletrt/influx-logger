@@ -76,16 +76,20 @@ class InfluxConnection(Connection):
             bool: True if the connection was successful, False otherwise.
         """
         try:
+            self.connection_checker.stop()  # Stop the connection checker thread if it's already running
             self.connection = InfluxDBClient(
                 url=self.get_full_link(),
                 token=self.token,
                 org=self.org
             )
-            self.connection_checker.stop()  # Stop the connection checker thread if it's already running
             self.connection_checker = ConnectionChecker(self, check_interval=10)  # Create a new connection checker thread
             self.connection_checker.start()  # Start the connection checker thread
-            logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
-            return True
+            if self.is_connected():
+                logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
+                return True
+            else:
+                logger.warning(f"influx-connection: Connection to InfluxDB at {self.url}:{self.port} established, but ping failed")
+                return False
         except Exception as e:
             logger.error(f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}")
             return False
@@ -115,14 +119,14 @@ class InfluxConnection(Connection):
         """
         try:
             # List buckets (lightweight operation)
-            self.connection.buckets_api().find_buckets()
+            result = self.connection.buckets_api().find_buckets()
             # Connection is active and authenticated
-            return True
+            return result is not None
         except Exception as e:
             # Check weather InfluxDB is up
             health_api = self.connection.health()
             if health_api.status == "pass":
-                logger.warning("influx-connection: InfluxDB up, but connection down")
+                logger.warning("influx-connection: InfluxDB up, but not connected. Check your token and permissions.")
             return False
 
 class ConnectionChecker(Thread):

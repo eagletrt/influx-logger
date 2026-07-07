@@ -21,14 +21,14 @@ class ConnectionHandler:
             cls._instance = super(ConnectionHandler, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Configuration = None, on_state_change=None):
+    def __init__(self, config: Configuration = None, on_state_change=None, on_message=None):
         if self._initialized:
             return
         self.on_state_change = on_state_change
-        self.set(config) if config else None
+        self.set(config, on_state_change=on_state_change, on_message=on_message) if config else None
         self._initialized = True
 
-    def set(self, config: Configuration = None, on_state_change=None) -> None:
+    def set(self, config: Configuration = None, on_state_change=None, on_message=None) -> None:
         """
         Set the configuration for InfluxDB and MQTT connections.
         This method allows updating the connection settings after the ConnectionHandler instance has been created.
@@ -48,7 +48,8 @@ class ConnectionHandler:
         self.mqtt_connection = MQTTConnection(
             url=config.mqtt_url,
             port=config.mqtt_port,
-            on_state_change=self.on_state_change
+            on_state_change=self.on_state_change,
+            on_message=on_message,
         ) if config else None
 
     def start_connections(self) -> None:

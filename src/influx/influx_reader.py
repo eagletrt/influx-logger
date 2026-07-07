@@ -1,4 +1,6 @@
+from src.utils.timestamp import TimestampPrecision
 from src.influx.influx_manager import InfluxManager
+from src.connections.influx_connection import InfluxConnection
 
 class InfluxReader(InfluxManager):
     """
