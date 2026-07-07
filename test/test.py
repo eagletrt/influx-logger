@@ -1,6 +1,7 @@
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
+from asyncio.log import logger
 import sys
+from pathlib import Path
+from importlib.util import module_from_spec, spec_from_file_location
 from unittest import FunctionTestCase, TestLoader, TestSuite, TextTestRunner
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -35,16 +36,16 @@ def main():
 
     runner = TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    print(f"Tests run: {result.testsRun}")
-    print(f"\tPassed: {result.testsRun - len(result.failures) - len(result.errors) - len(result.skipped)}")
-    print(f"\tFailures: {len(result.failures)}")
-    print(f"\tErrors: {len(result.errors)}")
-    print(f"\tSkipped: {len(result.skipped)}")
-    print()
+    logger.info(f"Tests run: {result.testsRun}")
+    logger.info(f"\tPassed: {result.testsRun - len(result.failures) - len(result.errors) - len(result.skipped)}")
+    logger.info(f"\tFailures: {len(result.failures)}")
+    logger.info(f"\tErrors: {len(result.errors)}")
+    logger.info(f"\tSkipped: {len(result.skipped)}")
+    logger.info()
     if result.wasSuccessful():
-        print("All tests passed successfully.")
+        logger.info("All tests passed successfully.")
     else:
-        print("Some tests failed or encountered errors.")
+        logger.info("Some tests failed or encountered errors.")
         exit(1)  # Exit with a non-zero status to indicate failure
 
 if __name__ == '__main__':
