@@ -186,15 +186,34 @@ class Parser(Thread):
         cond: Condition = Condition(lock=self.__row_message_lock)
         while len(self.row_messages) > 0:
             cond.wait()
-        self.stop = True
+        self.stop_parser()
     
     def stop_parser(self) -> None:
+        '''
+        Method to stop the parser thread. It sets the stop flag to True and notifies the parser thread to wake up and check the stop condition. This allows the parser to exit its loop and stop processing messages.
+        If you want to stop the parser gracefully, use the `graceful_stop` method instead, which will wait for the message queue to be empty before stopping.
+        '''
         self.stop = True
         self.list_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
     
     def run(self) -> None:
         while not self.stop:
             self.__parse_next_message()
+
+    def pop_points(self, max: int = -1) -> list[Point]:
+        '''
+        Pops a specified number of points from the destination list and returns them.
+        Args:
+            max (int): The maximum number of points to pop. If max is less than or equal to 0 or greater than the length of the destination list, all points will be popped.
+        Returns:
+            list[Point]: A list of popped InfluxDB Point objects.
+        '''
+        with self.__destination_list_lock:
+            if max <= 0 or max > len(self.destination_list):
+                points: list[Point] = self.destination_list.pop(0, len(self.destination_list))
+            else:
+                points: list[Point] = self.destination_list.pop(0, max)
+        return points
 
 parser: Parser = Parser()
 
