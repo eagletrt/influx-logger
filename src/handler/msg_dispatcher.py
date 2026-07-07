@@ -2,8 +2,8 @@ from re import Pattern, compile
 from typing import Callable, Any
 
 from src.utils.logger_utils import logger
-from src.parser.parser import parser
 from src.parser.protobuf_manager import LibCANManager
+from src.influx.influx_writer import InfluxWriter
 
 class MsgDispatcher:
     def __init__(self):
@@ -11,8 +11,7 @@ class MsgDispatcher:
             "+/+/version":  self.handle_version_message,
             "+/+/data/+":   self.handle_data_message,
         }
-        #self.protobuff_manager: ProtobufManager = ProtobufManager()
-        #self.mqtt: MQTTConnection = connection
+        self.influx_writer: InfluxWriter = InfluxWriter()
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -61,7 +60,7 @@ class MsgDispatcher:
                 logger.info(f"Commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
             try:
                 self.parser.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
-                parser.protobuf_manager.version_descriptors[payload_str] = {}
+                self.influx_writer.parser.protobuf_manager.version_descriptors[payload_str] = {}
                 logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
             except Exception as e:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
@@ -77,6 +76,6 @@ class MsgDispatcher:
             ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
         '''
         row_msg: tuple[list[str], bytes] = (ids, payload)
-        parser.add_to_queue(row_msg)
+        self.influx_writer.parser.add_to_queue(row_msg)
         
 __all__ = ["MsgDispatcher"]

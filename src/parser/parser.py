@@ -1,6 +1,6 @@
 from typing import Any
 from influxdb_client import Point
-from threading import Condition, Thread, Lock
+from threading import Condition, Event, Thread, Lock
 
 from src.utils.line import Line
 from src.utils.logger_utils import logger
@@ -26,18 +26,20 @@ class Parser(Thread):
         '''Lock to synchronize access to the destination_list, ensuring thread safety when adding parsed points.'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
-        self.list_not_empty: Condition = Condition(lock=self.__row_message_lock)
+        self.row_queue_not_empty: Condition = Condition(lock=self.__row_message_lock)
         '''Condition variable to signal when the row_messages list is not empty, allowing the parser to start processing messages.'''
+        self.points_increased: Event = Condition()
+        '''Event to signal when new points have been added to the destination_list, allowing other threads to wait for new points to be available.'''
 
     def add_to_queue(self, message: tuple[list[str], bytes]) -> None:
         with self.__row_message_lock:
             self.row_messages.append(message)
-            self.list_not_empty.notify()  # Notify the parser thread that a new message has been added to the queue
+            self.row_queue_not_empty.notify_all()  # Notify the parser thread that a new message has been added to the queue
     
     def __parse_next_message(self) -> None:
-        with self.list_not_empty:
+        with self.row_queue_not_empty:
             while len(self.row_messages) == 0 and not self.stop:
-                self.list_not_empty.wait()
+                self.row_queue_not_empty.wait()
         if self.stop:
             return
         with self.__row_message_lock:
@@ -108,6 +110,16 @@ class Parser(Thread):
                     #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
                     pass
 
+    def __append_to_destination_list(self, line: Line) -> None:
+        """
+        Appends a Line object to the destination list in a thread-safe manner.
+        Args:
+            line (Line): The Line object to be appended to the destination list.
+        """
+        with self.__destination_list_lock:
+            self.destination_list.append(line)
+        self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+    
     def push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
         '''
         Pushes a record to the line repository by creating a Line object and adding it to the destination list.
@@ -128,13 +140,11 @@ class Parser(Thread):
                     for row in Parser._expand_columnar_record(record):
                         # Push each row-wise record to the line repository
                         line: Line = Line.from_object(row, measurement, tags)
-                        with self.__destination_list_lock:
-                            self.destination_list.append(line)
+                        self.__append_to_destination_list(line)
                     return
         # Create a Line object from the record and add it to the destination list
         line: Line = Line.from_object(record, measurement, tags)
-        with self.__destination_list_lock:
-            self.destination_list.append(line)
+        self.__append_to_destination_list(line)
 
     @staticmethod
     def _expand_columnar_record(record: dict[str, Any]) -> list[dict[str, Any]]:
@@ -194,11 +204,21 @@ class Parser(Thread):
         If you want to stop the parser gracefully, use the `graceful_stop` method instead, which will wait for the message queue to be empty before stopping.
         '''
         self.stop = True
-        self.list_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
+        self.row_queue_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
+        self.points_increased.notify_all()  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
     
     def run(self) -> None:
         while not self.stop:
             self.__parse_next_message()
+
+    def get_points_count(self) -> int:
+        '''
+        Returns the number of points currently stored in the destination list.
+        Returns:
+            int: The number of points in the destination list.
+        '''
+        with self.__destination_list_lock:
+            return len(self.destination_list)
 
     def pop_points(self, max: int = -1) -> list[Point]:
         '''
@@ -214,7 +234,5 @@ class Parser(Thread):
             else:
                 points: list[Point] = self.destination_list.pop(0, max)
         return points
-
-parser: Parser = Parser()
 
 __all__ = ["parser", "Parser"]
