@@ -130,61 +130,61 @@ class MsgDispatcher:
         #            #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
         #            pass
 
-    def _push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
-        # If the record is a dictionary containing "valuesMap" and "timestamp", expand it into multiple rows and push each row to the line repository
-        if isinstance(record, dict) and "valuesMap" in record and "timestamp" in record:
-            for row in MsgDispatcher._expand_columnar_record(record):
-                line = Line.from_object(row, measurement, tags)
-                if self.line_repository:
-                    self.line_repository.push(line)
-            return
-        # If the record is not a dictionary, log a warning and return without pushing it to the line repository
-        if not isinstance(record, dict):
-            logger.warning(f"msg_dispatcher: Invalid object received from device for measurement '{measurement}'")
-            return
-        # Create a Line object from the record and push it to the line repository if it exists
-        line = Line.from_object(record, measurement, tags)
-        if self.line_repository:
-            self.line_repository.push(line)
-
-
-    def _expand_columnar_record(record: dict[str, Any]) -> list[dict[str, Any]]:
-        '''
-        Expands a columnar record into a list of row-wise records.
-        Args:
-            record (dict[str, Any]): The columnar record containing "timestamp" and "valuesMap" keys.
-        Returns:
-            list[dict[str, Any]]: A list of row-wise records, where each record is a dictionary containing a "timestamp" and corresponding field values.
-        '''
-        timestamps = MsgDispatcher._unwrap_values(record.get("timestamp"))
-        values_map = record.get("valuesMap", {})
-        # Validate that the timestamps and values_map are of the expected types
-        if not isinstance(timestamps, list):
-            raise ValueError("Missing or invalid timestamp")
-        if not isinstance(values_map, dict):
-            raise ValueError("Missing or invalid values map")
-        # Expand the columnar record into a list of row-wise records
-        rows: list[dict[str, Any]] = []
-        # Iterate through the timestamps and corresponding field values, creating a row-wise record for each timestamp
-        for index, timestamp in enumerate(timestamps):
-            row: dict[str, Any] = {"timestamp": timestamp}
-            # Iterate through the field names and their corresponding values in the values_map, unwrapping the values and adding them to the row if they exist for the current index
-            for field_name, field_values in values_map.items():
-                values = MsgDispatcher._unwrap_values(field_values)
-                if isinstance(values, list) and index < len(values):
-                    row[field_name] = values[index]
-            # Append the constructed row to the list of rows
-            rows.append(row)
-        return rows
-
-    def _unwrap_values(values: Any) -> Any:
-        '''
-        Unwraps the "values" key from a dictionary if it exists, otherwise returns the original value.
-        Args:
-            values (Any): The value to be unwrapped, which can be a dictionary or any other type.
-        Returns:
-            Any: The unwrapped value if it was a dictionary with a "values" key, otherwise the original value.
-        '''
-        if isinstance(values, dict):
-            return values.get("values")
-        return values
+    #def _push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
+    #    # If the record is a dictionary containing "valuesMap" and "timestamp", expand it into multiple rows and push each row to the line repository
+    #    if isinstance(record, dict) and "valuesMap" in record and "timestamp" in record:
+    #        for row in MsgDispatcher._expand_columnar_record(record):
+    #            line = Line.from_object(row, measurement, tags)
+    #            if self.line_repository:
+    #                self.line_repository.push(line)
+    #        return
+    #    # If the record is not a dictionary, log a warning and return without pushing it to the line repository
+    #    if not isinstance(record, dict):
+    #        logger.warning(f"msg_dispatcher: Invalid object received from device for measurement '{measurement}'")
+    #        return
+    #    # Create a Line object from the record and push it to the line repository if it exists
+    #    line = Line.from_object(record, measurement, tags)
+    #    if self.line_repository:
+    #        self.line_repository.push(line)
+#
+#
+    #def _expand_columnar_record(record: dict[str, Any]) -> list[dict[str, Any]]:
+    #    '''
+    #    Expands a columnar record into a list of row-wise records.
+    #    Args:
+    #        record (dict[str, Any]): The columnar record containing "timestamp" and "valuesMap" keys.
+    #    Returns:
+    #        list[dict[str, Any]]: A list of row-wise records, where each record is a dictionary containing a "timestamp" and corresponding field values.
+    #    '''
+    #    timestamps = MsgDispatcher._unwrap_values(record.get("timestamp"))
+    #    values_map = record.get("valuesMap", {})
+    #    # Validate that the timestamps and values_map are of the expected types
+    #    if not isinstance(timestamps, list):
+    #        raise ValueError("Missing or invalid timestamp")
+    #    if not isinstance(values_map, dict):
+    #        raise ValueError("Missing or invalid values map")
+    #    # Expand the columnar record into a list of row-wise records
+    #    rows: list[dict[str, Any]] = []
+    #    # Iterate through the timestamps and corresponding field values, creating a row-wise record for each timestamp
+    #    for index, timestamp in enumerate(timestamps):
+    #        row: dict[str, Any] = {"timestamp": timestamp}
+    #        # Iterate through the field names and their corresponding values in the values_map, unwrapping the values and adding them to the row if they exist for the current index
+    #        for field_name, field_values in values_map.items():
+    #            values = MsgDispatcher._unwrap_values(field_values)
+    #            if isinstance(values, list) and index < len(values):
+    #                row[field_name] = values[index]
+    #        # Append the constructed row to the list of rows
+    #        rows.append(row)
+    #    return rows
+#
+    #def _unwrap_values(values: Any) -> Any:
+    #    '''
+    #    Unwraps the "values" key from a dictionary if it exists, otherwise returns the original value.
+    #    Args:
+    #        values (Any): The value to be unwrapped, which can be a dictionary or any other type.
+    #    Returns:
+    #        Any: The unwrapped value if it was a dictionary with a "values" key, otherwise the original value.
+    #    '''
+    #    if isinstance(values, dict):
+    #        return values.get("values")
+    #    return values
