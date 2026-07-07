@@ -188,3 +188,5 @@ class MsgDispatcher:
     #    if isinstance(values, dict):
     #        return values.get("values")
     #    return values
+
+__all__ = ["MsgDispatcher"]

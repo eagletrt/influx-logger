@@ -1,16 +1,15 @@
-from threading import Condition, Thread, Lock
-from influxdb_client import Point
 from typing import Any
+from influxdb_client import Point
+from threading import Condition, Thread, Lock
 
-from src.parser.protobuf_manager import ProtobufManager
+from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
-from src.utils.line import Line
-from src.handler.msg_dispatcher import MsgDispatcher
+from src.parser.protobuf_manager import ProtobufManager
 
 class Parser(Thread):
     def __init__(self, excluded_networks: list[str] = []) -> None:
-        super(Thread, self).__init__(name="Parser")
+        super().__init__(name="Parser", daemon=False)
         self.excluded_networks: list[str] = excluded_networks
         '''List of network identifiers to be excluded from parsing. Messages from these networks will be ignored.'''
         self.protobuf_manager: ProtobufManager = ProtobufManager()
@@ -146,7 +145,7 @@ class Parser(Thread):
         Returns:
             list[dict[str, Any]]: A list of row-wise records, where each record is a dictionary containing a "timestamp" and corresponding field values.
         '''
-        timestamps = MsgDispatcher._unwrap_values(record.get("timestamp"))
+        timestamps = Parser._unwrap_values(record.get("timestamp"))
         values_map = record.get("valuesMap", {})
         # Validate that the timestamps and values_map are of the expected types
         if not isinstance(timestamps, list):
@@ -160,13 +159,14 @@ class Parser(Thread):
             row: dict[str, Any] = {"timestamp": timestamp}
             # Iterate through the field names and their corresponding values in the values_map, unwrapping the values and adding them to the row if they exist for the current index
             for field_name, field_values in values_map.items():
-                values = MsgDispatcher._unwrap_values(field_values)
+                values = Parser._unwrap_values(field_values)
                 if isinstance(values, list) and index < len(values):
                     row[field_name] = values[index]
             # Append the constructed row to the list of rows
             rows.append(row)
         return rows
 
+    @staticmethod
     def _unwrap_values(values: Any) -> Any:
         '''
         Unwraps the "values" key from a dictionary if it exists, otherwise returns the original value.
