@@ -88,7 +88,7 @@ class InfluxConnection(Connection):
                 logger.info(f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}")
                 return True
             else:
-                logger.warning(f"influx-connection: Connection to InfluxDB at {self.url}:{self.port} established, but ping failed")
+                logger.warning(f"influx-connection: Connection to InfluxDB at {self.connection.url} Connection not established.")
                 return False
         except Exception as e:
             logger.error(f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}")
@@ -134,12 +134,12 @@ class ConnectionChecker(Thread):
     A thread that periodically checks the connection status of the InfluxDB service.
     It runs in the background and logs the connection status at regular intervals.
     """
-    def __init__(self, influx_connection: 'InfluxConnection', check_interval: int = 10):
+    def __init__(self, influx_connection: 'InfluxConnection', check_interval: int = 2):
         """
         Initializes the ConnectionChecker thread with a specified check interval.
         Args:
             influx_connection (InfluxConnection): The InfluxConnection instance to check.
-            check_interval (int, optional): The interval (in seconds) between connection checks. Defaults to 10 seconds.
+            check_interval (int, optional): The interval (in seconds) between connection checks. Defaults to 2 seconds.
         """
         super().__init__(name="ConnectionChecker")
         self.influx_connection: InfluxConnection = influx_connection
