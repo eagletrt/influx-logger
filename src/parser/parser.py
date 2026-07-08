@@ -9,7 +9,7 @@ from src.parser.protobuf_manager import ProtobufManager
 
 class Parser(Thread):
     def __init__(self, excluded_networks: list[str] = []) -> None:
-        super().__init__(name="Parser", daemon=False)
+        super().__init__(name="Parser")
         self.excluded_networks: list[str] = excluded_networks
         '''List of network identifiers to be excluded from parsing. Messages from these networks will be ignored.'''
         self.protobuf_manager: ProtobufManager = ProtobufManager()

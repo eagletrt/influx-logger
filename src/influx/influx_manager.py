@@ -16,7 +16,7 @@ class InfluxManager(Thread, ABC):
         timestamp_precision (TimestampPrecision): The precision of timestamps used in interactions with InfluxDB.
     """
     def __init__(self, client:InfluxConnection, timestamp_precision:TimestampPrecision = TimestampPrecision.ns, name:str = "InfluxManager") -> None:
-        super().__init__(name=name, daemon=True)
+        super().__init__(name=name)
         self.client:InfluxConnection = client
         self.timestamp_precision:TimestampPrecision = timestamp_precision
         self.__stop__:bool = False

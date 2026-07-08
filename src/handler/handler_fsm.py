@@ -170,11 +170,12 @@ class HandlerFSM(Thread, StateMachine):
         If neither connection is established, it remains in the idle state and continues to check for both connections.
         """
         self.__event = False
+        self.handler.start_connections()
         while not self.__event and not self.are_both_connected():
-            logger.info(f"{self.get_log_header()} - Trying connection")
-            self.handler.start_connections()
             with self.__connection_condition:
                 self.__connection_condition.wait(timeout=1.0)
+            logger.info(f"{self.get_log_header()} - Trying connection")
+            self.handler.start_connections()
         if self.are_both_connected():
             logger.info(f"{self.get_log_header()} - Both connections established, transitioning to running state")
             self.send('connection')

@@ -141,7 +141,7 @@ class ConnectionChecker(Thread):
             influx_connection (InfluxConnection): The InfluxConnection instance to check.
             check_interval (int, optional): The interval (in seconds) between connection checks. Defaults to 10 seconds.
         """
-        super().__init__(name="ConnectionChecker", daemon=True)
+        super().__init__(name="ConnectionChecker")
         self.influx_connection: InfluxConnection = influx_connection
         self.check_interval: int = check_interval
         self._stop_event: Event = Event()
@@ -166,7 +166,6 @@ class ConnectionChecker(Thread):
         """
         self._stop_event.set()
         try:
-            self.daemon = False  # Allow the thread to be joined
             self.join()  # Wait for the thread to finish
         except Exception as e:
             pass
