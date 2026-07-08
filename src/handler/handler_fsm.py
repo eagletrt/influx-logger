@@ -103,6 +103,7 @@ class HandlerFSM(Thread, StateMachine):
         If both connections are still established, it remains in the running state. If one or both connections are lost, it transitions to the idle state and continues to check for both connections.
         """
         logger.info(f"{self.get_log_header()} - on_disconnection event triggered")
+        self.msg_dispatcher.stop()
     
     def on_finish(self):
         """
@@ -143,14 +144,6 @@ class HandlerFSM(Thread, StateMachine):
         """
         logger.info(f"{self.get_log_header()} - Entering stop state")
         self.do_stop()
-    
-    def on_exit_running(self):
-        """
-        Method called when exiting the running state. It performs any necessary cleanup operations, such as stopping the handler's main operation and releasing resources.
-        """
-        logger.info(f"{self.get_log_header()} - Exiting running state")
-        if not self.handler.are_both_connected():
-            self.msg_dispatcher.stop()  # Stop the MsgDispatcher if connections are lost
 
     def do_start(self):
         """
@@ -201,6 +194,7 @@ class HandlerFSM(Thread, StateMachine):
         """
         Method to handle the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
         """
+        self.msg_dispatcher.graceful_stop()
         self.handler.stop_connections()
         logger.info(f"{self.get_log_header()} - Connections stopped, handler in finale state")
 

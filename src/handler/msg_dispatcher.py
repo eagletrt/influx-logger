@@ -129,9 +129,11 @@ class MsgDispatcher:
         if self.influx_writer:
             self.influx_writer.stop()
             self.influx_writer.join()
+            self.influx_writer = None  # Clear the reference to the InfluxWriter instance
         if self.influx_reader:
             self.influx_reader.stop()
             self.influx_reader.join()
+            self.influx_reader = None  # Clear the reference to the InfluxReader instance
 
     def graceful_stop(self) -> None:
         '''
