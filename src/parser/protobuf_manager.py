@@ -19,7 +19,7 @@ class ProtobufManager:
     Manages the retrieval and caching of protobuf descriptors for different versions and networks.
     '''
     def __init__(self, cache_folder: str = ".cache"):
-        self.version_descriptors: dict[str, dict[str, Any]]
+        self.version_descriptors: dict[str, dict[str, Any]] = {}
         ''' Version descriptors maps version -> network -> protobuf type/object'''
         self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         self.generated_proto_root = os.path.join(self.project_root, cache_folder, "proto")
