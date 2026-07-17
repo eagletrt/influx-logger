@@ -39,7 +39,7 @@ class ProtobufManager:
         if descriptor_raw is None:
             logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
             return
-        logger.info("protobuf_manager: Descriptor successfully downloaded")
+        logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
             decoder = _DecoderWrapper.build_decoder(descriptor_raw, network)
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
@@ -216,6 +216,7 @@ class _DecoderWrapper:
             # Write the downloaded .proto descriptor to a temporary file
             with open(proto_file, "w", encoding="utf-8") as fh:
                 fh.write(descriptor_raw)
+            logger.info(f"protobuf_manager: Descriptor successfully written to temporary file: {proto_file}")
             # Compile the .proto file into a descriptor set using protoc
             result = protoc.main(
                 [
