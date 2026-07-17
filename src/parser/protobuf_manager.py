@@ -52,7 +52,7 @@ class ProtobufManager:
             logger.trace(e)
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
             return
-        logger.info("protobuf_manager: Descriptor successfully parsed and is now ready for deserialize data")
+        logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
     
     @staticmethod
     def register_generated_proto_package(package_name: str) -> None:

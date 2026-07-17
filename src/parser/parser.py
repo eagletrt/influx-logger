@@ -86,6 +86,7 @@ class Parser(Thread):
             message_content = decoder.decode(payload)
         except Exception as e:
             logger.error(f"msg_dispatcher: Cannot deserialize payload with saved descriptor: {e}")
+            logger.error(f"msg_dispatcher: {self.protobuf_manager.version_descriptors}")
             return
         tags = {
             "vehicle-id": vehicle_id,
