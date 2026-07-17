@@ -238,6 +238,5 @@ class HandlerFSM(Thread, StateMachine):
             payload (bytes): The payload of the incoming MQTT message.
         '''
         # Handle message only if the FSM is in the running state
-        if self.current_state != self.running:
-            return
-        self.msg_dispatcher.handle_incoming_message(topic, payload)
+        if self.current_state == self.running:
+            self.msg_dispatcher.handle_incoming_message(topic, payload)

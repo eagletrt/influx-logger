@@ -96,21 +96,7 @@ class Parser(Thread):
         if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
             message_content = message_content["valuesPack"]
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
-        for measurement, records in message_content.items():
-            if isinstance(records, list):
-                for record in records:
-                    try:
-                        self.push_record(measurement, record, tags)
-                    except ValueError as e:
-                        #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
-                        pass
-                continue
-            else:
-                try:
-                    self.push_record(measurement, records, tags)
-                except ValueError as e:
-                    #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
-                    pass
+        self.commit(message_content, message_content, tags)
 
     def __append_to_destination_list(self, line: Line) -> None:
         """
@@ -122,8 +108,33 @@ class Parser(Thread):
             self.destination_list.append(line)
         with self.__new_points_event_lock__:
             self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+
+    def commit(self, message_content: dict[str, Any], records: Any, tags: dict[str, str]) -> None:
+        """
+        Commits a record to the line repository by creating a Line object and adding it to the destination list.
+        Args:
+            message_content (dict[str, Any]): A dictionary containing the message content with measurements as keys and their corresponding records as values.
+            records (Any): The records to be committed, which can be a dictionary or any other type. If it's a dictionary, it will be processed to create a Line object.
+            tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
+        """
+        # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
+        for measurement, records in message_content.items():
+            if isinstance(records, list):
+                for record in records:
+                    try:
+                        self.push(measurement, record, tags)
+                    except ValueError as e:
+                        #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+                        pass
+                continue
+            else:
+                try:
+                    self.push(measurement, records, tags)
+                except ValueError as e:
+                    #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+                    pass
     
-    def push_record(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
+    def push(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
         '''
         Pushes a record to the line repository by creating a Line object and adding it to the destination list.
         Args:

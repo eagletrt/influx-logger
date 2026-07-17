@@ -54,7 +54,7 @@ class MsgDispatcher:
             topic (str): The topic of the incoming MQTT message.
             payload (bytes): The payload of the incoming MQTT message.
         '''
-        #logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
+        logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
         # Iterate through the registered topic handlers and invoke the appropriate handler for the incoming message
         for handler_topic, handler_function in self.topic_callbacks.items():
             # Check if the incoming topic matches the handler topic pattern
