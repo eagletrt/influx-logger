@@ -72,9 +72,8 @@ class Parser(Thread):
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
         if network not in self.protobuf_manager.version_descriptors.get(version, {}):
             logger.info(f"msg_dispatcher: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
-            protobuf_manager = ProtobufManager()
             try:
-                protobuf_manager.download_proto_descriptor(version, network)
+                self.protobuf_manager.download_proto_descriptor(version, network)
             except Exception:
                 logger.error(f"msg_dispatcher: Error while getting proto, skipping message")
                 return
@@ -247,9 +246,11 @@ class Parser(Thread):
         '''
         with self.__destination_list_lock:
             if max <= 0 or max > len(self.destination_list):
-                points: list[Point] = self.destination_list.pop(0, len(self.destination_list))
+                # Get all points
+                points: list[Point] = [self.destination_list.pop(0) for _ in range(len(self.destination_list))]
             else:
-                points: list[Point] = self.destination_list.pop(0, max)
+                # Get the specified number of points
+                points: list[Point] = [self.destination_list.pop(0) for _ in range(max)]
         return points
 
 __all__ = ["parser", "Parser"]

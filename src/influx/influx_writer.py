@@ -32,10 +32,15 @@ class InfluxWriter(InfluxManager):
             write_options=self.write_options
         )
         self.points:list[Point] = None
+        '''Points to be written to InfluxDB. This list will be prepared and committed in batches based on the specified batch size.'''
         self.ready_to_flush_list:list[str] = None
+        '''List of identifiers for points that are ready to be flushed to InfluxDB. This can be used to track which points have been prepared and are ready for commit.'''
         self.parser: Parser = Parser()
+        '''Parser instance for processing incoming data and converting it into InfluxDB points. The parser will handle the parsing of messages and the creation of Point objects.'''
         self.__lock__: Lock = Lock()
+        '''Lock for synchronizing access to shared resources, ensuring thread safety when preparing and committing points to InfluxDB.'''
         self.cond_to_push: Condition = Condition(lock=self.__lock__)
+        '''Condition variable for signaling when the batch size limit is reached and points are ready to be pushed to InfluxDB. This allows for efficient waiting and notification between threads.'''
 
     def is_list_limit_reached(self, count:int) -> bool:
         return count >= self.write_options.batch_size
@@ -46,7 +51,7 @@ class InfluxWriter(InfluxManager):
     def push(self, point:Point) -> None:
         points: list[Point] = self.parser.pop_points(self.write_options.batch_size)
     
-    def commit(self) -> None:
+    def commit(self) -> bool:
         points: list[Point] = self.parser.pop_points(self.write_options.batch_size)
         try:
             result = self.write_api.write(
@@ -55,13 +60,16 @@ class InfluxWriter(InfluxManager):
                 record=points,
                 write_precision=self.timestamp_precision,
             )
+            if result is None:
+                logger.warning("Influx Connection: Write API returned None, indicating that the write operation may not have been successful.")
+            else:
+                logger.info(f"Influx Connection: Successfully committed {len(points)} lines")
+                logger.debug(f"Influx Connection: Write API returned: {result}")
+            return result is not None
         except Exception as e:
             pack: str = InfluxWriter.__pack_lines(points)
             logger.error(f"Influx Connection: Failed to commit lines: {e}", exc_info=True)
             logger.debug(f"Influx Connection: Lines that failed to commit: {pack}")
-        else:
-            logger.info(f"Influx Connection: Successfully committed {len(points)} lines")
-            logger.debug(f"Influx Connection: Write API returned: {result}")
 
     @staticmethod
     def __pack_lines(lines: list[Point]) -> str:
