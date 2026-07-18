@@ -55,12 +55,13 @@ class InfluxWriter(InfluxManager):
         Returns:
             str: A string representation of the packed points, ready to be committed to InfluxDB.
         '''
+        points: list[Line] = []
         with self.__lock__:
-            self.points = self.parser.pop_points(self.write_options.batch_size)
-        if self.points is None:
-            self.points = []
-        pack: str = self.__pack_lines(self.points, self.timestamp_precision)
-        return pack
+            lines: list[Line] = self.parser.pop_points(self.write_options.batch_size)
+        for line in lines:
+            points.append(line.to_point(timestamp_precision=self.timestamp_precision))
+        # pack: str = self.__pack_lines(self.points, self.timestamp_precision)
+        return points
     
     def commit(self) -> bool:
         '''
@@ -69,10 +70,10 @@ class InfluxWriter(InfluxManager):
             bool: True if the commit was successful, False otherwise.
         '''
         points: str = self.prepare_for_commit()
-        if len(self.points) == 0:
+        if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
-        logger.info(f"influx_writer: Committing {len(self.points)} lines to InfluxDB")
+        logger.info(f"influx_writer: Committing {len(points)} lines to InfluxDB")
         #logger.info(f"influx_writer: Lines to commit:\n{points}")
         try:
             #logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
@@ -83,7 +84,7 @@ class InfluxWriter(InfluxManager):
                 write_precision=self.timestamp_precision,
             )
             if result is None:
-                logger.warning("influx_writer: Write API returned None, indicating that the write operation may not have been successful.")
+                logger.warning("influx_writer: Unsuccessful commit.")
             else:
                 logger.info(f"influx_writer: Successfully committed {len(self.points)} lines")
                 logger.debug(f"influx_writer: Write API returned: {result}")

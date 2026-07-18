@@ -1,13 +1,14 @@
 from pydot import Any
 from influxdb_client import Point
 
+from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision, INFLUX_INT64_MAX, TIMESTAMP_KEYS
 
 class Line:
     '''
     Represents a single measurement line for InfluxDB.
     Attributes:
-        measurement (str): The name of the measurement's signal.
+        measurement (Any): The name of the measurement's signal.
         tags (dict[str, str]): Tags associated with the measurement.
         fields (dict[str, Any]): Fields containing the actual data values.
         timestamp (int): Timestamp of the measurement in nanoseconds since epoch.
@@ -39,7 +40,7 @@ class Line:
         Creates a Line object from a dictionary representation of a measurement.
         Args:
             obj (dict[str, Any]): The dictionary containing the measurement data.
-            measurement (str): The name of the measurement.
+            measurement (Any): The name of the measurement.
             tags (dict[str, str]): A dictionary of tags associated with the measurement.
         Returns:
             Line: A Line object representing the measurement.
@@ -106,13 +107,24 @@ class Line:
             influxdb_client.Point: The converted InfluxDB Point object.
         '''
         point: Point = Point(self.measurement)
-        for k, v in self.tags.items():
-            point.tag(k, v)
-        for k, v in self.fields.items():
-            if isinstance(v, bytes):
-                point.field(k, v.decode("utf-8", errors="replace"))
-            else:
-                point.field(k, v)
+        for key, value in self.tags.items():
+            point.tag(key, value)
+        type_of_v: type  = None
+        type_of_f: type  = None
+        for field, value in self.fields.items():
+            if type_of_v is None:
+                type_of_v = type(value)
+                logger.info(f"Line: Type of value for vaule '{value}' is {type_of_v}")
+            if type_of_f is None:
+                type_of_f = type(field)
+                logger.info(f"Line: Type of field for field '{field}' is {type_of_f}")
+            if not isinstance(value, type_of_v):
+                # Cast it to it
+                value = type_of_v(value)
+            if not isinstance(field, type_of_f):
+                # Cast it to it
+                field = type_of_f(field)
+            point.field(field, value)
         point.time(self.timestamp, write_precision=timestamp_precision)
         return point
 
