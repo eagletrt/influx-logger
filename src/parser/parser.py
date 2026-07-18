@@ -47,6 +47,8 @@ class Parser(Thread):
         with self.__row_message_lock:
             message = self.row_messages.pop(0)
             parsed_message = self.parse_msg(message)
+        if parsed_message is None:
+            return
         with self.__destination_list_lock:
             self.destination_list.append(parsed_message)
     

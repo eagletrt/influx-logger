@@ -72,6 +72,8 @@ class Line:
             for k, v in obj.items()
             if k not in TIMESTAMP_KEYS
         }
+        if len(fields) == 0:
+            raise ValueError("Missing fields")
         #logger.info(f"Influx Connection: Measurement '{measurement}' and timestamp {timestamp_value}")
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
@@ -96,6 +98,14 @@ class Line:
         if normalized > INFLUX_INT64_MAX:
             raise ValueError(f"Timestamp {timestamp} is out of range for InfluxDB")
         return normalized
+
+    @staticmethod
+    def _normalize_field_value(field_name: str, value: Any) -> Any:
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        if field_name == "id" or field_name.endswith("_id"):
+            return str(value)
+        return value
     
     def to_point(self, timestamp_precision: str = "ns") -> Point:
         '''
@@ -109,19 +119,17 @@ class Line:
         for k, v in self.tags.items():
             point.tag(k, v)
         for k, v in self.fields.items():
-            if isinstance(v, bytes):
-                point.field(k, v.decode("utf-8", errors="replace"))
-            else:
-                point.field(k, str(v))
+            point.field(k, self._normalize_field_value(k, v))
         point.time(self.timestamp, write_precision=timestamp_precision)
         return point
 
     def __str__(self) -> str:
         def field_to_str(k, v):
-            if isinstance(v, str):
-                return f'{k}="{v}"'
+            normalized = self._normalize_field_value(k, v)
+            if isinstance(normalized, str):
+                return f'{k}="{normalized}"'
             else:
-                return f"{k}={v}"
+                return f"{k}={normalized}"
         # Create a string representation of the fields in the format "key1=value1, key2=value2, ..."
         fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
         tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())

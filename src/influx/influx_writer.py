@@ -1,8 +1,8 @@
-from influxdb_client import Point
 from influxdb_client.client.write_api import WriteOptions, WriteApi
 from threading import Condition, Lock
 
 from src.parser.parser import Parser
+from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
 from src.influx.influx_manager import InfluxManager
@@ -31,8 +31,6 @@ class InfluxWriter(InfluxManager):
         self.write_api:WriteApi = self.client.connection.write_api(
             write_options=self.write_options
         )
-        self.points:list[Point] = None
-        '''Points to be written to InfluxDB. This list will be prepared and committed in batches based on the specified batch size.'''
         self.parser: Parser = Parser()
         '''Parser instance for processing incoming data and converting it into InfluxDB points. The parser will handle the parsing of messages and the creation of Point objects.'''
         self.__lock__: Lock = Lock()
@@ -59,7 +57,9 @@ class InfluxWriter(InfluxManager):
         '''
         with self.__lock__:
             self.points = self.parser.pop_points(self.write_options.batch_size)
-        pack: str = self.__pack_lines(self.points)
+        if self.points is None:
+            self.points = []
+        pack: str = self.__pack_lines(self.points, self.timestamp_precision)
         return pack
     
     def commit(self) -> bool:
@@ -69,6 +69,9 @@ class InfluxWriter(InfluxManager):
             bool: True if the commit was successful, False otherwise.
         '''
         points: str = self.prepare_for_commit()
+        if len(self.points) == 0:
+            logger.debug("Influx Connection: No points available to commit")
+            return False
         logger.info(f"Influx Connection: Committing {len(self.points)} lines to InfluxDB")
         #logger.info(f"Influx Connection: Lines to commit:\n{points}")
         try:
@@ -82,16 +85,16 @@ class InfluxWriter(InfluxManager):
             if result is None:
                 logger.warning("Influx Connection: Write API returned None, indicating that the write operation may not have been successful.")
             else:
-                logger.info(f"Influx Connection: Successfully committed {len(points)} lines")
+                logger.info(f"Influx Connection: Successfully committed {len(self.points)} lines")
                 logger.debug(f"Influx Connection: Write API returned: {result}")
             return result is not None
         except Exception as e:
-            pack: str = InfluxWriter.__pack_lines(points)
+            pack: str = InfluxWriter.__pack_lines(self.points, self.timestamp_precision)
             logger.error(f"Influx Connection: Failed to commit lines: {e}", exc_info=True)
             logger.debug(f"Influx Connection: Lines that failed to commit: {pack}")
 
     @staticmethod
-    def __pack_lines(lines: list[Point]) -> str:
+    def __pack_lines(lines: list[Line], timestamp_precision: str) -> str:
         """
         Packs a list of InfluxDB points into a single string representation.
 
@@ -101,8 +104,11 @@ class InfluxWriter(InfluxManager):
         Returns:
             str: A string representation of the packed points, where each point is converted to its line protocol format and separated by newlines.
         """
-        # TODO: probably change it in order to not use str(line) but line.to_line_protocol() or something like that
-        return "\n".join([str(line) for line in lines])
+        valid_lines = [line for line in lines if line is not None]
+        return "\n".join([
+            line.to_point(timestamp_precision=timestamp_precision).to_line_protocol()
+            for line in valid_lines
+        ])
     
     def check_to_commit(self) -> bool:
         '''
