@@ -13,12 +13,12 @@ class InfluxManager(Thread, ABC):
     
     Attributes:
         client (InfluxConnection): The connection to the InfluxDB service.
-        timestamp_precision (TimestampPrecision): The precision of timestamps used in interactions with InfluxDB.
+        timestamp_precision (str): The precision of timestamps used in interactions with InfluxDB.
     """
-    def __init__(self, client:InfluxConnection, timestamp_precision:TimestampPrecision = TimestampPrecision.ns, name:str = "InfluxManager") -> None:
+    def __init__(self, client:InfluxConnection, timestamp_precision: str = TimestampPrecision.ns.name, name:str = "InfluxManager") -> None:
         super().__init__(name=name)
         self.client:InfluxConnection = client
-        self.timestamp_precision:TimestampPrecision = timestamp_precision
+        self.timestamp_precision:str = timestamp_precision
         self.__stop__:bool = False
         self.__stop_lock__:Lock = Lock()
 

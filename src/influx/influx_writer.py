@@ -20,7 +20,7 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, batch_size:int = 5_000, timestamp_precision:TimestampPrecision = TimestampPrecision.ns) -> None:
+    def __init__(self, client:InfluxConnection, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.ns.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.
@@ -33,8 +33,6 @@ class InfluxWriter(InfluxManager):
         )
         self.points:list[Point] = None
         '''Points to be written to InfluxDB. This list will be prepared and committed in batches based on the specified batch size.'''
-        self.ready_to_flush_list:list[str] = None
-        '''List of identifiers for points that are ready to be flushed to InfluxDB. This can be used to track which points have been prepared and are ready for commit.'''
         self.parser: Parser = Parser()
         '''Parser instance for processing incoming data and converting it into InfluxDB points. The parser will handle the parsing of messages and the creation of Point objects.'''
         self.__lock__: Lock = Lock()
@@ -43,17 +41,38 @@ class InfluxWriter(InfluxManager):
         '''Condition variable for signaling when the batch size limit is reached and points are ready to be pushed to InfluxDB. This allows for efficient waiting and notification between threads.'''
 
     def is_list_limit_reached(self, count:int) -> bool:
+        '''
+        Checks if the number of points in the list has reached the specified batch size limit.
+        
+        Args:
+            count (int): The current number of points in the list.
+        Returns:
+            bool: True if the count is greater than or equal to the batch size limit, False otherwise.
+        '''
         return count >= self.write_options.batch_size
     
-    def prepare_for_commit(self, point:Point) -> None:
-        raise NotImplementedError("This method should be implemented by subclasses to prepare the point for commit, e.g. by adding it to the points list and checking if the batch size limit is reached.")
-    
-    def push(self, point:Point) -> None:
-        points: list[Point] = self.parser.pop_points(self.write_options.batch_size)
+    def prepare_for_commit(self) -> str:
+        '''
+        Prepares the points for committing to InfluxDB by popping a batch of points from the parser and packing them into a string representation.
+        Returns:
+            str: A string representation of the packed points, ready to be committed to InfluxDB.
+        '''
+        with self.__lock__:
+            self.points = self.parser.pop_points(self.write_options.batch_size)
+        pack: str = self.__pack_lines(self.points)
+        return pack
     
     def commit(self) -> bool:
-        points: list[Point] = self.parser.pop_points(self.write_options.batch_size)
+        '''
+        Commits the prepared points to InfluxDB using the write API.
+        Returns:
+            bool: True if the commit was successful, False otherwise.
+        '''
+        points: str = self.prepare_for_commit()
+        logger.info(f"Influx Connection: Committing {len(self.points)} lines to InfluxDB")
+        #logger.info(f"Influx Connection: Lines to commit:\n{points}")
         try:
+            logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
             result = self.write_api.write(
                 bucket=self.client.bucket,
                 org=self.client.org,
@@ -85,7 +104,12 @@ class InfluxWriter(InfluxManager):
         # TODO: probably change it in order to not use str(line) but line.to_line_protocol() or something like that
         return "\n".join([str(line) for line in lines])
     
-    def check_to_push(self) -> None:
+    def check_to_commit(self) -> bool:
+        '''
+        Checks if the number of points in the parser has reached the batch size limit for pushing to InfluxDB.
+        Returns:
+            bool: True if the number of points in the parser has reached or exceeded the batch size limit, False otherwise.
+        '''
         return self.is_list_limit_reached(
             self.parser.get_points_count()
             )
@@ -98,16 +122,22 @@ class InfluxWriter(InfluxManager):
         while self.stopped() is False:
             with self.parser.__new_points_event_lock__:
                 self.parser.points_increased.wait()
-            if self.check_to_push():
-                self.push(self.parser.pop_points(self.write_options.batch_size))
+            if self.check_to_commit():
+                self.commit()
         self.parser.graceful_stop()
 
     def graceful_stop(self) -> None:
+        '''
+        Gracefully stops the InfluxWriter and its associated parser, ensuring that any remaining points are processed and committed before termination.
+        '''
         super().stop()
         self.parser.graceful_stop()
         self.parser.join()
 
     def stop(self) -> None:
+        '''
+        Stops the InfluxWriter and its associated parser, ensuring that any remaining points are processed and committed before termination.
+        '''
         super().stop()
         self.parser.stop_parser()
         self.parser.join()
