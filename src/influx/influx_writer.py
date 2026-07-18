@@ -70,12 +70,12 @@ class InfluxWriter(InfluxManager):
         '''
         points: str = self.prepare_for_commit()
         if len(self.points) == 0:
-            logger.debug("Influx Connection: No points available to commit")
+            logger.debug("influx_writer: No points available to commit")
             return False
-        logger.info(f"Influx Connection: Committing {len(self.points)} lines to InfluxDB")
-        #logger.info(f"Influx Connection: Lines to commit:\n{points}")
+        logger.info(f"influx_writer: Committing {len(self.points)} lines to InfluxDB")
+        #logger.info(f"influx_writer: Lines to commit:\n{points}")
         try:
-            logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
+            #logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
             result = self.write_api.write(
                 bucket=self.client.bucket,
                 org=self.client.org,
@@ -83,15 +83,15 @@ class InfluxWriter(InfluxManager):
                 write_precision=self.timestamp_precision,
             )
             if result is None:
-                logger.warning("Influx Connection: Write API returned None, indicating that the write operation may not have been successful.")
+                logger.warning("influx_writer: Write API returned None, indicating that the write operation may not have been successful.")
             else:
-                logger.info(f"Influx Connection: Successfully committed {len(self.points)} lines")
-                logger.debug(f"Influx Connection: Write API returned: {result}")
+                logger.info(f"influx_writer: Successfully committed {len(self.points)} lines")
+                logger.debug(f"influx_writer: Write API returned: {result}")
             return result is not None
         except Exception as e:
             pack: str = InfluxWriter.__pack_lines(self.points, self.timestamp_precision)
-            logger.error(f"Influx Connection: Failed to commit lines: {e}", exc_info=True)
-            logger.debug(f"Influx Connection: Lines that failed to commit: {pack}")
+            logger.error(f"influx_writer: Failed to commit lines: {e}", exc_info=True)
+            logger.debug(f"influx_writer: Lines that failed to commit: {pack}")
 
     @staticmethod
     def __pack_lines(lines: list[Line], timestamp_precision: str) -> str:

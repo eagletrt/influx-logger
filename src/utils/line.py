@@ -1,8 +1,6 @@
-import influxdb_client
 from pydot import Any
-from influxdb_client import Point, InfluxDBClient
+from influxdb_client import Point
 
-from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision, INFLUX_INT64_MAX, TIMESTAMP_KEYS
 
 class Line:
@@ -14,8 +12,8 @@ class Line:
         fields (dict[str, Any]): Fields containing the actual data values.
         timestamp (int): Timestamp of the measurement in nanoseconds since epoch.
     '''
-    def __init__(self, measurement: str, tags: dict[str, str], fields: dict[str, Any], timestamp: int) -> None:
-        self.measurement:str = measurement
+    def __init__(self, measurement: Any, tags: dict[str, str], fields: dict[str, Any], timestamp: int) -> None:
+        self.measurement:Any = measurement
         '''Name of the measurement's signal'''
         self.tags:dict[str, str] = tags
         '''Tags associated with the measurement'''
@@ -36,7 +34,7 @@ class Line:
         return ", ".join(f"{k}={v}" for k, v in obj.items())
 
     @staticmethod
-    def from_object(obj: dict[str, Any], measurement: str, tags: dict[str, str]) -> "Line":
+    def from_object(obj: dict[str, Any], measurement: Any, tags: dict[str, str]) -> "Line":
         '''
         Creates a Line object from a dictionary representation of a measurement.
         Args:
@@ -99,14 +97,6 @@ class Line:
             raise ValueError(f"Timestamp {timestamp} is out of range for InfluxDB")
         return normalized
 
-    @staticmethod
-    def _normalize_field_value(field_name: str, value: Any) -> Any:
-        if isinstance(value, bytes):
-            return value.decode("utf-8", errors="replace")
-        if field_name == "id" or field_name.endswith("_id"):
-            return str(value)
-        return value
-    
     def to_point(self, timestamp_precision: str = "ns") -> Point:
         '''
         Converts the Line object to an InfluxDB Point object.
@@ -119,17 +109,21 @@ class Line:
         for k, v in self.tags.items():
             point.tag(k, v)
         for k, v in self.fields.items():
-            point.field(k, self._normalize_field_value(k, v))
+            if isinstance(v, bytes):
+                point.field(k, v.decode("utf-8", errors="replace"))
+            else:
+                point.field(k, v)
         point.time(self.timestamp, write_precision=timestamp_precision)
         return point
 
     def __str__(self) -> str:
         def field_to_str(k, v):
-            normalized = self._normalize_field_value(k, v)
-            if isinstance(normalized, str):
-                return f'{k}="{normalized}"'
+            if isinstance(v, bytes):
+                return f'{k}="{v.decode("utf-8", errors="replace")}"'
+            if isinstance(v, str):
+                return f'{k}="{v}"'
             else:
-                return f"{k}={normalized}"
+                return f"{k}={v}"
         # Create a string representation of the fields in the format "key1=value1, key2=value2, ..."
         fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
         tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
