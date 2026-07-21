@@ -110,20 +110,22 @@ class Line:
         for key, value in self.tags.items():
             point.tag(key, value)
         type_of_v: type  = None
-        type_of_f: type  = None
         for field, value in self.fields.items():
+            if field == "canlib_build_time" or field == "cellboard_id":
+                logger.info(f"line: Field '{field}' has value '{value}' of type {type(value)}")
+                type_of_v = int
             if type_of_v is None:
                 type_of_v = type(value)
-                logger.info(f"Line: Type of value for vaule '{value}' is {type_of_v}")
-            if type_of_f is None:
-                type_of_f = type(field)
-                logger.info(f"Line: Type of field for field '{field}' is {type_of_f}")
+                #if type_of_v is not str:
+                #    logger.info(f"line: Type of value for value '{value}' is {type_of_v}")
             if not isinstance(value, type_of_v):
+                #logger.warning(f"line: Type of value for field '{field}':{type(value)} is {type(value)}, expected {type_of_v}")
                 # Cast it to it
-                value = type_of_v(value)
-            if not isinstance(field, type_of_f):
-                # Cast it to it
-                field = type_of_f(field)
+                try:
+                    value = type_of_v(value)
+                except Exception as e:
+                    logger.error(f"line: Failed to cast value '{value}' of field '{field}' to type {type_of_v}: {e}")
+                    value = None # Set to None if casting fails
             point.field(field, value)
         point.time(self.timestamp, write_precision=timestamp_precision)
         return point
