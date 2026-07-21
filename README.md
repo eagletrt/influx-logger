@@ -86,13 +86,13 @@ A Dockerfile is provided in this repository with all the requirements satisfied 
 It requires the bind mount of a configuration file.
 In the following commands the host machine configuration file provided to docker is called *configuration.json*.
 ```sh
-docker build --secret id=manager-config,src=$(pwd)/configuration.json -f Dockerfile.manager.yml -t influx-manager:latest .
+docker build --secret id=logger-config,src=$(pwd)/configuration.json -f Dockerfile.influx-logger.yml -t influx-logger:latest .
 ```
 ```sh
-docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly manager:latest
+docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly influx-logger:latest
 ```
 #### Tests
-For tests purpose can be useful to run Influx and Mosquitto on Docker with Influx Manager, to do so this repository provide a *docker-compose.yml* file which creates such system.
+For tests purpose can be useful to run Influx and Mosquitto on Docker with Influx Logger, to do so this repository provide a *docker-compose.yml* file which creates such system.
 You must first execute it once and retrives the Influxdb token from https://localhost:8086, than place the token in a configuration file named *configuration.json*, than you can properly 
 run tests using mosquitto at port 8883 (change the port in the configuration file).
 To run the docker compose file use:

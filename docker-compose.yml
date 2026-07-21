@@ -25,10 +25,10 @@ services:
             - "8883:8883"
         networks:
             - default
-    manager:
+    influx-logger:
         build:
             context: .
-            dockerfile: Dockerfile.manager.yml
+            dockerfile: Dockerfile.influx-logger.yml
         ports:
             - "8000:8000"
         volumes:
@@ -45,7 +45,7 @@ secrets:
         file: ./.env.influxdb2-admin-password
     influxdb2-admin-token:
         file: ./.env.influxdb2-admin-token
-    manager-config:
+    logger-config:
         file: ./config.json
 volumes:
     influxdb2-data:
