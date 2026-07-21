@@ -1,17 +1,10 @@
 # Influx Logger: Securely Collecting and Storing Telemetry Data
 
-**Influx Logger** acts as a secure data collection and storage solution for telemetry devices. It seamlessly integrates with InfluxDB, a popular time-series database, offering efficient storage and analysis of real-time data.
+## Description
+**Influx Logger** is a middleware beetween Telemetry and Influx which main purpose is to log data in the database.
+It takes data sent on the MQTT broker, deserialze them with protobuffer and insert them in Influx.
 
-## Functionality
-
-Influx Logger performs the following tasks:
-
-* **Secure and reliable data collection:** Utilizes the MQTT protocol to establish secure communication with connected telemetry devices.
-* **Version-aware handling:** Adapts to different device versions by dynamically retrieving corresponding descriptor files.
-* **Efficient data storage:** Leverages InfluxDB for optimized storage and retrieval of time-series data.
-* **Scalable architecture:** Designed to handle large volumes of data from numerous devices.
-
-## Procedure
+### Functionality
 
 Here's a step-by-step breakdown of Influx Logger's operation:
 
@@ -37,7 +30,7 @@ Here's a step-by-step breakdown of Influx Logger's operation:
 
 5. **Data Accumulation and InfluxDB Integration:**
     - Accumulates received data points and constructs InfluxDB insert statements incrementally.
-    - To optimize database performance, sends data in batches of 1000 lines (measurements) to InfluxDB using HTTP requests.
+    - To optimize database performance, sends data in batches of lines (measurements) to InfluxDB using HTTP requests.
 
 ```mermaid
 flowchart LR
@@ -60,7 +53,49 @@ flowchart LR
 ```
 
 ## Usage
+### Configuration File
+In order to execute the program a *json* configuration file is required.
+It should be written like this:
+```json
+{
+    "mqtt_url" : "mosquitto",
+    "mqtt_port" : "1883",
+    "influx_url" : "influxdb",
+    "influx_port" : "8086",
+    "influx_token" : "token_given_by_the_influx_administrator",
+    "influx_org" : "eagletrt",
+    "influx_bucket" : "telemetry"
+}
 ```
+### Python
+#### Requirements
+In order to use python to execute the program you need to install the following dependecies:
+```sh
+pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine pydot
+```
+#### Execution
+To execute the program run:
+```sh
+python3 -m src.main
+```
+It takes as argument the configuration *json* file you want to use.
+By default *config.json* is taken in input.
+### Docker
+An alternative to bare Python execution is execution through Docker.
+A Dockerfile is provided in this repository with all the requirements satisfied which allows to execute the program properly.
+It requires the bind mount of a configuration file.
+In the following commands the host machine configuration file provided to docker is called *configuration.json*.
+```sh
+docker build --secret id=manager-config,src=$(pwd)/configuration.json -f Dockerfile.manager.yml -t influx-manager:latest .
+```
+```sh
+docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly manager:latest
+```
+#### Tests
+For tests purpose can be useful to run Influx and Mosquitto on Docker with Influx Manager, to do so this repository provide a *docker-compose.yml* file which creates such system.
+You must first execute it once and retrives the Influxdb token from https://localhost:8086, than place the token in a configuration file named *configuration.json*, than you can properly 
+run tests using mosquitto at port 8883 (change the port in the configuration file).
+To run the docker compose file use:
+```sh
 docker compose up --build --remove-orphans
 ```
-**Mosquitto** broker avaible at *8883*

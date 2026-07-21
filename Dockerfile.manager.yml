@@ -1,5 +1,5 @@
 FROM alpine:3.18
-RUN apk add --no-cache python3 py3-pip bash python3-dev && \
+RUN apk add --no-cache python3 py3-pip python3-dev && \
     #create pyenv
     python3 -m venv /opt/venv && \
     #activate pyenv
@@ -15,9 +15,6 @@ RUN apk add --no-cache python3 py3-pip bash python3-dev && \
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
-COPY protobuffer /app/protobuffer
-RUN chmod +x ./protobuffer/compile.sh && ./protobuffer/compile.sh
-COPY ./external /app/external
 COPY ./src /app/src
 
 CMD ["python3", "-m", "src.main", "config.json"]
