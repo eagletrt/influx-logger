@@ -16,5 +16,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 COPY ./src /app/src
+# Bidirectionally mount cache directory to persist downloaded .proto files across container runs
+VOLUME /app/cache
 
 CMD ["python3", "-m", "src.main", "config.json"]

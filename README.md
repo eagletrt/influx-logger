@@ -89,7 +89,7 @@ In the following commands the host machine configuration file provided to docker
 docker build --secret id=logger-config,src=$(pwd)/configuration.json -f Dockerfile.influx-logger.yml -t influx-logger:latest .
 ```
 ```sh
-docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly influx-logger:latest
+docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly --mount=type=bind,src=./cache,target=/app/cache influx-logger:latest
 ```
 #### Tests
 For tests purpose can be useful to run Influx and Mosquitto on Docker with Influx Logger, to do so this repository provide a *docker-compose.yml* file which creates such system.
