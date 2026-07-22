@@ -5,7 +5,6 @@ from typing import Any
 from requests import get
 from types import ModuleType
 from grpc_tools import protoc
-from tempfile import TemporaryDirectory
 from google.protobuf import json_format
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
@@ -34,14 +33,14 @@ class ProtobufManager:
             version (str): The version of the protobuf descriptor.
             network (str): The network for which the protobuf descriptor is needed.
         '''
-        descriptor_raw: str | None = LibCANManager.download_proto_version(version, network)
+        download_result: bool = LibCANManager.download_proto_version(version, network)
         '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
-        if descriptor_raw is None:
+        if not download_result:
             logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
             return
         logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
-            decoder = _DecoderWrapper.build_decoder(descriptor_raw, network)
+            decoder = _DecoderWrapper.build_decoder(network)
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
@@ -121,6 +120,8 @@ class LibCANManager:
     '''URL to the raw .proto file in the CAN repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
     CAN_COMMIT_URL:str = "https://github.com/eagletrt/can/tree/hash"
     '''URL to the commit page in the CAN repository, where 'hash' is a placeholder for the commit hash.'''
+    CACHE_DIR: str = "cache"
+    '''Cache directory used for storing .proto files and descriptor sets.'''
     
     def __init__(self):
         pass
@@ -144,34 +145,34 @@ class LibCANManager:
             return False
 
     @staticmethod
-    def download_proto_version(hash: str, network: str) -> str:
+    def download_proto_version(hash: str, network: str) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the CAN repository.
         Args:
             hash (str): The commit hash for which to download the protobuf descriptor.
             network (str): The network for which to download the protobuf descriptor.
         Returns:
-            str: The raw content of the downloaded protobuf descriptor. None if the download fails.
+            bool: True if the download is successful, False otherwise.
         '''
         url = LibCANManager.CAN_PROTO_URL.replace("hash", hash).replace("network", network)
         try:
             resp = get(url)
             if not resp.ok:
                 raise RuntimeError("Failed to download proto")
-            return resp.text
+            if not os.path.exists(LibCANManager.CACHE_DIR):
+                os.makedirs(LibCANManager.CACHE_DIR)
+            with open(os.path.join(LibCANManager.CACHE_DIR, f"{network}.proto"), "w", encoding="utf-8") as fh:
+                fh.write(resp.text)
+                return True
         except Exception as e:
             logger.trace(e)
             logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
-            return None
+            return False
 
 class _DecoderWrapper:
     '''
     A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
     '''
-    
-    CACHE_DIR: str = "cache"
-    '''Cache directory used for storing .proto files and descriptor sets.'''
-
     def __init__(self, message_class, json_format_module, cache_dir: str = CACHE_DIR):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
@@ -181,7 +182,7 @@ class _DecoderWrapper:
         '''
         self._message_class = message_class
         self._json_format = json_format_module
-        _DecoderWrapper.CACHE_DIR = cache_dir
+        LibCANManager.CACHE_DIR = cache_dir
 
     def decode(self, payload: bytes) -> dict:
         '''
@@ -198,43 +199,50 @@ class _DecoderWrapper:
         return self._json_format.MessageToDict(message, preserving_proto_field_name=True)
     
     @staticmethod
-    def build_decoder(descriptor_raw: str, network: str) -> '_DecoderWrapper':
+    def build_decoder(network: str) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
-            descriptor_raw (str): The raw content of the protobuf descriptor.
             network (str): The network for which the decoder is being built.
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
-        # Use a cache directory to store the .proto file and the generated descriptor set
-        with TemporaryDirectory(prefix=_DecoderWrapper.CACHE_DIR) as tmp_dir:
-            proto_file: str = os.path.join(tmp_dir, f"{network}.proto")
-            '''temporary .proto file that will be created for the given network'''
-            descriptor_set_file: str = os.path.join(tmp_dir, "descriptor_set.pb")
-            '''temporary file that will store the compiled descriptor set'''
-            # Write the downloaded .proto descriptor to a temporary file
-            with open(proto_file, "w", encoding="utf-8") as fh:
-                fh.write(descriptor_raw)
-            logger.info(f"protobuf_manager: Descriptor successfully written to temporary file: {proto_file}")
-            # Compile the .proto file into a descriptor set using protoc
-            result = protoc.main(
-                [
-                    "protoc",
-                    f"-I{tmp_dir}",
-                    f"--descriptor_set_out={descriptor_set_file}",
-                    "--include_imports",
-                    proto_file,
-                ]
-            )
-            # Check if the compilation was successful
-            if result != 0:
-                raise RuntimeError("Failed to compile downloaded .proto descriptor")
-            file_set: FileDescriptorSet = FileDescriptorSet()
-            '''protobuf descriptor set that will be populated with the compiled descriptor data'''
-            # Read the compiled descriptor set from the temporary file and parse it into a FileDescriptorSet object
-            with open(descriptor_set_file, "rb") as fh:
-                file_set.ParseFromString(fh.read())
+        # If cache directory does not exist, create it
+        if not os.path.exists(LibCANManager.CACHE_DIR):
+            os.makedirs(LibCANManager.CACHE_DIR)
+        # Create files for the .proto descriptor and the compiled descriptor set
+        proto_files: list[str] = []
+        '''All .proto in cache directory'''
+        for file_name in os.listdir(LibCANManager.CACHE_DIR):
+            if file_name.endswith(".proto"):
+                proto_files.append(os.path.join(LibCANManager.CACHE_DIR, file_name))
+        if not proto_files:
+            raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{LibCANManager.CACHE_DIR}'")
+        files_to_line: str = [f"{file_name} " for file_name in proto_files]
+        '''String containing all .proto file paths to be passed to protoc'''
+        descriptor_set_file: str = os.path.join(LibCANManager.CACHE_DIR, "descriptor_set.pb")
+        '''File that will store the compiled descriptor set'''
+        # Write the downloaded .proto descriptor to file
+        logger.info(f"protobuf_manager: Descriptor successfully written to file: {proto_files}")
+        # Compile the .proto file into a descriptor set using protoc
+        result = protoc.main(
+            [
+                "protoc",
+                f"-I{LibCANManager.CACHE_DIR}",
+                f"--descriptor_set_out={descriptor_set_file}",
+                "--include_imports",
+                files_to_line
+            ]
+        )
+        # Check if the compilation was successful
+        if result != 0:
+            raise RuntimeError("Failed to compile downloaded .proto descriptor")
+        file_set: FileDescriptorSet = FileDescriptorSet()
+        '''protobuf descriptor set that will be populated with the compiled descriptor data'''
+        # Read the compiled descriptor set from the file and parse it into a FileDescriptorSet object
+        with open(descriptor_set_file, "rb") as fh:
+            file_set.ParseFromString(fh.read())
+        # Create a DescriptorPool to register the compiled file descriptors
         pool: DescriptorPool = DescriptorPool()
         '''DescriptorPool that will be used to register the compiled file descriptors'''
         # Add the compiled file descriptors to the DescriptorPool

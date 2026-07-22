@@ -190,3 +190,7 @@ __pycache__/
 .generated/
 **/__pycache__/
 *.log
+
+# Cache
+.cache/
+cache/
