@@ -169,10 +169,10 @@ class _DecoderWrapper:
     A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
     '''
     
-    TMP_DIR_PREFIX: str = "influx_proto_"
-    '''Temporary directory prefix used for storing temporary .proto files and descriptor sets.'''
+    CACHE_DIR: str = "cache"
+    '''Cache directory used for storing .proto files and descriptor sets.'''
 
-    def __init__(self, message_class, json_format_module, tmp_dir_prefix: str = TMP_DIR_PREFIX):
+    def __init__(self, message_class, json_format_module, cache_dir: str = CACHE_DIR):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
         Args:
@@ -181,7 +181,7 @@ class _DecoderWrapper:
         '''
         self._message_class = message_class
         self._json_format = json_format_module
-        _DecoderWrapper.TMP_DIR_PREFIX = tmp_dir_prefix
+        _DecoderWrapper.CACHE_DIR = cache_dir
 
     def decode(self, payload: bytes) -> dict:
         '''
@@ -207,8 +207,8 @@ class _DecoderWrapper:
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
-        # Use a temporary directory to store the .proto file and the generated descriptor set
-        with TemporaryDirectory(prefix=_DecoderWrapper.TMP_DIR_PREFIX) as tmp_dir:
+        # Use a cache directory to store the .proto file and the generated descriptor set
+        with TemporaryDirectory(prefix=_DecoderWrapper.CACHE_DIR) as tmp_dir:
             proto_file: str = os.path.join(tmp_dir, f"{network}.proto")
             '''temporary .proto file that will be created for the given network'''
             descriptor_set_file: str = os.path.join(tmp_dir, "descriptor_set.pb")
