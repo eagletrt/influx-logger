@@ -33,7 +33,7 @@ class ProtobufManager:
         '''
         version_dir = os.path.join(LibCANManager.CACHE_DIR, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
-        proto_file_path = os.path.join(version_dir, f"{network}.proto")
+        proto_file_path = os.path.join(version_dir, "proto", f"{network}.proto")
         '''Path to the .proto file for the specified version and network'''
         if os.path.exists(proto_file_path):
             logger.info(f"protobuf_manager: Descriptor for network '{network}' (version {version}) already downloaded")
@@ -182,7 +182,10 @@ class LibCANManager:
                 os.makedirs(LibCANManager.CACHE_DIR)
             if not os.path.exists(version_dir):
                 os.makedirs(version_dir)
-            with open(os.path.join(version_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
+            proto_dir = os.path.join(version_dir, "proto")
+            if not os.path.exists(proto_dir):
+                os.makedirs(proto_dir)
+            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
         except Exception as e:
@@ -236,23 +239,18 @@ class _DecoderWrapper:
             os.makedirs(LibCANManager.CACHE_DIR)
         if not os.path.exists(version_dir):
             os.makedirs(version_dir)
+        if not os.path.exists(os.path.join(version_dir, "proto")):
+            os.makedirs(os.path.join(version_dir, "proto"))
+        if not os.path.exists(os.path.join(version_dir, "pb")):
+            os.makedirs(os.path.join(version_dir, "pb"))
         # Create files for the .proto descriptor and the compiled descriptor set
-        proto_files: list[str] = []
-        '''All .proto in cache directory'''
-        for file_name in os.listdir(version_dir):
-            if file_name.endswith(".proto"):
-                proto_files.append(file_name)
-        if not proto_files:
-            logger.error(f"protobuf_manager: No .proto files found in cache directory '{version_dir}'")
-            raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{version_dir}'")
-        files_to_line: list[str] = proto_files
+        proto_file: str = os.path.join(version_dir, "proto", f"{network}.proto")
+        '''Path to the .proto file for the specified version and network'''
         '''List of .proto file names to be passed to protoc'''
-        descriptor_set_file: str = os.path.join(version_dir, "descriptor_set.pb")
+        descriptor_set_file: str = os.path.join(version_dir, "pb", f"{network}.pb")
         '''File that will store the compiled descriptor set'''
-        # Write the downloaded .proto descriptor to file
-        logger.info(f"protobuf_manager: Descriptor successfully written to file: {proto_files}")
         # Compile the .proto file into a descriptor set using protoc
-        logger.info(f"protobuf_manager: protoc -I{version_dir} --descriptor_set_out={descriptor_set_file} --include_imports {files_to_line}")
+        logger.info(f"protobuf_manager: protoc -I{version_dir} --descriptor_set_out={descriptor_set_file} --include_imports {proto_file}")
         try:
             result = protoc.main(
                 [
@@ -260,7 +258,7 @@ class _DecoderWrapper:
                     f"-I{version_dir}",
                     f"--descriptor_set_out={descriptor_set_file}",
                     "--include_imports",
-                    *files_to_line
+                    proto_file
                 ]
             )
         except Exception as e:
