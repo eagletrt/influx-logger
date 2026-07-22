@@ -241,8 +241,10 @@ class _DecoderWrapper:
             os.makedirs(version_dir)
         if not os.path.exists(os.path.join(version_dir, "proto")):
             os.makedirs(os.path.join(version_dir, "proto"))
-        if not os.path.exists(os.path.join(version_dir, "pb")):
-            os.makedirs(os.path.join(version_dir, "pb"))
+        pb_dir: str = os.path.join(version_dir, "pb")
+        '''Directory in the cache where the compiled descriptor set for the specified version will be stored'''
+        if not os.path.exists(pb_dir):
+            os.makedirs(pb_dir)
         # Create files for the .proto descriptor and the compiled descriptor set
         proto_file: str = os.path.join(version_dir, "proto", f"{network}.proto")
         '''Path to the .proto file for the specified version and network'''
