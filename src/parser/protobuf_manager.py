@@ -247,7 +247,7 @@ class _DecoderWrapper:
             raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{version_dir}'")
         files_to_line: list[str] = proto_files
         '''List of .proto file names to be passed to protoc'''
-        descriptor_set_file: str = "descriptor_set.pb"
+        descriptor_set_file: str = os.path.join(version_dir, "descriptor_set.pb")
         '''File that will store the compiled descriptor set'''
         # Write the downloaded .proto descriptor to file
         logger.info(f"protobuf_manager: Descriptor successfully written to file: {proto_files}")
