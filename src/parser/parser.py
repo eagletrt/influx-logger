@@ -65,19 +65,19 @@ class Parser(Thread):
         vehicle_id, device_id, network = ids
         key = f"{vehicle_id}/{device_id}"
         if key not in self.device_versions:
-            logger.error(f"msg_dispatcher: Device '{key}' started streaming data before sending version. Skipping")
+            logger.error(f"parser: Device '{key}' started streaming data before sending version. Skipping")
             return
         if network in self.excluded_networks:
-            logger.debug(f"msg_dispatcher: Network '{network}' is in the exclusion list. Skipping message")
+            logger.debug(f"parser: Network '{network}' is in the exclusion list. Skipping message")
             return
         version = self.device_versions[key]
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
         if network not in self.protobuf_manager.version_descriptors.get(version, {}):
-            logger.info(f"msg_dispatcher: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+            logger.info(f"parser: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
             try:
                 self.protobuf_manager.download_proto_descriptor(version, network)
             except Exception:
-                logger.error(f"msg_dispatcher: Error while getting proto, skipping message")
+                logger.error(f"parser: Error while getting proto, skipping message")
                 return
         # Deserialize the payload using the appropriate decoder for the given version and network
         try:
@@ -86,8 +86,8 @@ class Parser(Thread):
             # Expect decoder to provide a `decode` method returning a dict-like object
             message_content = decoder.decode(payload)
         except Exception as e:
-            logger.error(f"msg_dispatcher: Cannot deserialize payload with saved descriptor: {e}")
-            logger.error(f"msg_dispatcher: {self.protobuf_manager.version_descriptors}")
+            logger.error(f"parser: Cannot deserialize payload with saved descriptor: {e}")
+            logger.error(f"parser: {self.protobuf_manager.version_descriptors}")
             return
         tags = {
             "vehicle-id": vehicle_id,
@@ -126,14 +126,14 @@ class Parser(Thread):
                     try:
                         self.push(measurement, record, tags)
                     except ValueError as e:
-                        #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+                        #logger.error(f"parser: Skipping invalid record for measurement '{measurement}': {e}")
                         pass
                 continue
             else:
                 try:
                     self.push(measurement, records, tags)
                 except ValueError as e:
-                    #logger.error(f"msg_dispatcher: Skipping invalid record for measurement '{measurement}': {e}")
+                    #logger.error(f"parser: Skipping invalid record for measurement '{measurement}': {e}")
                     pass
     
     def push(self, measurement: str, record: Any, tags: dict[str, str]) -> None:

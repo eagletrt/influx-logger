@@ -48,8 +48,8 @@ class ProtobufManager:
             # Store the decoder in the version_descriptors dictionary for the given version and network
             self.version_descriptors[version][network] = decoder
         except Exception as e:
-            logger.trace(e)
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
+            logger.error(e.__traceback__)
             return
         logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
     
@@ -173,7 +173,7 @@ class _DecoderWrapper:
     '''
     A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
     '''
-    def __init__(self, message_class, json_format_module, cache_dir: str = CACHE_DIR):
+    def __init__(self, message_class, json_format_module, cache_dir: str = LibCANManager.CACHE_DIR):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
         Args:
@@ -217,6 +217,7 @@ class _DecoderWrapper:
             if file_name.endswith(".proto"):
                 proto_files.append(os.path.join(LibCANManager.CACHE_DIR, file_name))
         if not proto_files:
+            logger.error(f"protobuf_manager: No .proto files found in cache directory '{LibCANManager.CACHE_DIR}'")
             raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{LibCANManager.CACHE_DIR}'")
         files_to_line: str = [f"{file_name} " for file_name in proto_files]
         '''String containing all .proto file paths to be passed to protoc'''
@@ -236,6 +237,7 @@ class _DecoderWrapper:
         )
         # Check if the compilation was successful
         if result != 0:
+            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}'")
             raise RuntimeError("Failed to compile downloaded .proto descriptor")
         file_set: FileDescriptorSet = FileDescriptorSet()
         '''protobuf descriptor set that will be populated with the compiled descriptor data'''
@@ -251,7 +253,9 @@ class _DecoderWrapper:
         # Keep parity with the original TypeScript implementation, which expects
         # the top-level message type `${network}.Pack`.
         full_name = f"{network}.Pack"
+        '''Fully qualified name of the top-level message type expected in the DescriptorPool'''
         message_descriptor = None
+        '''Descriptor for the top-level message type in the DescriptorPool'''
         try:
             # Find the message descriptor for the top-level message type in the DescriptorPool
             message_descriptor = pool.FindMessageTypeByName(full_name)
@@ -266,6 +270,7 @@ class _DecoderWrapper:
             '''Fully qualified names of message types named "Pack" found in the descriptor set'''
             # If no candidates are found, raise an error indicating that the protobuf message type cannot be found
             if not candidates:
+                logger.error(f"protobuf_manager: Cannot find protobuf message type '{full_name}'")
                 raise RuntimeError(f"Cannot find protobuf message type '{full_name}'")
             # If candidates are found, log a warning and use the first candidate as the message type
             message_descriptor = pool.FindMessageTypeByName(candidates[0])
