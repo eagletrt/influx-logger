@@ -1,4 +1,4 @@
-from pydot import Any
+from typing import Any
 from influxdb_client import Point
 
 from src.utils.logger_utils import logger
@@ -109,20 +109,7 @@ class Line:
         point: Point = Point(self.measurement)
         for key, value in self.tags.items():
             point.tag(key, value)
-        type_of_v: type  = None
         for field, value in self.fields.items():
-            if type_of_v is None:
-                type_of_v = type(value)
-                #if type_of_v is not str:
-                #    logger.info(f"line: Type of value for value '{value}' is {type_of_v}")
-            if not isinstance(value, type_of_v):
-                #logger.warning(f"line: Type of value for field '{field}':{type(value)} is {type(value)}, expected {type_of_v}")
-                # Cast it to it
-                try:
-                    value = type_of_v(value)
-                except Exception as e:
-                    #logger.error(f"line: Failed to cast value '{value}' of field '{field}' to type {type_of_v}: {e}")
-                    value = None # Set to None if casting fails
             point.field(field, value)
         point.time(self.timestamp, write_precision=timestamp_precision)
         return point

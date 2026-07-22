@@ -84,11 +84,10 @@ class InfluxWriter(InfluxManager):
                 write_precision=self.timestamp_precision,
             )
             if result is None:
-                logger.warning("influx_writer: Unsuccessful commit.")
+                logger.info(f"influx_writer: Successfully committed {len(points)} lines")
             else:
-                logger.info(f"influx_writer: Successfully committed {len(self.points)} lines")
-                logger.debug(f"influx_writer: Write API returned: {result}")
-            return result is not None
+                logger.warning(f"influx_writer: Commit returned unexpected result: {result}")
+            return result is None
         except Exception as e:
             pack: str = InfluxWriter.__pack_lines(self.points, self.timestamp_precision)
             logger.error(f"influx_writer: Failed to commit lines: {e}", exc_info=True)
