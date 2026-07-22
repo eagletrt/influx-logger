@@ -6,6 +6,6 @@ class InfluxReader(InfluxManager):
     """
     A reader for interacting with InfluxDB.
     """
-    def __init__(self, client:InfluxConnection, timestamp_precision: str = TimestampPrecision.ns.name) -> None:
+    def __init__(self, client:InfluxConnection, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision)
         self.query_api = self.client.connection.query_api()

@@ -20,7 +20,7 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.ns.name) -> None:
+    def __init__(self, client:InfluxConnection, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.

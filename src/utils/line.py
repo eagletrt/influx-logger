@@ -59,9 +59,7 @@ class Line:
             #logger.error(f"Handler: Missing timestamp in object: {Line.obj_to_str(obj)}")
             raise ValueError("Missing timestamp")
         # Convert the timestamp to an integer if it's a string or float
-        if isinstance(timestamp, str):
-            timestamp_value: int = int(timestamp)
-        elif isinstance(timestamp, (int, float)):
+        if isinstance(timestamp, (str, float, int)):
             timestamp_value: int = int(timestamp)
         else:
             raise ValueError("Invalid timestamp")
@@ -77,7 +75,7 @@ class Line:
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
     @staticmethod
-    def _normalize_timestamp(timestamp: int, timestamp_precision: str = "ns") -> int:
+    def _normalize_timestamp(timestamp: int, timestamp_precision: str = "us") -> int:
         '''
         Normalizes a timestamp based on the specified precision.
         Args:
@@ -98,11 +96,11 @@ class Line:
             raise ValueError(f"Timestamp {timestamp} is out of range for InfluxDB")
         return normalized
 
-    def to_point(self, timestamp_precision: str = "ns") -> Point:
+    def to_point(self, timestamp_precision: str = "us") -> Point:
         '''
         Converts the Line object to an InfluxDB Point object.
         Args:
-            timestamp_precision (str): The precision of the timestamp for the InfluxDB Point, which can be "ns", "us", "ms", or "s". Default is "ns".
+            timestamp_precision (str): The precision of the timestamp for the InfluxDB Point, which can be "ns", "us", "ms", or "s". Default is "us".
         Returns:
             influxdb_client.Point: The converted InfluxDB Point object.
         '''
