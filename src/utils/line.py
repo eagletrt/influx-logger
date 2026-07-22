@@ -111,9 +111,6 @@ class Line:
             point.tag(key, value)
         type_of_v: type  = None
         for field, value in self.fields.items():
-            if field == "canlib_build_time" or field == "cellboard_id":
-                #logger.info(f"line: Field '{field}' has value '{value}' of type {type(value)}")
-                type_of_v = int
             if type_of_v is None:
                 type_of_v = type(value)
                 #if type_of_v is not str:

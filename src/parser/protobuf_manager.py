@@ -220,7 +220,11 @@ class _DecoderWrapper:
         '''Creates an instance of the message class to hold the decoded data'''
         # Parse the payload into the message instance
         message.ParseFromString(payload)
-        return self._json_format.MessageToDict(message, preserving_proto_field_name=True)
+        return self._json_format.MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            use_integers_for_enums=True,
+        )
     
     @staticmethod
     def build_decoder(version: str, network: str) -> '_DecoderWrapper':
