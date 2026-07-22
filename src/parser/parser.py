@@ -73,6 +73,7 @@ class Parser(Thread):
         version = self.device_versions[key]
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
         if network not in self.protobuf_manager.version_descriptors.get(version, {}):
+            # If the proto descriptor is not already downloaded for the given version and network, download it
             logger.info(f"parser: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
             try:
                 self.protobuf_manager.download_proto_descriptor(version, network)

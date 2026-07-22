@@ -25,6 +25,21 @@ class ProtobufManager:
         sys.path.insert(0, self.project_root)
         sys.path.insert(0, self.generated_proto_root)
 
+    def proto_version_downloaded(self, version: str, network: str) -> bool:
+        '''
+        Checks if the protobuf descriptor for the current version is already downloaded and cached.
+        Returns:
+            bool: True if the protobuf descriptor is already downloaded, False otherwise.
+        '''
+        version_dir = os.path.join(LibCANManager.CACHE_DIR, version)
+        '''Directory in the cache where the .proto file for the specified version will be stored'''
+        proto_file_path = os.path.join(version_dir, f"{network}.proto")
+        '''Path to the .proto file for the specified version and network'''
+        if os.path.exists(proto_file_path):
+            logger.info(f"protobuf_manager: Descriptor for network '{network}' (version {version}) already downloaded")
+            return True
+        return False
+
     def download_proto_descriptor(self, version: str, network: str) -> None:
         '''
         Retrieves the protobuf descriptor for a given version and network.
@@ -33,14 +48,15 @@ class ProtobufManager:
             version (str): The version of the protobuf descriptor.
             network (str): The network for which the protobuf descriptor is needed.
         '''
-        download_result: bool = LibCANManager.download_proto_version(version, network)
-        '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
-        if not download_result:
-            logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
-            return
-        logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
+        if not self.proto_version_downloaded(version, network):
+            download_result: bool = LibCANManager.download_proto_version(version, network)
+            '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
+            if not download_result:
+                logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
+                return
+            logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
-            decoder = _DecoderWrapper.build_decoder(network)
+            decoder = _DecoderWrapper.build_decoder(version, network)
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
@@ -155,13 +171,18 @@ class LibCANManager:
             bool: True if the download is successful, False otherwise.
         '''
         url = LibCANManager.CAN_PROTO_URL.replace("hash", hash).replace("network", network)
+        '''URL to the raw .proto file in the CAN repository for the specified commit hash and network.'''
+        version_dir: str = os.path.join(LibCANManager.CACHE_DIR, hash)
+        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
         try:
             resp = get(url)
             if not resp.ok:
                 raise RuntimeError("Failed to download proto")
             if not os.path.exists(LibCANManager.CACHE_DIR):
                 os.makedirs(LibCANManager.CACHE_DIR)
-            with open(os.path.join(LibCANManager.CACHE_DIR, f"{network}.proto"), "w", encoding="utf-8") as fh:
+            if not os.path.exists(version_dir):
+                os.makedirs(version_dir)
+            with open(os.path.join(version_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
         except Exception as e:
@@ -199,45 +220,55 @@ class _DecoderWrapper:
         return self._json_format.MessageToDict(message, preserving_proto_field_name=True)
     
     @staticmethod
-    def build_decoder(network: str) -> '_DecoderWrapper':
+    def build_decoder(version: str, network: str) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
+            version (str): The version for which the decoder is being built.
             network (str): The network for which the decoder is being built.
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
+        version_dir = os.path.join(LibCANManager.CACHE_DIR, version)
+        '''Directory in the cache where the .proto file for the specified version will be stored'''
         # If cache directory does not exist, create it
         if not os.path.exists(LibCANManager.CACHE_DIR):
             os.makedirs(LibCANManager.CACHE_DIR)
+        if not os.path.exists(version_dir):
+            os.makedirs(version_dir)
         # Create files for the .proto descriptor and the compiled descriptor set
         proto_files: list[str] = []
         '''All .proto in cache directory'''
-        for file_name in os.listdir(LibCANManager.CACHE_DIR):
+        for file_name in os.listdir(version_dir):
             if file_name.endswith(".proto"):
-                proto_files.append(os.path.join(LibCANManager.CACHE_DIR, file_name))
+                proto_files.append(file_name)
         if not proto_files:
-            logger.error(f"protobuf_manager: No .proto files found in cache directory '{LibCANManager.CACHE_DIR}'")
-            raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{LibCANManager.CACHE_DIR}'")
-        files_to_line: str = [f"{file_name} " for file_name in proto_files]
-        '''String containing all .proto file paths to be passed to protoc'''
-        descriptor_set_file: str = os.path.join(LibCANManager.CACHE_DIR, "descriptor_set.pb")
+            logger.error(f"protobuf_manager: No .proto files found in cache directory '{version_dir}'")
+            raise RuntimeError(f"protobuf_manager: No .proto files found in cache directory '{version_dir}'")
+        files_to_line: list[str] = proto_files
+        '''List of .proto file names to be passed to protoc'''
+        descriptor_set_file: str = "descriptor_set.pb"
         '''File that will store the compiled descriptor set'''
         # Write the downloaded .proto descriptor to file
         logger.info(f"protobuf_manager: Descriptor successfully written to file: {proto_files}")
         # Compile the .proto file into a descriptor set using protoc
-        result = protoc.main(
-            [
-                "protoc",
-                f"-I{LibCANManager.CACHE_DIR}",
-                f"--descriptor_set_out={descriptor_set_file}",
-                "--include_imports",
-                files_to_line
-            ]
-        )
+        logger.info(f"protobuf_manager: protoc -I{version_dir} --descriptor_set_out={descriptor_set_file} --include_imports {files_to_line}")
+        try:
+            result = protoc.main(
+                [
+                    "protoc",
+                    f"-I{version_dir}",
+                    f"--descriptor_set_out={descriptor_set_file}",
+                    "--include_imports",
+                    *files_to_line
+                ]
+            )
+        except Exception as e:
+            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}'")
+            result = 1
         # Check if the compilation was successful
         if result != 0:
-            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}'")
+            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}' (version {version})")
             raise RuntimeError("Failed to compile downloaded .proto descriptor")
         file_set: FileDescriptorSet = FileDescriptorSet()
         '''protobuf descriptor set that will be populated with the compiled descriptor data'''
