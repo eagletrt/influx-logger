@@ -49,7 +49,7 @@ class InfluxWriter(InfluxManager):
         '''
         return count >= self.write_options.batch_size
     
-    def prepare_for_commit(self) -> str:
+    def prepare_for_commit(self) -> list[Point]:
         '''
         Prepares the points for committing to InfluxDB by popping a batch of points from the parser and packing them into a string representation.
         Returns:
@@ -66,7 +66,7 @@ class InfluxWriter(InfluxManager):
         Returns:
             bool: True if the commit was successful, False otherwise.
         '''
-        points: str = self.prepare_for_commit()
+        points: list[Point] = self.prepare_for_commit()
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
