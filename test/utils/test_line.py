@@ -22,7 +22,7 @@ if "influxdb_client" not in sys.modules:
             self.fields[key] = value
             return self
 
-        def time(self, timestamp, write_precision="ns"):
+        def time(self, timestamp, write_precision="us"):
             self.timestamp = timestamp
             self.write_precision = write_precision
             return self

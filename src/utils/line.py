@@ -75,7 +75,7 @@ class Line:
         return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
 
     @staticmethod
-    def _normalize_timestamp(timestamp: int, timestamp_precision: str = "us") -> int:
+    def _normalize_timestamp(timestamp: int, timestamp_precision: str = TimestampPrecision.us.name) -> int:
         '''
         Normalizes a timestamp based on the specified precision.
         Args:
@@ -96,7 +96,7 @@ class Line:
             raise ValueError(f"Timestamp {timestamp} is out of range for InfluxDB")
         return normalized
 
-    def to_point(self, timestamp_precision: str = "us") -> Point:
+    def to_point(self, timestamp_precision: str = TimestampPrecision.us.name) -> Point:
         '''
         Converts the Line object to an InfluxDB Point object.
         Args:
