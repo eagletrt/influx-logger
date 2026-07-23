@@ -1,8 +1,8 @@
-from influxdb_client.client.write_api import WriteOptions, WriteApi
 from threading import Condition, Lock
+from influxdb_client.client.write_api import WriteOptions, WriteApi, Point
 
-from src.parser.parser import Parser
 from src.utils.line import Line
+from src.parser.parser import Parser
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
 from src.influx.influx_manager import InfluxManager
@@ -55,12 +55,9 @@ class InfluxWriter(InfluxManager):
         Returns:
             str: A string representation of the packed points, ready to be committed to InfluxDB.
         '''
-        points: list[Line] = []
+        points: list[Point] = []
         with self.__lock__:
-            lines: list[Line] = self.parser.pop_points(self.write_options.batch_size)
-        for line in lines:
-            points.append(line.to_point(timestamp_precision=self.timestamp_precision))
-        # pack: str = self.__pack_lines(self.points, self.timestamp_precision)
+            points: list[Point] = self.parser.pop_points(self.write_options.batch_size)
         return points
     
     def commit(self) -> bool:

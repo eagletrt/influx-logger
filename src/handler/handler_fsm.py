@@ -132,7 +132,7 @@ class HandlerFSM(Thread, StateMachine):
         """
         logger.info(f"{self.get_log_header()} - Entering running state")
         self.msg_dispatcher.set(
-            influx_writer=InfluxWriter(self.handler.influx_connection), # TODO: Add timestamp precision and other parameters if needed
+            influx_writer=InfluxWriter(self.handler.influx_connection),
             influx_reader=None, # TODO: Add InfluxReader if needed
             mqtt=self.handler.mqtt_connection,
         )

@@ -1,8 +1,8 @@
 import sys
 
+from src.utils.logger_utils import logger
 from src.handler.handler_fsm import HandlerFSM
 from src.utils.configuration import Configuration
-from src.utils.logger_utils import logger
 
 def safe_stop(handler: HandlerFSM):
     """
