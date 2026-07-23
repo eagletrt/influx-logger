@@ -1,7 +1,7 @@
 FROM eclipse-mosquitto:2.0
 
 # Generate the required configuration to allow anonymous connections from other containers
-RUN echo "listener 8883 0.0.0.0" > /mosquitto/config/mosquitto.conf && \
-    echo "allow_anonymous true" >> /mosquitto/config/mosquitto.conf
+RUN echo "listener 8883 0.0.0.0" > /mosquitto/config/mosquitto.conf
+RUN echo "allow_anonymous true" >> /mosquitto/config/mosquitto.conf
 
 EXPOSE 8883

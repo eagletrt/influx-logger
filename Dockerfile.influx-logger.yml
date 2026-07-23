@@ -1,16 +1,14 @@
 FROM alpine:3.18
+# Install Python 3 and pip
 RUN apk add --no-cache python3 py3-pip python3-dev && \
-    #create pyenv
-    python3 -m venv /opt/venv && \
-    #activate pyenv
-    . /opt/venv/bin/activate && \
-    #upgrade pip
-    pip install --upgrade pip && \
+    # cleanup
+    rm -rf /var/cache/apk/*
+# Install Python dependencies
+RUN pip install --upgrade pip && \
     #install dependencies
     pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine pydot && \
     # cleanup
-    apk del --no-cache py3-pip python3-dev && \
-    rm -rf /var/cache/apk/* 
+    apk del --no-cache py3-pip python3-dev
 
 ENV PATH="/opt/venv/bin:$PATH"
 

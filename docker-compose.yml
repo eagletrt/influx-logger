@@ -1,12 +1,13 @@
 name: influx-test-env
 services:
     influxdb2:
-        hostname: influxdb
-        build:
-            context: .
-            dockerfile: Dockerfile.influx.yml
+        image: influxdb:2
+        container_name: influxdb2
+        hostname: influxdb2
         ports:
             - "8086:8086"
+        env_file:
+            - ./.env.influxdb2.example
         volumes:
             - type: volume
               source: influxdb2-data
