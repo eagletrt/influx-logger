@@ -131,11 +131,14 @@ class HandlerFSM(Thread, StateMachine):
         If either connection is lost while in the running state, it transitions back to the idle state and continues to check for both connections.
         """
         logger.info(f"{self.get_log_header()} - Entering running state")
+        # Set the InfluxWriter and MQTT connection in the MsgDispatcher
         self.msg_dispatcher.set(
             influx_writer=InfluxWriter(self.handler.influx_connection),
             influx_reader=None, # TODO: Add InfluxReader if needed
             mqtt=self.handler.mqtt_connection,
         )
+        # Check if there are already messages on the MQTT broker and handle them before starting the main operation
+        self.msg_dispatcher.handle_existing_messages()
         self.do_run()
 
     def on_enter_final(self):

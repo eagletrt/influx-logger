@@ -47,6 +47,19 @@ class MsgDispatcher:
             except Exception as e:
                 pass
 
+    def handle_existing_messages(self) -> None:
+        '''
+        Handles any existing messages on the MQTT broker by subscribing to the relevant topics and processing the messages.
+        '''
+        if not self.mqtt:
+            logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle existing messages.")
+            return
+        logger.info("msg_dispatcher: Handling existing messages on the MQTT broker")
+        # Subscribe to the relevant topics to receive existing messages
+        for topic in self.topic_callbacks.keys():
+            self.mqtt.connection.subscribe(topic)
+            logger.info(f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages")
+        
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
         Handles incoming MQTT messages by dispatching them to the appropriate handler based on the topic.
