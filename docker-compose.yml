@@ -3,7 +3,7 @@ services:
     influxdb2:
         image: influxdb:2
         container_name: influxdb2
-        hostname: influxdb2
+        hostname: influxdb
         ports:
             - "8086:8086"
         env_file:
@@ -30,8 +30,6 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.influx-logger.yml
-        ports:
-            - "8000:8000"
         volumes:
             - ./configuration.json:/app/config.json:ro
             - ./cache:/app/cache:rw
