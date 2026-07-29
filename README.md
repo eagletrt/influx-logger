@@ -58,13 +58,26 @@ In order to execute the program a *json* configuration file is required.
 It should be written like this:
 ```json
 {
-    "mqtt_url" : "mosquitto",
-    "mqtt_port" : "1883",
-    "influx_url" : "influxdb",
-    "influx_port" : "8086",
-    "influx_token" : "token_given_by_the_influx_administrator",
-    "influx_org" : "eagletrt",
-    "influx_bucket" : "telemetry"
+    "mqtt" : {
+        "url" : "mosquitto",
+        "port" : "8883"
+    },
+    "influx" : {
+        "adr" : {
+            "url" : "influxdb",
+            "port" : "8086",
+            "token" : "influx_token",
+            "org" : "eagletrt",
+            "bucket" : "telemetry_adr"
+        },
+        "logs" : {
+            "url" : "influxdb",
+            "port" : "8086",
+            "token" : "influx_token",
+            "org" : "eagletrt",
+            "bucket" : "telemetry_logs"
+        }
+    }
 }
 ```
 ### Python
