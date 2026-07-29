@@ -35,5 +35,12 @@ def main(argv=None):
         logger.info("Ctrl+C received, stopping handler")
         safe_stop(handler)
 
+def print_fsm():
+    """
+    Prints the FSM structure of the HandlerFSM instance.
+    """
+    HandlerFSM.draw()
+
 if __name__ == "__main__":
+    #print_fsm()
     main()

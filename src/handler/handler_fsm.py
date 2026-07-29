@@ -71,6 +71,11 @@ class HandlerFSM(Thread, StateMachine):
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
+        """
+        Draws the FSM structure and saves it to a file.
+        Args:
+            filename (str): The name of the file to save the FSM diagram. Defaults to 'handler_fsm.png'.
+        """
         DotGraphMachine(HandlerFSM).get_graph().write_png(filename)
 
     def get_log_header(self) -> str:
