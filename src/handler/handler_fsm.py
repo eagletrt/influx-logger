@@ -133,9 +133,9 @@ class HandlerFSM(Thread, StateMachine):
         logger.info(f"{self.get_log_header()} - Entering running state")
         # Set the InfluxWriter and MQTT connection in the MsgDispatcher
         self.msg_dispatcher.set(
-            influx_writer=InfluxWriter(self.handler.influx_connection),
+            influx_writer=InfluxWriter(self.handler.influx_adr),
             influx_reader=None, # TODO: Add InfluxReader if needed
-            mqtt=self.handler.mqtt_connection,
+            mqtt=self.handler.mqtt,
         )
         # Check if there are already messages on the MQTT broker and handle them before starting the main operation
         self.msg_dispatcher.handle_existing_messages()

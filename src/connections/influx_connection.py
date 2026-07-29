@@ -32,8 +32,7 @@ class InfluxConnection(Connection):
         self.on_state_change = on_state_change
 
     def __str__(self):
-        #TODO fix
-        return super().__str__()
+        return f"InfluxConnection(url={self.url}, port={self.port}, org={self.org}, bucket={self.bucket})"
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
