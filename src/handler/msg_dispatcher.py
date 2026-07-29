@@ -4,7 +4,7 @@ from typing import Callable
 from src.utils.logger_utils import logger
 from src.influx.influx_writer import InfluxWriter
 from src.influx.influx_reader import InfluxReader
-from src.parser.protobuf_manager import LibCANManager
+from src.parser.protobuf_manager import LibcanManager
 from src.connections.mqtt_connection import MQTTConnection
 
 class MsgDispatcher:
@@ -106,7 +106,7 @@ class MsgDispatcher:
         vehicle_id, device_id = ids
         payload_str = payload.decode()
         logger.info(f"msg_dispatcher: Checking existance of commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
-        check = LibCANManager.check_commit_existence(payload_str)
+        check = LibcanManager.check_commit_existence(payload_str)
         if check:
             logger.info(f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
             if self.mqtt.connection:
@@ -119,7 +119,7 @@ class MsgDispatcher:
             except Exception as e:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:
-            logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a CAN commit that apparently doesn't exists. This device will not be considered")
+            logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered")
 
     def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''

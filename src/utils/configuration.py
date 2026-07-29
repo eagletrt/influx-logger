@@ -124,10 +124,12 @@ class Configuration:
         mqtt: MQTTConfig = None,
         influx: Dict[str, InfluxConfig] = None,
         excluded_networks: list = None,
+        github_token: str = None,
     ):
         self.mqtt: MQTTConfig = mqtt
         self.influx: Dict[str, InfluxConfig] = influx or {}
         self.excluded_networks: list = excluded_networks or []
+        self.github_token: str = github_token
 
     def get_influx(self, name: str) -> Optional[InfluxConfig]:
         """Returns the InfluxConfig registered under `name`, or None."""
@@ -152,6 +154,7 @@ class Configuration:
 
         mqtt_data = data.get("mqtt", {})
         influx_data = data.get("influx", {})
+        github_token = data.get("github_token", "")
 
         mqtt = MQTTConfig.from_dict(mqtt_data) if mqtt_data else None
 
@@ -163,6 +166,7 @@ class Configuration:
             mqtt=mqtt,
             influx=influx,
             excluded_networks=data.get("excluded_networks", None),
+            github_token=github_token
         )
 
     @staticmethod
@@ -183,14 +187,17 @@ class Configuration:
         influx = {
             name: InfluxConfig.from_dict(cfg) for name, cfg in influx_raw.items()
         }
+        mqtt = MQTTConfig(
+            url=os.getenv("MQTT_URL", "localhost"),
+            port=int(os.getenv("MQTT_PORT", 1883)),
+        )
+        github_token = os.getenv("GITHUB_TOKEN", "")
 
         return Configuration(
-            mqtt=MQTTConfig(
-                url=os.getenv("MQTT_URL", "localhost"),
-                port=int(os.getenv("MQTT_PORT", 1883)),
-            ),
+            mqtt=mqtt,
             influx=influx,
             excluded_networks=json.loads(os.getenv("EXCLUDED_NETWORKS", "[]")),
+            github_token=github_token
         )
 
     def __str__(self):
@@ -198,5 +205,6 @@ class Configuration:
             "mqtt": self.mqtt.to_dict() if self.mqtt else None,
             "influx": {name: cfg.to_dict() for name, cfg in self.influx.items()},
             "excluded_networks": self.excluded_networks,
+            "github_token": self.github_token
         }
         return json.dumps(conf, indent=4)

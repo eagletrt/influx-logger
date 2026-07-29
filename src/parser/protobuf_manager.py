@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -31,7 +32,7 @@ class ProtobufManager:
         Returns:
             bool: True if the protobuf descriptor is already downloaded, False otherwise.
         '''
-        version_dir = os.path.join(LibCANManager.CACHE_DIR, version)
+        version_dir = os.path.join(LibcanManager.CACHE_DIR, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
         proto_file_path = os.path.join(version_dir, "proto", f"{network}.proto")
         '''Path to the .proto file for the specified version and network'''
@@ -49,7 +50,7 @@ class ProtobufManager:
             network (str): The network for which the protobuf descriptor is needed.
         '''
         if not self.proto_version_downloaded(version, network):
-            download_result: bool = LibCANManager.download_proto_version(version, network)
+            download_result: bool = LibcanManager.download_proto_version(version, network)
             '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
             if not download_result:
                 logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
@@ -126,14 +127,26 @@ class ProtobufManager:
         # Set the module as an attribute of the package module to allow for dynamic imports
         setattr(sys.modules[package_name], module_name, module)
 
-class LibCANManager:
+class LibcanManager:
     '''
     A utility class for interacting with the CAN repository to check commit existence and download protobuf descriptors.
     '''
+    token: str = None
+    '''GitHub personal access token used for authentication when accessing the CAN repository.'''
+
+    CAN_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/can/commits/hash"
+    '''URL to the commit page in the can repository, where 'hash' is a placeholder for the commit hash.'''
+    LIBCAN_COMMIT_URL:str = CAN_COMMIT_URL.replace("can", "libcan-sw")
+    '''URL to the commit page in the libcan-sw repository, where 'hash' is a placeholder for the commit hash.'''
+    CAN_COMMIT_URLS:list[str] = [
+        CAN_COMMIT_URL,
+        LIBCAN_COMMIT_URL,
+    ]
+    '''URLs to the commit pages in the can and libcan-sw repositories, where 'hash' is a placeholder for the commit hash.'''
 
     CAN_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/can/hash/proto/network/network.proto"
     '''URL to the raw .proto file in the can repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
-    LIBCAN_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/libcan-sw/hash/proto/network/network.proto"
+    LIBCAN_PROTO_URL:str = CAN_PROTO_URL.replace("can", "libcan-sw")
     '''URL to the raw .proto file in the libcan-sw repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
     CAN_PROTO_URLS:list[str] = [
         CAN_PROTO_URL,
@@ -141,15 +154,6 @@ class LibCANManager:
     ]
     '''URLs to the raw .proto files in the can and libcan-sw repositories, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
 
-    CAN_COMMIT_URL:str = "https://github.com/eagletrt/can/tree/hash"
-    '''URL to the commit page in the can repository, where 'hash' is a placeholder for the commit hash.'''
-    LIBCAN_COMMIT_URL:str = "https://github.com/eagletrt/libcan-sw/tree/hash"
-    '''URL to the commit page in the libcan-sw repository, where 'hash' is a placeholder for the commit hash.'''
-    CAN_COMMIT_URLS:list[str] = [
-        CAN_COMMIT_URL,
-        LIBCAN_COMMIT_URL,
-    ]
-    '''URLs to the commit pages in the can and libcan-sw repositories, where 'hash' is a placeholder for the commit hash.'''
 
     CACHE_DIR: str = "cache"
     '''Cache directory used for storing .proto files and descriptor sets.'''
@@ -166,14 +170,26 @@ class LibCANManager:
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        for url in LibCANManager.CAN_COMMIT_URLS:
+        headers:json = {}
+        # If a GitHub token is provided, include it in the request headers for authentication
+        if LibcanManager.token and LibcanManager.token != "":
+            headers:json = {
+                "Authorization": f"Bearer {LibcanManager.token}",
+                "Accept": "application/vnd.github+json",
+                }
+        # Check the existence of the commit hash in the CAN repository by sending a GET request to the commit URLs
+        for url in LibcanManager.CAN_COMMIT_URLS:
             check_url = url.replace("hash", hash)
             try:
-                resp = get(check_url)
+                resp = get(check_url, headers=headers)
+                logger.info(f"protobuf_manager: url: {check_url}, headers: {headers}")
                 if resp.ok:
                     return True
+                else:
+                    logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
             except Exception as e:
                 logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
+                logger.error(f"protobuf_manager: {e}")
         return False
 
     @staticmethod
@@ -186,26 +202,37 @@ class LibCANManager:
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        version_dir: str = os.path.join(LibCANManager.CACHE_DIR, hash)
+        headers:json = {}
+        # If a GitHub token is provided, include it in the request headers for authentication
+        if LibcanManager.token and LibcanManager.token != "":
+            headers:json = {
+                "Authorization": f"Bearer {LibcanManager.token}",
+                }
+        version_dir: str = os.path.join(LibcanManager.CACHE_DIR, hash)
         '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
-        try:
-            for url in LibCANManager.CAN_PROTO_URLS:
+        for url in LibcanManager.CAN_PROTO_URLS:
+            try:
                 url = url.replace("hash", hash).replace("network", network)
-                resp = get(url)
-                if not resp.ok:
-                    raise RuntimeError("Failed to download proto")
-                if not os.path.exists(LibCANManager.CACHE_DIR):
-                    os.makedirs(LibCANManager.CACHE_DIR)
-                if not os.path.exists(version_dir):
-                    os.makedirs(version_dir)
-                proto_dir = os.path.join(version_dir, "proto")
-                if not os.path.exists(proto_dir):
-                    os.makedirs(proto_dir)
-                with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
-                    fh.write(resp.text)
-                    return True
+                resp = get(url, headers=headers)
+                if resp.ok:
+                    break
+            except Exception as e:
+                logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
+        if not resp or not resp.ok:
+            return False
+        try:
+            if not os.path.exists(LibcanManager.CACHE_DIR):
+                os.makedirs(LibcanManager.CACHE_DIR)
+            if not os.path.exists(version_dir):
+                os.makedirs(version_dir)
+            proto_dir = os.path.join(version_dir, "proto")
+            if not os.path.exists(proto_dir):
+                os.makedirs(proto_dir)
+            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
+                fh.write(resp.text)
+                return True
         except Exception as e:
-            logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
+            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
             return False
         return False
 
@@ -213,7 +240,7 @@ class _DecoderWrapper:
     '''
     A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
     '''
-    def __init__(self, message_class, json_format_module, cache_dir: str = LibCANManager.CACHE_DIR):
+    def __init__(self, message_class, json_format_module, cache_dir: str = LibcanManager.CACHE_DIR):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
         Args:
@@ -222,7 +249,7 @@ class _DecoderWrapper:
         '''
         self._message_class = message_class
         self._json_format = json_format_module
-        LibCANManager.CACHE_DIR = cache_dir
+        LibcanManager.CACHE_DIR = cache_dir
 
     def decode(self, payload: bytes) -> dict:
         '''
@@ -252,11 +279,11 @@ class _DecoderWrapper:
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
-        version_dir = os.path.join(LibCANManager.CACHE_DIR, version)
+        version_dir = os.path.join(LibcanManager.CACHE_DIR, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
         # If cache directory does not exist, create it
-        if not os.path.exists(LibCANManager.CACHE_DIR):
-            os.makedirs(LibCANManager.CACHE_DIR)
+        if not os.path.exists(LibcanManager.CACHE_DIR):
+            os.makedirs(LibcanManager.CACHE_DIR)
         if not os.path.exists(version_dir):
             os.makedirs(version_dir)
         if not os.path.exists(os.path.join(version_dir, "proto")):
