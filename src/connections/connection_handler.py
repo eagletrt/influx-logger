@@ -38,13 +38,12 @@ class ConnectionHandler:
         if on_state_change is not None:
             self.on_state_change = on_state_change
         self.influx_adr = InfluxConnection(
-            url=config.influx["adr"].url,
-            token=config.influx["adr"].token,
-            org=config.influx["adr"].org,
-            bucket=config.influx["adr"].bucket,
-            port=config.influx["adr"].port,
+            url=config.influx.url,
+            token=config.influx.token,
+            org=config.influx.org,
+            port=config.influx.port,
             on_state_change=self.on_state_change
-        ) if config and config.influx and config.influx["adr"] else None
+        ) if config and config.influx else None
         self.mqtt = MQTTConnection(
             url=config.mqtt.url,
             port=config.mqtt.port,
@@ -57,7 +56,7 @@ class ConnectionHandler:
         Start both InfluxDB and MQTT connections.
         If either connection is not configured, it will log an error message and return without attempting to connect.
         """
-        if not self.influx_adr and not self.mqtt:
+        if not self.influx_adr or not self.mqtt:
             logger.error("No connections to start. Please provide a valid configuration.")
             return
         if not self.influx_adr.is_connected():

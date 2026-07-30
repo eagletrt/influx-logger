@@ -21,11 +21,11 @@ def main(argv=None):
         conf:str = "config.json"
     else:
         conf:str = argv[1]
-    try:
-        configuration:Configuration = Configuration.load_from_file(conf)
-    except Exception as e:
-        logger.error(f"Failed to load configuration from {conf}: {e}")
-        sys.exit(1)
+    #try:
+    configuration:Configuration = Configuration.load_from_file(conf)
+    #except Exception as e:
+    #    logger.error(f"Failed to load configuration from {conf}: {e}")
+    #    sys.exit(1)
     logger.info(f"Configuration loaded from {conf}: {configuration}")
     try:
         handler:HandlerFSM = HandlerFSM(configuration)

@@ -21,13 +21,13 @@ class InfluxConfig:
         port: int,
         token: str,
         org: str,
-        bucket: str
+        buckets: dict[str: str] = {}
     ):
         self.url: str = url
         self.port: int = int(port)
         self.token: str = token
         self.org: str = org
-        self.bucket: str = bucket
+        self.buckets: dict[str: str] = buckets
 
     @staticmethod
     def from_dict(data: dict) -> "InfluxConfig":
@@ -38,12 +38,20 @@ class InfluxConfig:
         Returns:
             InfluxConfig: An instance of InfluxConfig populated with data from the dictionary.
         '''
+        url = data.get("url")
+        port = data.get("port", 8086)
+        token = data.get("token")
+        org = data.get("org")
+        buckets_data = data.get("buckets", {})
+        buckets: dict[str, str] = {}
+        for name, bucket in buckets_data.items():
+            buckets[name] = bucket
         return InfluxConfig(
-            url=data.get("url"),
-            port=data.get("port", 8086),
-            token=data.get("token"),
-            org=data.get("org"),
-            bucket=data.get("bucket")
+            url=url,
+            port=port,
+            token=token,
+            org=org,
+            buckets=buckets
         )
 
     def to_dict(self) -> dict:
@@ -57,7 +65,7 @@ class InfluxConfig:
             "port": self.port,
             "token": self.token,
             "org": self.org,
-            "bucket": self.bucket,
+            "buckets": self.buckets,
         }
 
     def __str__(self):
@@ -122,22 +130,14 @@ class Configuration:
     def __init__(
         self,
         mqtt: MQTTConfig = None,
-        influx: Dict[str, InfluxConfig] = None,
+        influx: InfluxConfig = None,
         excluded_networks: list = None,
         github_token: str = None,
     ):
         self.mqtt: MQTTConfig = mqtt
-        self.influx: Dict[str, InfluxConfig] = influx or {}
+        self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []
         self.github_token: str = github_token
-
-    def get_influx(self, name: str) -> Optional[InfluxConfig]:
-        """Returns the InfluxConfig registered under `name`, or None."""
-        return self.influx.get(name)
-
-    def influx_names(self) -> List[str]:
-        """Returns the list of configured Influx connection names."""
-        return list(self.influx.keys())
 
     @staticmethod
     def load_from_file(file_path: str = "config.json") -> "Configuration":
@@ -152,15 +152,13 @@ class Configuration:
         with open(file_path, "r") as file:
             data = json.load(file)
 
-        mqtt_data = data.get("mqtt", {})
-        influx_data = data.get("influx", {})
-        github_token = data.get("github_token", "")
+        mqtt_data = data.get("mqtt", None)
+        influx_data = data.get("influx", None)
+        github_token = data.get("github_token", None)
 
         mqtt = MQTTConfig.from_dict(mqtt_data) if mqtt_data else None
 
-        influx = {
-            name: InfluxConfig.from_dict(cfg) for name, cfg in influx_data.items()
-        }
+        influx = InfluxConfig.from_dict(influx_data) if influx_data else None
 
         return Configuration(
             mqtt=mqtt,
@@ -203,7 +201,7 @@ class Configuration:
     def __str__(self):
         conf = {
             "mqtt": self.mqtt.to_dict() if self.mqtt else None,
-            "influx": {name: cfg.to_dict() for name, cfg in self.influx.items()},
+            "influx": self.influx.to_dict() if self.influx else None,
             "excluded_networks": self.excluded_networks,
             "github_token": self.github_token
         }

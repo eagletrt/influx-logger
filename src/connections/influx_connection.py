@@ -7,32 +7,29 @@ from src.connections.connection import Connection
 class InfluxConnection(Connection):
     """
     This class manages the connection to an InfluxDB service.
-    It extends the abstract Connection class and implements the connect method to establish a connection to InfluxDB using the provided URL, token, organization, and bucket.
+    It extends the abstract Connection class and implements the connect method to establish a connection to InfluxDB using the provided URL, token, organizationb.
     Attributes:
         token: The authentication token for the InfluxDB service.
         org: The organization name for the InfluxDB service.
-        bucket: The bucket name for the InfluxDB service.
     """
-    def __init__(self, url: str, token: str, org: str, bucket: str, port: int = 8086, on_state_change=None):
+    def __init__(self, url: str, token: str, org: str, port: int = 8086, on_state_change=None):
         """
-        Initializes the InfluxConnection instance with the provided URL, token, organization, bucket, and port.
+        Initializes the InfluxConnection instance with the provided URL, token, organization, and port.
         Args:
             url (str): The URL of the InfluxDB service.
             token (str): The authentication token for the InfluxDB service.
             org (str): The organization name for the InfluxDB service.
-            bucket (str): The bucket name for the InfluxDB service.
             port (int, optional): The port of the InfluxDB service. Defaults to 8086.
             on_state_change (callable, optional): A callback function to be called when the connection state changes. Defaults to None.
         """
         super().__init__(url=url, port=port)
         self.token: str = token
         self.org: str = org
-        self.bucket: str = bucket
         self.connection_checker: ConnectionChecker = ConnectionChecker(self, check_interval=10)
         self.on_state_change = on_state_change
 
     def __str__(self):
-        return f"InfluxConnection(url={self.url}, port={self.port}, org={self.org}, bucket={self.bucket})"
+        return f"InfluxConnection(url={self.url}, port={self.port}, org={self.org})"
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
@@ -69,7 +66,7 @@ class InfluxConnection(Connection):
 
     def connect(self) -> bool:
         """
-        Establishes a connection to the InfluxDB service using the provided URL, token, organization, and bucket.
+        Establishes a connection to the InfluxDB service using the provided URL, token and organization.
         Logs the success or failure of the connection attempt.
         Returns:
             bool: True if the connection was successful, False otherwise.

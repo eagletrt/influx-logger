@@ -60,26 +60,21 @@ It should be written like this:
 {
     "mqtt" : {
         "url" : "mosquitto",
-        "port" : "8883"
+        "port" : 8883
     },
     "influx" : {
-        "adr" : {
-            "url" : "influxdb",
-            "port" : "8086",
-            "token" : "influx_token",
-            "org" : "eagletrt",
-            "bucket" : "telemetry_adr"
-        },
-        "logs" : {
-            "url" : "influxdb",
-            "port" : "8086",
-            "token" : "influx_token",
-            "org" : "eagletrt",
-            "bucket" : "telemetry_logs"
+        "url" : "influxdb",
+        "port" : 8086,
+        "token" : "influx_token",
+        "org" : "eagletrt",
+        "buckets" : {
+            "adr" : "telemetry_adr",
+            "logs" : "telemetry_log"
         }
     },
     "github_token" : "optional_github_personal_access_token"
 }
+
 ```
 ### Python
 #### Requirements

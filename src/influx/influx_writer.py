@@ -20,7 +20,7 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
+    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.
@@ -28,15 +28,26 @@ class InfluxWriter(InfluxManager):
             retry_interval=5_000,  # Retry every 5 seconds if the write fails
             max_retries=3,  # Maximum number of retries
         )
+        '''Write options for the InfluxDB write API, including batch size, flush interval, retry interval, and maximum retries. These options control how data is written to InfluxDB in batches, with automatic handling of retries and flush intervals.'''
         self.write_api:WriteApi = self.client.connection.write_api(
             write_options=self.write_options
         )
+        '''Write API for interacting with InfluxDB, initialized with the specified write options. This API is used to write points to InfluxDB in batches, with automatic handling of retries and flush intervals.'''
+        self.adr_bucket = adr_bucket
+        '''The name of the InfluxDB bucket where address points will be written. This bucket is specified in the InfluxConnection instance and is used to organize and store time-series data in InfluxDB.'''
+        self.log_bucket = log_bucket
+        '''The name of the InfluxDB bucket where log points will be written. This bucket is specified in the InfluxConnection instance and is used to organize and store log data in InfluxDB.'''
         self.parser: Parser = Parser()
         '''Parser instance for processing incoming data and converting it into InfluxDB points. The parser will handle the parsing of messages and the creation of Point objects.'''
         self.__lock__: Lock = Lock()
         '''Lock for synchronizing access to shared resources, ensuring thread safety when preparing and committing points to InfluxDB.'''
         self.cond_to_push: Condition = Condition(lock=self.__lock__)
         '''Condition variable for signaling when the batch size limit is reached and points are ready to be pushed to InfluxDB. This allows for efficient waiting and notification between threads.'''
+        # TODO Remove
+        if self.adr_bucket:
+            logger.info(f"influx_writer: adr bucket: {self.adr_bucket}")
+        if self.log_bucket:
+            logger.info(f"influx_writer: log bucket: {self.log_bucket}")
 
     def is_list_limit_reached(self, count:int) -> bool:
         '''
@@ -70,18 +81,23 @@ class InfluxWriter(InfluxManager):
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
-        logger.info(f"influx_writer: Committing {len(points)} lines to InfluxDB")
-        #logger.info(f"influx_writer: Lines to commit:\n{points}")
+        committed: bool = False
+        '''Flag indicating whether the commit was successful. This is set to True if the write operation to InfluxDB returns None, indicating success.'''
+        bucket: str = self.adr_bucket
+        if bucket is None:
+            logger.error("influx_writer: No bucket specified for committing points")
+            return False
+        logger.info(f"influx_writer: Sending {len(points)} lines to bucket '{bucket}'")
         try:
             #logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
             result = self.write_api.write(
-                bucket=self.client.bucket,
+                bucket=bucket,
                 org=self.client.org,
                 record=points,
                 write_precision=self.timestamp_precision,
             )
             if result is None:
-                logger.info(f"influx_writer: Successfully committed {len(points)} lines")
+                logger.info(f"influx_writer: Successfully committed {len(points)} lines to bucket '{bucket}'")
             else:
                 logger.warning(f"influx_writer: Commit returned unexpected result: {result}")
             return result is None
