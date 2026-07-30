@@ -178,8 +178,7 @@ dist
 .vscode/
 
 # Configuration 
-configuration.json
-config.json
+*.json
 
 # Python
 .venv/
