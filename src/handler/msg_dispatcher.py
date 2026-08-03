@@ -4,13 +4,14 @@ from typing import Callable
 from src.utils.logger_utils import logger
 from src.influx.influx_writer import InfluxWriter
 from src.influx.influx_reader import InfluxReader
-from src.parser.protobuf_manager import LibcanManager
+from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.connections.mqtt_connection import MQTTConnection
 
 class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
-            "+/+/version":  self.handle_version_message,
+            "+/+/version":  self.handle_libcan_version_message,
+            "+/+/gpslib":   self.handle_libgps_version_message,
             "+/+/data/+":   self.handle_data_message,
         }
         self.influx_writer: InfluxWriter = influx_writer
@@ -89,7 +90,7 @@ class MsgDispatcher:
         pattern = topic.replace("/", "\\/").replace("+", "([^\\/]+)").replace("#", ".*")
         return compile(pattern)
     
-    def handle_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+    def handle_libcan_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''
         Handles incoming version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
         Args:
@@ -120,6 +121,38 @@ class MsgDispatcher:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:
             logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered")
+
+    def handle_libgps_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+        '''
+        Handles incoming GPS library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Args:
+            _topic (str): The topic of the incoming GPS library version message.
+            payload (bytes): The payload of the incoming GPS library version message.
+            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+        '''
+        if not self.mqtt:
+            logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle GPS library version message.")
+            return
+        if not self.influx_writer:
+            logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle GPS library version message.")
+            return
+        vehicle_id, device_id = ids
+        payload_str = payload.decode()
+        logger.info(f"msg_dispatcher: Checking existence of GPS library commit {payload_str}, requested by device '{vehicle_id}/{device_id}'")
+        check = LibgpsManager.check_commit_existence(payload_str)
+        if check:
+            logger.info(f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id}) with GPS library commit {payload_str}")
+            if self.mqtt.connection:
+                self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
+                logger.info(f"GPS library commit {payload_str} exists, device '{vehicle_id}/{device_id}' will be considered")
+            try:
+                self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = payload_str
+                self.influx_writer.parser.protobuf_manager.version_descriptors[payload_str] = {}
+                logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics with GPS library commit {payload_str}")
+            except Exception as e:
+                logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics with GPS library commit {payload_str}: {e}")
+        else:
+            logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a GPS library commit that apparently doesn't exist. This device will not be considered")
 
     def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''

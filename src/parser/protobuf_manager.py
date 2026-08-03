@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json
 import os
 import sys
@@ -49,8 +50,10 @@ class ProtobufManager:
             version (str): The version of the protobuf descriptor.
             network (str): The network for which the protobuf descriptor is needed.
         '''
+        download_function = LibcanManager.download_proto_version if network != "gps" else LibgpsManager.download_proto_version
+        '''Download function to use based on the network type'''
         if not self.proto_version_downloaded(version, network):
-            download_result: bool = LibcanManager.download_proto_version(version, network)
+            download_result: bool = download_function(version, network)
             '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
             if not download_result:
                 logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
@@ -127,7 +130,35 @@ class ProtobufManager:
         # Set the module as an attribute of the package module to allow for dynamic imports
         setattr(sys.modules[package_name], module_name, module)
 
-class LibcanManager:
+class LibManager(ABC):
+    '''
+    A utility class for interacting with the CAN and GPS repositories to check commit existence and download protobuf descriptors.
+    '''
+    @abstractmethod
+    @staticmethod
+    def check_commit_existence(hash: str) -> bool:
+        '''
+        Checks if a given commit hash exists in the repository.
+        Args:
+            hash (str): The commit hash to check.
+        Returns:
+            bool: True if the commit exists, False otherwise.
+        '''
+        raise NotImplementedError("Subclasses must implement the check_commit_existence method.")
+    @abstractmethod
+    @staticmethod
+    def download_proto_version(hash: str, network: str) -> bool:
+        '''
+        Downloads the protobuf descriptor for a given commit hash and network from the repository.
+        Args:
+            hash (str): The commit hash for which to download the protobuf descriptor.
+            network (str): The network for which to download the protobuf descriptor.
+        Returns:
+            bool: True if the download is successful, False otherwise.
+        '''
+        raise NotImplementedError("Subclasses must implement the download_proto_version method.")
+
+class LibcanManager(LibManager):
     '''
     A utility class for interacting with the CAN repository to check commit existence and download protobuf descriptors.
     '''
@@ -153,7 +184,6 @@ class LibcanManager:
         LIBCAN_PROTO_URL,
     ]
     '''URLs to the raw .proto files in the can and libcan-sw repositories, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
-
 
     CACHE_DIR: str = "cache"
     '''Cache directory used for storing .proto files and descriptor sets.'''
@@ -191,7 +221,6 @@ class LibcanManager:
                 logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
                 logger.error(f"protobuf_manager: {e}")
         return False
-
     @staticmethod
     def download_proto_version(hash: str, network: str) -> bool:
         '''
@@ -235,6 +264,73 @@ class LibcanManager:
             logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
             return False
         return False
+
+class LibgpsManager(LibManager):
+    '''
+    A utility class for interacting with the GPS repository to check commit existence.
+    '''
+    GPS_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/gpslib/commits/hash"
+    '''URL to the commit page in the gps repository, where 'hash' is a placeholder for the commit hash.'''
+    GPS_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/gpslib/hash/proto/network/network.proto"
+    '''URL to the raw .proto file in the gps repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
+
+    @staticmethod
+    def check_commit_existence(hash: str) -> bool:
+        '''
+        Checks if a given commit hash exists in the GPS repository.
+        Args:
+            hash (str): The commit hash to check.
+        Returns:
+            bool: True if the commit exists, False otherwise.
+        '''
+        # Check the existence of the commit hash in the GPS repository by sending a GET request to the commit URL
+        check_url = LibgpsManager.GPS_COMMIT_URL.replace("hash", hash)
+        try:
+            resp = get(check_url)
+            logger.info(f"protobuf_manager: url: {check_url}")
+            if resp.ok:
+                return True
+            else:
+                logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
+            logger.error(f"protobuf_manager: {e}")
+        return False
+    @staticmethod
+    def download_proto_version(hash: str, network: str) -> bool:
+        '''
+        Downloads the protobuf descriptor for a given commit hash and network from the GPS repository.
+        Args:
+            hash (str): The commit hash for which to download the protobuf descriptor.
+            network (str): The network for which to download the protobuf descriptor.
+        Returns:
+            bool: True if the download is successful, False otherwise.
+        '''
+        version_dir: str = os.path.join(LibcanManager.CACHE_DIR, hash)
+        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
+        url = f"https://raw.githubusercontent.com/eagletrt/gpslib/{hash}/proto/{network}/{network}.proto"
+        try:
+            resp = get(url)
+            if not resp.ok:
+                return False
+        except Exception as e:
+            logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
+            return False
+        try:
+            if not os.path.exists(LibcanManager.CACHE_DIR):
+                os.makedirs(LibcanManager.CACHE_DIR)
+            if not os.path.exists(version_dir):
+                os.makedirs(version_dir)
+            proto_dir = os.path.join(version_dir, "proto")
+            if not os.path.exists(proto_dir):
+                os.makedirs(proto_dir)
+            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
+                fh.write(resp.text)
+                return True
+        except Exception as e:
+            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
+            return False
+
 
 class _DecoderWrapper:
     '''
