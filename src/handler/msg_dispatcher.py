@@ -10,9 +10,10 @@ from src.connections.mqtt_connection import MQTTConnection
 class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
-            "+/+/version":  self.handle_libcan_version_message,
-            "+/+/data/+":   self.handle_data_message,
-            "+/+/info/version/gpslib":   self.handle_libgps_version_message,
+            "+/+/version":              self.handle_canlib_version_message,
+            "+/+/data/+":               self.handle_data_message,
+            "+/+/info/version/libcan":  self.handle_libcan_version_message,
+            "+/+/info/version/gpslib":  self.handle_libgps_version_message,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
@@ -117,10 +118,20 @@ class MsgDispatcher:
     
     def handle_libcan_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''
-        Handles incoming version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Handles incoming libcan version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
         Args:
-            _topic (str): The topic of the incoming version message.
-            payload (bytes): The payload of the incoming version message.
+            _topic (str): The topic of the incoming libcan version message.
+            payload (bytes): The payload of the incoming libcan version message.
+            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+        '''
+        self.handle_version_message(self, LibcanManager, payload.decode(), ids)
+
+    def handle_canlib_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+        '''
+        Handles incoming CAN library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Args:
+            _topic (str): The topic of the incoming CAN library version message.
+            payload (bytes): The payload of the incoming CAN library version message.
             ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
         '''
         self.handle_version_message(self, LibcanManager, payload.decode(), ids)
