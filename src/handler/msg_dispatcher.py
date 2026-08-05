@@ -1,11 +1,11 @@
-from re import Pattern, compile
 from typing import Callable
+from re import Pattern, compile, sub
 
 from src.utils.logger_utils import logger
 from src.influx.influx_writer import InfluxWriter
 from src.influx.influx_reader import InfluxReader
-from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.connections.mqtt_connection import MQTTConnection
+from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 
 class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
@@ -98,6 +98,10 @@ class MsgDispatcher:
         if not self.influx_writer:
             logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle version message.")
             return
+        VERSION_SANITIZE_REGEX = r"^(w)"
+        '''Regex pattern to sanitize the version string by extracting the commit hash from the version string.'''
+        # Sanitize the version string to extract the commit hash
+        version = sub(VERSION_SANITIZE_REGEX, "", version)
         vehicle_id, device_id = ids
         logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
         check = library.check_commit_existence(version)
@@ -124,7 +128,7 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming libcan version message.
             ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
         '''
-        self.handle_version_message(self, LibcanManager, payload.decode(), ids)
+        self.handle_version_message(LibcanManager, payload.decode(), ids)
 
     def handle_canlib_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''
@@ -134,7 +138,8 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming CAN library version message.
             ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
         '''
-        self.handle_version_message(self, LibcanManager, payload.decode(), ids)
+        # We could think about moving this to a dedicated class
+        self.handle_version_message(LibcanManager, payload.decode(), ids)
 
     def handle_libgps_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''
@@ -144,7 +149,7 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming GPS library version message.
             ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
         '''
-        self.handle_version_message(self, LibgpsManager, payload.decode(), ids)
+        self.handle_version_message(LibgpsManager, payload.decode(), ids)
 
     def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''
