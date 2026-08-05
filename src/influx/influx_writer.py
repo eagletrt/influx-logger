@@ -6,7 +6,7 @@ from src.parser.parser import Parser
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
 from src.influx.influx_manager import InfluxManager
-from connections.influx_connection import InfluxConnection
+from src.connections.influx_connection import InfluxConnection
 
 class InfluxWriter(InfluxManager):
     """

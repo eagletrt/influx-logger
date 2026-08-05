@@ -11,8 +11,8 @@ class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
             "+/+/version":  self.handle_libcan_version_message,
-            "+/+/gpslib":   self.handle_libgps_version_message,
             "+/+/data/+":   self.handle_data_message,
+            "+/+/info/version/gpslib":   self.handle_libgps_version_message,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader

@@ -19,13 +19,9 @@ class ProtobufManager:
     '''
     Manages the retrieval and caching of protobuf descriptors for different versions and networks.
     '''
-    def __init__(self, cache_folder: str = ".cache"):
+    def __init__(self):
         self.version_descriptors: dict[str, dict[str, Any]] = {}
         ''' Version descriptors maps version -> network -> protobuf type/object'''
-        self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        self.generated_proto_root = os.path.join(self.project_root, cache_folder, "proto")
-        sys.path.insert(0, self.project_root)
-        sys.path.insert(0, self.generated_proto_root)
 
     def proto_version_downloaded(self, version: str, network: str) -> bool:
         '''
@@ -50,17 +46,17 @@ class ProtobufManager:
             version (str): The version of the protobuf descriptor.
             network (str): The network for which the protobuf descriptor is needed.
         '''
-        download_function = LibcanManager.download_proto_version if network != "gps" else LibgpsManager.download_proto_version
-        '''Download function to use based on the network type'''
+        lib_manager = LibcanManager if network != "gps" else LibgpsManager
+        '''Library manager class to use based on the network type'''
         if not self.proto_version_downloaded(version, network):
-            download_result: bool = download_function(version, network)
+            download_result: bool = lib_manager.download_proto_version(version, network)
             '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
             if not download_result:
                 logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
                 return
             logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
-            decoder = _DecoderWrapper.build_decoder(version, network)
+            decoder = _DecoderWrapper.build_decoder(version, network, cache=lib_manager.CACHE_DIR)
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
@@ -97,43 +93,77 @@ class ProtobufManager:
 
         sys.modules[package_name] = module
 
-    @staticmethod
-    def load_generated_proto_module(package_name: str, module_name: str) -> None:
-        '''
-        Loads a generated protobuf module from the specified package and module name.
-        Args:
-            package_name (str): The name of the generated protobuf package.
-            module_name (str): The name of the generated protobuf module to load.
-        '''
-        protobuf_manager = ProtobufManager()
-        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-        '''Path to the generated protobuf package directory'''
-        module_path = os.path.join(package_path, f"{module_name}.py")
-        '''Path to the generated protobuf module file'''
-        if not os.path.isfile(module_path):
-            return
-        full_name = f"{package_name}.{module_name}"
-        '''Fully qualified name of the generated protobuf module'''
-        if full_name in sys.modules:
-            return
-        spec = spec_from_file_location(full_name, module_path)
-        '''Module spec for the generated protobuf module'''
-        if spec is None or spec.loader is None:
-            return
-        module = module_from_spec(spec)
-        '''Module object for the generated protobuf module'''
-        # Set the module in sys.modules and execute it to load the generated protobuf module
-        sys.modules[full_name] = module
-        # Execute the module to load its contents
-        spec.loader.exec_module(module)
-        # Set the module as an attribute of the package module to allow for dynamic imports
-        setattr(sys.modules[package_name], module_name, module)
+#    @staticmethod
+#    def load_generated_proto_module(package_name: str, module_name: str) -> None:
+#        '''
+#        Loads a generated protobuf module from the specified package and module name.
+#        Args:
+#            package_name (str): The name of the generated protobuf package.
+#            module_name (str): The name of the generated protobuf module to load.
+#        '''
+#        protobuf_manager = ProtobufManager()
+#        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+#        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+#        '''Path to the generated protobuf package directory'''
+#        module_path = os.path.join(package_path, f"{module_name}.py")
+#        '''Path to the generated protobuf module file'''
+#        if not os.path.isfile(module_path):
+#            return
+#        full_name = f"{package_name}.{module_name}"
+#        '''Fully qualified name of the generated protobuf module'''
+#        if full_name in sys.modules:
+#            return
+#        spec = spec_from_file_location(full_name, module_path)
+#        '''Module spec for the generated protobuf module'''
+#        if spec is None or spec.loader is None:
+#            return
+#        module = module_from_spec(spec)
+#        '''Module object for the generated protobuf module'''
+#        # Set the module in sys.modules and execute it to load the generated protobuf module
+#        sys.modules[full_name] = module
+#        # Execute the module to load its contents
+#        spec.loader.exec_module(module)
+#        # Set the module as an attribute of the package module to allow for dynamic imports
+#        setattr(sys.modules[package_name], module_name, module)
 
 class LibManager(ABC):
     '''
     A utility class for interacting with the CAN and GPS repositories to check commit existence and download protobuf descriptors.
     '''
+    CACHE_DIR: str = "cache"
+    '''Base cache directory used for storing .proto files and descriptor sets.'''
+    @staticmethod
+    def check(hash: str, url: str|list[str], token: str = None) -> bool:
+        '''
+        Checks if a given commit hash exists in the repository.
+        Args:
+            hash (str): The commit hash to check.
+            url (str|list[str]): The URL or list of URLs to check.
+            token (str): The GitHub personal access token for authentication.
+        Returns:
+            bool: True if the commit exists, False otherwise.
+        '''
+        headers:json = {}
+        # If a GitHub token is provided, include it in the request headers for authentication
+        if token and token != "":
+            headers:json = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                }
+        # Check the existence of the commit hash in the CAN repository by sending a GET request to the commit URLs
+        for url in url if isinstance(url, list) else [url]:
+            check_url = url.replace("hash", hash)
+            try:
+                resp = get(check_url, headers=headers)
+                logger.info(f"protobuf_manager: url: {check_url}, headers: {headers}")
+                if resp.ok:
+                    return True
+                else:
+                    logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
+            except Exception as e:
+                logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
+                logger.error(f"protobuf_manager: {e}")
+        return False
     @staticmethod
     @abstractmethod
     def check_commit_existence(hash: str) -> bool:
@@ -145,6 +175,54 @@ class LibManager(ABC):
             bool: True if the commit exists, False otherwise.
         '''
         raise NotImplementedError("Subclasses must implement the check_commit_existence method.")
+    @staticmethod
+    def download(hash: str, network: str, url: str|list[str], cache: str, token: str = None) -> bool:
+        '''
+        Downloads the protobuf descriptor for a given commit hash and network from the repository.
+        Args:
+            hash (str): The commit hash for which to download the protobuf descriptor.
+            network (str): The network for which to download the protobuf descriptor.
+            url (str|list[str]): The URL or list of URLs from which to download the protobuf descriptor.
+            cache (str): The path to the cache directory where the downloaded proto file will be stored.
+            token (str): The GitHub personal access token for authentication.
+        Returns:
+            bool: True if the download is successful, False otherwise.
+        '''
+        headers:json = {}
+        # If a GitHub token is provided, include it in the request headers for authentication
+        if token and token != "":
+            headers:json = {
+                "Authorization": f"Bearer {token}",
+                }
+        version_dir: str = os.path.join(cache, hash)
+        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
+        for url in url if isinstance(url, list) else [url]:
+            try:
+                url = url.replace("hash", hash).replace("network", network)
+                resp = get(url, headers=headers)
+                if resp.ok:
+                    break
+            except Exception as e:
+                logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
+        if not resp or not resp.ok:
+            return False
+        try:
+            if not os.path.exists(LibManager.CACHE_DIR):
+                os.makedirs(LibManager.CACHE_DIR)
+            if not os.path.exists(cache):
+                os.makedirs(cache)
+            if not os.path.exists(version_dir):
+                os.makedirs(version_dir)
+            proto_dir = os.path.join(version_dir, "proto")
+            if not os.path.exists(proto_dir):
+                os.makedirs(proto_dir)
+            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
+                fh.write(resp.text)
+                return True
+        except Exception as e:
+            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
+            return False
+        return False
     @staticmethod
     @abstractmethod
     def download_proto_version(hash: str, network: str) -> bool:
@@ -185,12 +263,11 @@ class LibcanManager(LibManager):
     ]
     '''URLs to the raw .proto files in the can and libcan-sw repositories, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
 
-    CACHE_DIR: str = "cache"
-    '''Cache directory used for storing .proto files and descriptor sets.'''
+    CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "can")
+    '''Cache directory used for storing .proto files and descriptor sets for CAN.'''
     
     def __init__(self):
         pass
-    
     @staticmethod
     def check_commit_existence(hash: str) -> bool:
         '''
@@ -200,27 +277,7 @@ class LibcanManager(LibManager):
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        headers:json = {}
-        # If a GitHub token is provided, include it in the request headers for authentication
-        if LibcanManager.token and LibcanManager.token != "":
-            headers:json = {
-                "Authorization": f"Bearer {LibcanManager.token}",
-                "Accept": "application/vnd.github+json",
-                }
-        # Check the existence of the commit hash in the CAN repository by sending a GET request to the commit URLs
-        for url in LibcanManager.CAN_COMMIT_URLS:
-            check_url = url.replace("hash", hash)
-            try:
-                resp = get(check_url, headers=headers)
-                logger.info(f"protobuf_manager: url: {check_url}, headers: {headers}")
-                if resp.ok:
-                    return True
-                else:
-                    logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
-            except Exception as e:
-                logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
-                logger.error(f"protobuf_manager: {e}")
-        return False
+        return LibManager.check(hash, LibcanManager.CAN_COMMIT_URLS, token=LibcanManager.token)
     @staticmethod
     def download_proto_version(hash: str, network: str) -> bool:
         '''
@@ -231,40 +288,7 @@ class LibcanManager(LibManager):
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        headers:json = {}
-        # If a GitHub token is provided, include it in the request headers for authentication
-        if LibcanManager.token and LibcanManager.token != "":
-            headers:json = {
-                "Authorization": f"Bearer {LibcanManager.token}",
-                }
-        version_dir: str = os.path.join(LibcanManager.CACHE_DIR, hash)
-        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
-        for url in LibcanManager.CAN_PROTO_URLS:
-            try:
-                url = url.replace("hash", hash).replace("network", network)
-                resp = get(url, headers=headers)
-                if resp.ok:
-                    break
-            except Exception as e:
-                logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
-        if not resp or not resp.ok:
-            return False
-        try:
-            if not os.path.exists(LibcanManager.CACHE_DIR):
-                os.makedirs(LibcanManager.CACHE_DIR)
-            if not os.path.exists(version_dir):
-                os.makedirs(version_dir)
-            proto_dir = os.path.join(version_dir, "proto")
-            if not os.path.exists(proto_dir):
-                os.makedirs(proto_dir)
-            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
-                fh.write(resp.text)
-                return True
-        except Exception as e:
-            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
-            return False
-        return False
-
+        return LibManager.download(hash, network, LibcanManager.CAN_PROTO_URLS, cache=LibcanManager.CACHE_DIR, token=LibcanManager.token)
 class LibgpsManager(LibManager):
     '''
     A utility class for interacting with the GPS repository to check commit existence.
@@ -273,6 +297,9 @@ class LibgpsManager(LibManager):
     '''URL to the commit page in the gps repository, where 'hash' is a placeholder for the commit hash.'''
     GPS_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/gpslib/hash/proto/network/network.proto"
     '''URL to the raw .proto file in the gps repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
+
+    CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "gps")
+    '''Cache directory used for storing .proto files and descriptor sets for GPS.'''
 
     @staticmethod
     def check_commit_existence(hash: str) -> bool:
@@ -283,19 +310,7 @@ class LibgpsManager(LibManager):
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        # Check the existence of the commit hash in the GPS repository by sending a GET request to the commit URL
-        check_url = LibgpsManager.GPS_COMMIT_URL.replace("hash", hash)
-        try:
-            resp = get(check_url)
-            logger.info(f"protobuf_manager: url: {check_url}")
-            if resp.ok:
-                return True
-            else:
-                logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
-        except Exception as e:
-            logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
-            logger.error(f"protobuf_manager: {e}")
-        return False
+        return LibManager.check(hash, LibgpsManager.GPS_COMMIT_URL)
     @staticmethod
     def download_proto_version(hash: str, network: str) -> bool:
         '''
@@ -306,37 +321,13 @@ class LibgpsManager(LibManager):
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        version_dir: str = os.path.join(LibcanManager.CACHE_DIR, hash)
-        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
-        url = f"https://raw.githubusercontent.com/eagletrt/gpslib/{hash}/proto/{network}/{network}.proto"
-        try:
-            resp = get(url)
-            if not resp.ok:
-                return False
-        except Exception as e:
-            logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
-            return False
-        try:
-            if not os.path.exists(LibcanManager.CACHE_DIR):
-                os.makedirs(LibcanManager.CACHE_DIR)
-            if not os.path.exists(version_dir):
-                os.makedirs(version_dir)
-            proto_dir = os.path.join(version_dir, "proto")
-            if not os.path.exists(proto_dir):
-                os.makedirs(proto_dir)
-            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
-                fh.write(resp.text)
-                return True
-        except Exception as e:
-            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
-            return False
-
+        return LibManager.download(hash, network, LibgpsManager.GPS_PROTO_URL, cache=LibgpsManager.CACHE_DIR)
 
 class _DecoderWrapper:
     '''
     A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
     '''
-    def __init__(self, message_class, json_format_module, cache_dir: str = LibcanManager.CACHE_DIR):
+    def __init__(self, message_class, json_format_module):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
         Args:
@@ -345,7 +336,6 @@ class _DecoderWrapper:
         '''
         self._message_class = message_class
         self._json_format = json_format_module
-        LibcanManager.CACHE_DIR = cache_dir
 
     def decode(self, payload: bytes) -> dict:
         '''
@@ -366,7 +356,7 @@ class _DecoderWrapper:
         )
     
     @staticmethod
-    def build_decoder(version: str, network: str) -> '_DecoderWrapper':
+    def build_decoder(version: str, network: str, cache: str = LibManager.CACHE_DIR) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
@@ -375,11 +365,11 @@ class _DecoderWrapper:
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
-        version_dir = os.path.join(LibcanManager.CACHE_DIR, version)
+        version_dir = os.path.join(cache, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
         # If cache directory does not exist, create it
-        if not os.path.exists(LibcanManager.CACHE_DIR):
-            os.makedirs(LibcanManager.CACHE_DIR)
+        if not os.path.exists(cache):
+            os.makedirs(cache)
         if not os.path.exists(version_dir):
             os.makedirs(version_dir)
         if not os.path.exists(os.path.join(version_dir, "proto")):
@@ -460,26 +450,27 @@ class _DecoderWrapper:
             message_class = MessageFactory(pool).GetPrototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
 
-for package_name in [
-    "actions",
-    "app",
-    "can",
-    "configs",
-    "data",
-    "handcart",
-    "influxlogger",
-    "lapcounter",
-    "mongodb",
-    "sessions",
-    "telemetry",
-    "tpms",
-]:
-    ProtobufManager.register_generated_proto_package(package_name)
-    protobuf_manager = ProtobufManager()
-    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-    '''Path to the generated protobuf package directory'''
-    if os.path.isdir(package_path):
-        for file_name in os.listdir(package_path):
-            if file_name.endswith(".py") and file_name != "__init__.py":
-                ProtobufManager.load_generated_proto_module(package_name, file_name[:-3])
+# TODO Remove
+#for package_name in [
+#    "actions",
+#    "app",
+#    "can",
+#    "configs",
+#    "data",
+#    "handcart",
+#    "influxlogger",
+#    "lapcounter",
+#    "mongodb",
+#    "sessions",
+#    "telemetry",
+#    "tpms",
+#]:
+#    ProtobufManager.register_generated_proto_package(package_name)
+#    protobuf_manager = ProtobufManager()
+#    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
+#    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
+#    '''Path to the generated protobuf package directory'''
+#    if os.path.isdir(package_path):
+#        for file_name in os.listdir(package_path):
+#            if file_name.endswith(".py") and file_name != "__init__.py":
+#                ProtobufManager.load_generated_proto_module(package_name, file_name[:-3])
