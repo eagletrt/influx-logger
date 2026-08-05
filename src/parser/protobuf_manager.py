@@ -93,39 +93,6 @@ class ProtobufManager:
 
         sys.modules[package_name] = module
 
-#    @staticmethod
-#    def load_generated_proto_module(package_name: str, module_name: str) -> None:
-#        '''
-#        Loads a generated protobuf module from the specified package and module name.
-#        Args:
-#            package_name (str): The name of the generated protobuf package.
-#            module_name (str): The name of the generated protobuf module to load.
-#        '''
-#        protobuf_manager = ProtobufManager()
-#        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-#        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-#        '''Path to the generated protobuf package directory'''
-#        module_path = os.path.join(package_path, f"{module_name}.py")
-#        '''Path to the generated protobuf module file'''
-#        if not os.path.isfile(module_path):
-#            return
-#        full_name = f"{package_name}.{module_name}"
-#        '''Fully qualified name of the generated protobuf module'''
-#        if full_name in sys.modules:
-#            return
-#        spec = spec_from_file_location(full_name, module_path)
-#        '''Module spec for the generated protobuf module'''
-#        if spec is None or spec.loader is None:
-#            return
-#        module = module_from_spec(spec)
-#        '''Module object for the generated protobuf module'''
-#        # Set the module in sys.modules and execute it to load the generated protobuf module
-#        sys.modules[full_name] = module
-#        # Execute the module to load its contents
-#        spec.loader.exec_module(module)
-#        # Set the module as an attribute of the package module to allow for dynamic imports
-#        setattr(sys.modules[package_name], module_name, module)
-
 class LibManager(ABC):
     '''
     A utility class for interacting with the CAN and GPS repositories to check commit existence and download protobuf descriptors.
@@ -449,28 +416,3 @@ class _DecoderWrapper:
             # If GetMessageClass is not available, use MessageFactory to get the message class
             message_class = MessageFactory(pool).GetPrototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
-
-# TODO Remove
-#for package_name in [
-#    "actions",
-#    "app",
-#    "can",
-#    "configs",
-#    "data",
-#    "handcart",
-#    "influxlogger",
-#    "lapcounter",
-#    "mongodb",
-#    "sessions",
-#    "telemetry",
-#    "tpms",
-#]:
-#    ProtobufManager.register_generated_proto_package(package_name)
-#    protobuf_manager = ProtobufManager()
-#    '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-#    package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-#    '''Path to the generated protobuf package directory'''
-#    if os.path.isdir(package_path):
-#        for file_name in os.listdir(package_path):
-#            if file_name.endswith(".py") and file_name != "__init__.py":
-#                ProtobufManager.load_generated_proto_module(package_name, file_name[:-3])
