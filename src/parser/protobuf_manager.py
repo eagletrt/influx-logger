@@ -169,9 +169,10 @@ class LibManager(ABC):
                 resp = get(url, headers=headers)
                 if resp.ok:
                     break
-            except Exception as e:
-                logger.error(f"protobuf_manager: Failed to download proto for network '{network}' (version {hash})")
+            except Exception:
+                logger.error(f"protobuf_manager: Error while downloading proto for network '{network}' (version {hash})")
         if not resp or not resp.ok:
+            logger.error(f"protobuf_manager: Proto for network '{network}' (version {hash}) not downloaded")
             return False
         try:
             if not os.path.exists(LibManager.CACHE_DIR):
@@ -186,7 +187,7 @@ class LibManager(ABC):
             with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
-        except Exception as e:
+        except Exception:
             logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
             return False
         return False

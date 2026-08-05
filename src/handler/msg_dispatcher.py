@@ -108,18 +108,20 @@ class MsgDispatcher:
             pass
         if sanitized_version:
             version = sanitized_version
-        vehicle_id, device_id = ids
+        logger.info(f"msg_dispatcher: Received version message from {ids}'")
+        vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
+        device_id: str = ids[1] if len(ids) > 1 else "unknown_id"
         logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
         check = library.check_commit_existence(version)
         if check:
             logger.info(f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
             if self.mqtt.connection:
                 self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
-                logger.info(f"Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered")
+                logger.info(f"msg_dispatcher: Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered")
             try:
                 self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = version
                 self.influx_writer.parser.protobuf_manager.version_descriptors[version] = {}
-                logger.info(f"Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
+                logger.info(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
             except Exception as e:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:
