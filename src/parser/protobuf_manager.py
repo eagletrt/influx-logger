@@ -63,6 +63,7 @@ class ProtobufManager:
                 self.version_descriptors[version] = {}
             # Store the decoder in the version_descriptors dictionary for the given version and network
             self.version_descriptors[version][network] = decoder
+            logger.info(f"protobuf_manager: Descriptor {network} (version {version}) is now ready for deserialize data")
         except Exception as e:
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
             logger.error(e.__traceback__)
@@ -82,7 +83,6 @@ class ProtobufManager:
         '''Path to the generated protobuf package directory'''
         if not os.path.isdir(package_path):
             return
-
         module = ModuleType(package_name)
         module.__path__ = [package_path]
         module.__package__ = package_name

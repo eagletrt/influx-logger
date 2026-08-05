@@ -98,10 +98,16 @@ class MsgDispatcher:
         if not self.influx_writer:
             logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle version message.")
             return
-        VERSION_SANITIZE_REGEX = r"^(w)"
+        VERSION_SANITIZE_REGEX = compile(r"^(\w+)",)
         '''Regex pattern to sanitize the version string by extracting the commit hash from the version string.'''
-        # Sanitize the version string to extract the commit hash
-        version = sub(VERSION_SANITIZE_REGEX, "", version)
+        try:
+            match = VERSION_SANITIZE_REGEX.search(version)
+            if match:
+                sanitized_version: str = match.group(1)
+        except Exception:
+            pass
+        if sanitized_version:
+            version = sanitized_version
         vehicle_id, device_id = ids
         logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
         check = library.check_commit_existence(version)
