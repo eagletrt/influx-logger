@@ -50,7 +50,9 @@ class MQTTConnection(Connection):
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message
             self.connection.connect(host=self.url, port=self.port)
-            self.connection.subscribe("+/+/version")
+            #self.connection.subscribe("+/+/version")
+            self.connection.subscribe("+/+/info/version/libcan")
+            self.connection.subscribe("+/+/info/version/gpslib")
             self.connection.loop_start()
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             return True

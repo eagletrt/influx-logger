@@ -8,10 +8,10 @@ from requests import get
 from types import ModuleType
 from grpc_tools import protoc
 from google.protobuf import json_format
+from importlib.util import spec_from_loader
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
 from google.protobuf.message_factory import MessageFactory, GetMessageClass
-from importlib.util import spec_from_loader, spec_from_file_location, module_from_spec
 
 from src.utils.logger_utils import logger
 

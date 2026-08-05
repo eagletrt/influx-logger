@@ -10,10 +10,10 @@ from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
-            "+/+/version":              self.handle_canlib_version_message,
-            "+/+/data/+":               self.handle_data_message,
             "+/+/info/version/libcan":  self.handle_libcan_version_message,
             "+/+/info/version/gpslib":  self.handle_libgps_version_message,
+            #"+/+/version":              self.handle_canlib_version_message,
+            "+/+/data/+":               self.handle_data_message,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
@@ -73,10 +73,10 @@ class MsgDispatcher:
         # Iterate through the registered topic handlers and invoke the appropriate handler for the incoming message
         for handler_topic, handler_function in self.topic_callbacks.items():
             # Check if the incoming topic matches the handler topic pattern
-            matches = list(self.build_topic_regex(handler_topic).finditer(topic))
+            match = self.build_topic_regex(handler_topic).fullmatch(topic)
             # If a match is found, extract the groups and call the handler function with the topic, payload, and extracted groups
-            if matches:
-                groups = list(matches[0].groups())
+            if match:
+                groups = list(match.groups())
                 handler_function(topic, payload, groups)
 
     @staticmethod
