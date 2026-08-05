@@ -134,8 +134,8 @@ class LibManager(ABC):
     '''
     A utility class for interacting with the CAN and GPS repositories to check commit existence and download protobuf descriptors.
     '''
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def check_commit_existence(hash: str) -> bool:
         '''
         Checks if a given commit hash exists in the repository.
@@ -145,8 +145,8 @@ class LibManager(ABC):
             bool: True if the commit exists, False otherwise.
         '''
         raise NotImplementedError("Subclasses must implement the check_commit_existence method.")
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def download_proto_version(hash: str, network: str) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the repository.
