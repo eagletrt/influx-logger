@@ -90,7 +90,7 @@ class MsgDispatcher:
         pattern = topic.replace("/", "\\/").replace("+", "([^\\/]+)").replace("#", ".*")
         return compile(pattern)
 
-    def handle_version_message(self, library, version: str, ids: list[str]) -> None:
+    def handle_version_message(self, library: type[LibcanManager]|type[LibgpsManager], version: str, ids: list[str]) -> None:
         if not self.mqtt:
             logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle version message.")
             return
