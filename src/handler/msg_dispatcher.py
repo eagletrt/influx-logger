@@ -119,9 +119,11 @@ class MsgDispatcher:
                 self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
                 logger.info(f"msg_dispatcher: Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered")
             try:
-                self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = version
+                if f"{vehicle_id}/{device_id}" not in self.influx_writer.parser.device_versions:
+                    self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = {}
+                self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"][library] = version
                 self.influx_writer.parser.protobuf_manager.version_descriptors[version] = {}
-                logger.info(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics")
+                logger.info(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics, version_descriptors: {self.influx_writer.parser.protobuf_manager.version_descriptors}")
             except Exception as e:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:

@@ -5,7 +5,7 @@ from threading import Condition, Event, Thread, Lock
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
-from src.parser.protobuf_manager import ProtobufManager
+from src.parser.protobuf_manager import ProtobufManager, LibcanManager, LibgpsManager
 
 class Parser(Thread):
     def __init__(self, excluded_networks: list[str] = []) -> None:
@@ -14,8 +14,8 @@ class Parser(Thread):
         '''List of network identifiers to be excluded from parsing. Messages from these networks will be ignored.'''
         self.protobuf_manager: ProtobufManager = ProtobufManager()
         '''ProtobufManager instance to handle .proto descriptor management and message decoding.'''
-        self.device_versions: dict = {}
-        '''Dictionary to store device versions, where the key is a combination of vehicle_id and device_id, and the value is the version.'''
+        self.device_versions: dict[str, dict[type, str]] = {}
+        '''Dictionary to store device versions, where the key is a combination of vehicle_id and device_id, and the value is a dictionary mapping library types to their respective versions.'''
         self.row_messages: list[tuple[list[str], bytes]] = []
         '''List to store incoming messages, where each message is a tuple containing a list of identifiers and a bytes payload.'''
         self.__row_message_lock: Lock = Lock()
@@ -64,19 +64,25 @@ class Parser(Thread):
         payload:bytes = msg[1]
         vehicle_id, device_id, network = ids
         key = f"{vehicle_id}/{device_id}"
+        library: type = LibcanManager if network != "gps" else LibgpsManager
         if key not in self.device_versions:
             logger.error(f"parser: Device '{key}' started streaming data before sending version. Skipping")
             return
         if network in self.excluded_networks:
             logger.debug(f"parser: Network '{network}' is in the exclusion list. Skipping message")
             return
-        version = self.device_versions[key]
+        try:
+            version = self.device_versions[key][library]
+        except KeyError:
+            logger.error(f"parser: Device '{key}' with library '{library.__name__}' not found in device versions. Skipping")
+            return
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
         if network not in self.protobuf_manager.version_descriptors.get(version, {}):
             # If the proto descriptor is not already downloaded for the given version and network, download it
             logger.info(f"parser: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
             try:
-                self.protobuf_manager.download_proto_descriptor(version, network)
+                if not self.protobuf_manager.download_proto_descriptor(version, network):
+                    return
             except Exception:
                 logger.error(f"parser: Error while getting proto, skipping message")
                 return

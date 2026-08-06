@@ -38,7 +38,7 @@ class ProtobufManager:
             return True
         return False
 
-    def download_proto_descriptor(self, version: str, network: str) -> None:
+    def download_proto_descriptor(self, version: str, network: str) -> bool:
         '''
         Retrieves the protobuf descriptor for a given version and network.
         If the descriptor is not already cached, it will be downloaded and parsed.
@@ -52,8 +52,7 @@ class ProtobufManager:
             download_result: bool = lib_manager.download_proto_version(version, network)
             '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
             if not download_result:
-                logger.error(f"protobuf_manager: descriptor for network '{network}' (version {version}) cannot be downloaded")
-                return
+                return False
             logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
             decoder = _DecoderWrapper.build_decoder(version, network, cache=lib_manager.CACHE_DIR)
@@ -67,9 +66,10 @@ class ProtobufManager:
         except Exception as e:
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
             logger.error(e.__traceback__)
-            return
+            return False
         logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
-    
+        return True
+
     @staticmethod
     def register_generated_proto_package(package_name: str) -> None:
         '''
@@ -417,3 +417,6 @@ class _DecoderWrapper:
             # If GetMessageClass is not available, use MessageFactory to get the message class
             message_class = MessageFactory(pool).GetPrototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
+
+    def __str__(self):
+        return f"_DecoderWrapper(message_class={self._message_class}, json_format_module={self._json_format})"
