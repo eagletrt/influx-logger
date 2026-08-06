@@ -191,7 +191,6 @@ class HandlerFSM(Thread, StateMachine):
         """
         self.__event = False
         while not self.__event and self.are_both_connected():
-            # TODO: Implement the main operation of the handler, such as processing incoming data and logging it to InfluxDB
             logger.info(f"{self.get_log_header()} - Running")
             with self.__connection_condition:
                 self.__connection_condition.wait(timeout=60)  # Simulate work being done

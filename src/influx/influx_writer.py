@@ -43,11 +43,6 @@ class InfluxWriter(InfluxManager):
         '''Lock for synchronizing access to shared resources, ensuring thread safety when preparing and committing points to InfluxDB.'''
         self.cond_to_push: Condition = Condition(lock=self.__lock__)
         '''Condition variable for signaling when the batch size limit is reached and points are ready to be pushed to InfluxDB. This allows for efficient waiting and notification between threads.'''
-        # TODO Remove
-        if self.adr_bucket:
-            logger.info(f"influx_writer: adr bucket: {self.adr_bucket}")
-        if self.log_bucket:
-            logger.info(f"influx_writer: log bucket: {self.log_bucket}")
 
     def is_list_limit_reached(self, count:int) -> bool:
         '''
