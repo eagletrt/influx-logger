@@ -55,7 +55,7 @@ class ProtobufManager:
                 return False
             logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
-            decoder = _DecoderWrapper.build_decoder(version, network, cache=lib_manager.CACHE_DIR)
+            decoder = _DecoderWrapper.build_decoder(version, network, cache=lib_manager)
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
@@ -65,7 +65,6 @@ class ProtobufManager:
             logger.info(f"protobuf_manager: Descriptor {network} (version {version}) is now ready for deserialize data")
         except Exception as e:
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
-            logger.error(e.__traceback__)
             return False
         logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
         return True
@@ -336,7 +335,7 @@ class _DecoderWrapper:
         )
     
     @staticmethod
-    def build_decoder(version: str, network: str, cache: str = LibManager.CACHE_DIR) -> '_DecoderWrapper':
+    def build_decoder(version: str, network: str, lib_manager: type = LibManager) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
@@ -347,6 +346,8 @@ class _DecoderWrapper:
         '''
         version_dir = os.path.join(cache, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
+        cache: str = lib_manager.CACHE_DIR
+        '''Cache directory used for storing .proto files and descriptor sets for the specified library'''
         # If cache directory does not exist, create it
         if not os.path.exists(cache):
             os.makedirs(cache)
@@ -361,7 +362,6 @@ class _DecoderWrapper:
         # Create files for the .proto descriptor and the compiled descriptor set
         proto_file: str = os.path.join(version_dir, "proto", f"{network}.proto")
         '''Path to the .proto file for the specified version and network'''
-        '''List of .proto file names to be passed to protoc'''
         descriptor_set_file: str = os.path.join(version_dir, "pb", f"{network}.pb")
         '''File that will store the compiled descriptor set'''
         # Compile the .proto file into a descriptor set using protoc
@@ -396,7 +396,10 @@ class _DecoderWrapper:
             pool.Add(file_proto)
         # Keep parity with the original TypeScript implementation, which expects
         # the top-level message type `${network}.Pack`.
-        full_name = f"{network}.Pack"
+        pack_name: str = "Pack"
+        if lib_manager == LibgpsManager:
+            pack_name = "GpsPack"
+        full_name = f"{network}.{pack_name}"
         '''Fully qualified name of the top-level message type expected in the DescriptorPool'''
         message_descriptor = None
         '''Descriptor for the top-level message type in the DescriptorPool'''

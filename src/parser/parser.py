@@ -65,6 +65,9 @@ class Parser(Thread):
         vehicle_id, device_id, network = ids
         key = f"{vehicle_id}/{device_id}"
         library: type = LibcanManager if network != "gps" else LibgpsManager
+        # TODO Remove
+        if network == "odometry":
+            return
         if key not in self.device_versions:
             logger.error(f"parser: Device '{key}' started streaming data before sending version. Skipping")
             return
