@@ -42,7 +42,8 @@ class ConnectionHandler:
             token=config.influx.token,
             org=config.influx.org,
             port=config.influx.port,
-            on_state_change=self.on_state_change
+            on_state_change=self.on_state_change,
+            buckets=list(config.influx.buckets.values())
         ) if config and config.influx else None
         self.mqtt = MQTTConnection(
             url=config.mqtt.url,

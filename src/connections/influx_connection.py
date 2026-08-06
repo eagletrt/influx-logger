@@ -12,7 +12,7 @@ class InfluxConnection(Connection):
         token: The authentication token for the InfluxDB service.
         org: The organization name for the InfluxDB service.
     """
-    def __init__(self, url: str, token: str, org: str, port: int = 8086, on_state_change=None):
+    def __init__(self, url: str, token: str, org: str, port: int = 8086, on_state_change=None, buckets: list = None):
         """
         Initializes the InfluxConnection instance with the provided URL, token, organization, and port.
         Args:
@@ -21,12 +21,14 @@ class InfluxConnection(Connection):
             org (str): The organization name for the InfluxDB service.
             port (int, optional): The port of the InfluxDB service. Defaults to 8086.
             on_state_change (callable, optional): A callback function to be called when the connection state changes. Defaults to None.
+            buckets (list, optional): A list of bucket names to be managed by the connection. Defaults to None.
         """
         super().__init__(url=url, port=port)
         self.token: str = token
         self.org: str = org
         self.connection_checker: ConnectionChecker = ConnectionChecker(self, check_interval=10)
         self.on_state_change = on_state_change
+        self.buckets: list = buckets
 
     def __str__(self):
         return f"InfluxConnection(url={self.url}, port={self.port}, org={self.org})"
@@ -100,6 +102,44 @@ class InfluxConnection(Connection):
         if not super().is_connected():
             return False
         return self.ping()
+    
+    def create_missing_bucket(self, buckets: list, needed_buckets: list = []) -> bool:
+        '''
+        Creates any missing buckets from the needed_buckets list that are not present in the buckets list.
+        Args:
+            buckets (list): A list of existing bucket names.
+            needed_buckets (list, optional): A list of bucket names that are required. Defaults to [].
+        Returns:
+            bool: True if all needed buckets are present or created successfully, False otherwise.
+        '''
+        if needed_buckets is None:
+            needed_buckets = []
+        ok: bool = True
+        for bucket in needed_buckets:
+            if bucket not in buckets:
+                ok = ok and self.create_bucket(bucket)
+        return ok
+
+    def create_bucket(self, bucket_name: str, retention_rules=None) -> bool:
+        """
+        Creates a new bucket in the InfluxDB service.
+        Args:
+            bucket_name (str): The name of the bucket to create.
+            retention_rules (dict, optional): The retention rules for the bucket. Defaults to None.
+        Returns:
+            bool: True if the bucket was created successfully, False otherwise.
+        """
+        try:
+            self.connection.buckets_api().create_bucket(
+                bucket_name=bucket_name,
+                retention_rules=retention_rules,
+                org=self.org,
+            )
+            logger.info(f"influx-connection: Bucket created successfully: {bucket_name}")
+            return True
+        except Exception as e:
+            logger.error(f"influx-connection: Failed to create bucket named {bucket_name}: {e}")
+            return False
 
     def ping(self) -> bool:
         """
@@ -117,7 +157,19 @@ class InfluxConnection(Connection):
             # List buckets (lightweight operation)
             result = self.connection.buckets_api().find_buckets()
             # Connection is active and authenticated
-            return result is not None
+            if result is not None:
+                Thread(
+                    target=self.create_missing_bucket,
+                    kwargs={
+                        "buckets": [bucket.name for bucket in result.buckets],
+                        "needed_buckets": self.buckets,
+                    },
+                    daemon=True,
+                ).start()
+                return True
+            else:
+                logger.warning("influx-connection: Ping returned None, indicating a potential issue with the connection.")
+                return False
         except Exception as e:
             # Check weather InfluxDB is up
             health_api = self.connection.health()
