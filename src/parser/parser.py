@@ -104,6 +104,8 @@ class Parser(Thread):
         # If the message content contains a "valuesPack" key and its value is a dictionary, extract the inner dictionary for processing
         if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
             message_content = message_content["valuesPack"]
+            logger.info(f"parser: Unpacked valuesPack for network '{network}' with version {version}: {message_content}")
+        #logger.info(f"parser: message_content: {message_content}")
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
         self.commit(message_content, message_content, tags)
 

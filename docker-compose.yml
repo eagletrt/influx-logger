@@ -23,7 +23,7 @@ services:
             context: .
             dockerfile: Dockerfile.mosquitto.yml
         ports:
-            - "8883:8883"
+            - "1884:1884"
         networks:
             - default
     influx-logger:
