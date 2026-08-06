@@ -143,7 +143,7 @@ class LibManager(ABC):
         '''
         raise NotImplementedError("Subclasses must implement the check_commit_existence method.")
     @staticmethod
-    def download(hash: str, network: str, url: str|list[str], cache: str, token: str = None) -> bool:
+    def download(hash: str, network: str, in_url: str|list[str], cache: str, token: str = None) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the repository.
         Args:
@@ -163,16 +163,28 @@ class LibManager(ABC):
                 }
         version_dir: str = os.path.join(cache, hash)
         '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
-        for url in url if isinstance(url, list) else [url]:
+        urls: list[str] = []
+        '''List of URLs to check for the protobuf descriptor'''
+        # If in_url is a list, use it directly; if it's a string, convert it to a list
+        if isinstance(in_url, list):
+            urls = in_url
+        elif isinstance(in_url, str):
+            urls.append(in_url)
+        for url_sample in urls:
             try:
-                url = url.replace("hash", hash).replace("network", network)
+                url:str = url_sample.replace("hash", hash).replace("network", network)
+                logger.info(f"protobuf_manager: URL: {url}")
                 resp = get(url, headers=headers)
-                if resp.ok:
+                if resp and resp.ok:
                     break
             except Exception:
                 logger.error(f"protobuf_manager: Error while downloading proto for network '{network}' (version {hash})")
         if not resp or not resp.ok:
             logger.error(f"protobuf_manager: Proto for network '{network}' (version {hash}) not downloaded")
+            if resp:
+                logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
+            else:
+                logger.error(f"protobuf_manager: No response received for network '{network}' (version {hash})")
             return False
         try:
             if not os.path.exists(LibManager.CACHE_DIR):
@@ -263,7 +275,7 @@ class LibgpsManager(LibManager):
     '''
     GPS_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/gpslib/commits/hash"
     '''URL to the commit page in the gps repository, where 'hash' is a placeholder for the commit hash.'''
-    GPS_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/gpslib/hash/proto/network/network.proto"
+    GPS_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/gpslib/hash/network.proto"
     '''URL to the raw .proto file in the gps repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
 
     CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "gps")
