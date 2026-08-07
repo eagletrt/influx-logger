@@ -103,12 +103,13 @@ class InfluxConnection(Connection):
             return False
         return self.ping()
     
-    def create_missing_bucket(self, buckets: list, needed_buckets: list = []) -> bool:
+    def create_missing_bucket(self, buckets: list, needed_buckets: list = [], daemon: bool = False) -> bool:
         '''
         Creates any missing buckets from the needed_buckets list that are not present in the buckets list.
         Args:
             buckets (list): A list of existing bucket names.
             needed_buckets (list, optional): A list of bucket names that are required. Defaults to [].
+            daemon (bool, optional): If True, creates missing buckets in a separate daemon thread. Defaults to False.
         Returns:
             bool: True if all needed buckets are present or created successfully, False otherwise.
         '''
@@ -117,7 +118,10 @@ class InfluxConnection(Connection):
         ok: bool = True
         for bucket in needed_buckets:
             if bucket not in buckets:
-                ok = ok and self.create_bucket(bucket)
+                if daemon:
+                    Thread(target=self.create_bucket, args=(bucket,), daemon=True).start()
+                else:
+                    ok = ok and self.create_bucket(bucket)
         return ok
 
     def create_bucket(self, bucket_name: str, retention_rules=None) -> bool:
@@ -158,14 +162,7 @@ class InfluxConnection(Connection):
             result = self.connection.buckets_api().find_buckets()
             # Connection is active and authenticated
             if result is not None:
-                Thread(
-                    target=self.create_missing_bucket,
-                    kwargs={
-                        "buckets": [bucket.name for bucket in result.buckets],
-                        "needed_buckets": self.buckets,
-                    },
-                    daemon=True,
-                ).start()
+                self.create_missing_bucket(buckets=[bucket.name for bucket in result.buckets], needed_buckets=self.buckets, daemon=True)
                 return True
             else:
                 logger.warning("influx-connection: Ping returned None, indicating a potential issue with the connection.")
