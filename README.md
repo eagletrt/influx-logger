@@ -60,7 +60,7 @@ It should be written like this:
 {
     "mqtt" : {
         "url" : "mosquitto",
-        "port" : 8883
+        "port" : 1883
     },
     "influx" : {
         "url" : "influxdb",
