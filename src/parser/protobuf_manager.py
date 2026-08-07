@@ -55,15 +55,21 @@ class ProtobufManager:
                 return False
             logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
         try:
-            decoder = _DecoderWrapper.build_decoder(version, network, cache=lib_manager)
+            try:
+                decoder = _DecoderWrapper.build_decoder(version=version, network=network, lib_manager=lib_manager)
+            except Exception as e:
+                logger.error(f"protobuf_manager: Failed to build decoder for network '{network}' (version {version}): {e}")
+                return False
             '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
+            logger.info(f"protobuf_manager: Descriptor successfully parsed: {network} (version {version})")
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
+                logger.info(f"protobuf_manager: Creating new entry for version {version} in version_descriptors")
                 self.version_descriptors[version] = {}
             # Store the decoder in the version_descriptors dictionary for the given version and network
             self.version_descriptors[version][network] = decoder
             logger.info(f"protobuf_manager: Descriptor {network} (version {version}) is now ready for deserialize data")
-        except Exception as e:
+        except Exception:
             logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
             return False
         logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
@@ -219,7 +225,7 @@ class LibcanManager(LibManager):
     '''
     A utility class for interacting with the CAN repository to check commit existence and download protobuf descriptors.
     '''
-    token: str = None
+    TOKEN: str = None
     '''GitHub personal access token used for authentication when accessing the CAN repository.'''
 
     CAN_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/can/commits/hash"
@@ -244,9 +250,7 @@ class LibcanManager(LibManager):
 
     CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "can")
     '''Cache directory used for storing .proto files and descriptor sets for CAN.'''
-    
-    def __init__(self):
-        pass
+
     @staticmethod
     def check_commit_existence(hash: str) -> bool:
         '''
@@ -256,7 +260,7 @@ class LibcanManager(LibManager):
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        return LibManager.check(hash, LibcanManager.CAN_COMMIT_URLS, token=LibcanManager.token)
+        return LibManager.check(hash, LibcanManager.CAN_COMMIT_URLS, token=LibcanManager.TOKEN)
     @staticmethod
     def download_proto_version(hash: str, network: str) -> bool:
         '''
@@ -267,7 +271,7 @@ class LibcanManager(LibManager):
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        return LibManager.download(hash, network, LibcanManager.CAN_PROTO_URLS, cache=LibcanManager.CACHE_DIR, token=LibcanManager.token)
+        return LibManager.download(hash, network, LibcanManager.CAN_PROTO_URLS, cache=LibcanManager.CACHE_DIR, token=LibcanManager.TOKEN)
 class LibgpsManager(LibManager):
     '''
     A utility class for interacting with the GPS repository to check commit existence.
@@ -300,6 +304,7 @@ class LibgpsManager(LibManager):
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
+        logger.info(f"protobuf_manager: Downloading GPS proto for network '{network}' (version {hash})")
         return LibManager.download(hash, network, LibgpsManager.GPS_PROTO_URL, cache=LibgpsManager.CACHE_DIR)
 
 class _DecoderWrapper:
@@ -344,10 +349,16 @@ class _DecoderWrapper:
         Returns:
             _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
         '''
+        try:
+            logger.info(f"protobuf_manager: Lib_manager '{lib_manager.__name__}'")
+            cache: str = lib_manager.CACHE_DIR
+            '''Cache directory used for storing .proto files and descriptor sets for the specified library'''
+            logger.info(f"protobuf_manager: Using cache directory '{cache}'")
+        except Exception:
+            logger.error(f"protobuf_manager: Invalid lib_manager provided. It must have a CACHE_DIR attribute.")
+            raise
         version_dir = os.path.join(cache, version)
         '''Directory in the cache where the .proto file for the specified version will be stored'''
-        cache: str = lib_manager.CACHE_DIR
-        '''Cache directory used for storing .proto files and descriptor sets for the specified library'''
         # If cache directory does not exist, create it
         if not os.path.exists(cache):
             os.makedirs(cache)

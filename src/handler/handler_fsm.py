@@ -159,7 +159,7 @@ class HandlerFSM(Thread, StateMachine):
         Method to start the FSM. It triggers the init event to transition from the start state to the idle state and begins the FSM operation.
         """
         if self.config.github_token and self.config.github_token != "":
-            LibcanManager.token = self.config.github_token
+            LibcanManager.TOKEN = self.config.github_token
         self.handler.set(
             self.config,
             on_state_change=self.__notify_connection_change,

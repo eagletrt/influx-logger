@@ -61,13 +61,15 @@ class Parser(Thread):
             Point: The parsed InfluxDB Point object.
         """
         ids:list[str] = msg[0]
+        '''List of identifiers extracted from the message, typically containing vehicle_id, device_id, and network.'''
         payload:bytes = msg[1]
+        '''The payload of the message, which is a bytes object containing the serialized data to be decoded.'''
         vehicle_id, device_id, network = ids
+        '''Extracted identifiers from the message, where vehicle_id is the unique identifier for the vehicle, device_id is the unique identifier for the device, and network is the network identifier indicating the source of the message.'''
         key = f"{vehicle_id}/{device_id}"
+        '''Key used to uniquely identify a device based on its vehicle_id and device_id, formatted as "vehicle_id/device_id".'''
         library: type = LibcanManager if network != "gps" else LibgpsManager
-        # TODO Remove
-        if network == "odometry":
-            return
+        '''Library type to be used for decoding the message, determined based on the network identifier.'''
         if key not in self.device_versions:
             logger.error(f"parser: Device '{key}' started streaming data before sending version. Skipping")
             return
