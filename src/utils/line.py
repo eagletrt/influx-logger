@@ -123,6 +123,6 @@ class Line:
         # Create a string representation of the fields in the format "key1=value1, key2=value2, ..."
         fields_str = ",".join(field_to_str(k, v) for k, v in self.fields.items())
         tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
-        tags_part = f",{tags_str}" if self.tags else ""
-        prefix = f"{self.measurement}{tags_part}"
-        return f"{prefix} {fields_str} {self.timestamp}"
+        tags_part = f"{tags_str}" if self.tags else ""
+        prefix = f"_measurement={self.measurement};tags=[{tags_part}]"
+        return f"{prefix};{fields_str};timestamp={self.timestamp}"

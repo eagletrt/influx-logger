@@ -159,22 +159,30 @@ class Parser(Thread):
             tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
         '''
         # Check if the record is a dictionary; if not, log a warning and return early
-        if not isinstance(record, dict):
-            logger.warning(f"Handler: Invalid object received from device for measurement '{measurement}'")
+        if isinstance(record, dict):
+            # Check if the record contains a "valuesMap" key, indicating a columnar format.
+            if "valuesMap" in record:
+                for timestamp_key in TIMESTAMP_KEYS:
+                    if timestamp_key in record:
+                        # Expand the columnar record into row-wise records
+                        for row in Parser._expand_columnar_record(record):
+                            # Push each row-wise record to the line repository
+                            line: Line = Line.from_object(row, measurement, tags)
+                            logger.info(f"parser: Line: {line}")
+                            self.__append_to_destination_list(line)
+                        return
+            # Create a Line object from the record and add it to the destination list
+            line: Line = Line.from_object(record, measurement, tags)
+            logger.info(f"parser: Line: {line}")
+            self.__append_to_destination_list(line)
+            exit(0)
+        elif isinstance(record, str):
+            # TODO Implement
+            logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
             return
-        # Check if the record contains a "valuesMap" key, indicating a columnar format.
-        if "valuesMap" in record:
-            for timestamp_key in TIMESTAMP_KEYS:
-                if timestamp_key in record:
-                    # Expand the columnar record into row-wise records
-                    for row in Parser._expand_columnar_record(record):
-                        # Push each row-wise record to the line repository
-                        line: Line = Line.from_object(row, measurement, tags)
-                        self.__append_to_destination_list(line)
-                    return
-        # Create a Line object from the record and add it to the destination list
-        line: Line = Line.from_object(record, measurement, tags)
-        self.__append_to_destination_list(line)
+        else:
+            logger.warning(f"Handler: Invalid tags received from device for measurement '{measurement}', type: {type(record)}.")
+            return
 
     @staticmethod
     def _expand_columnar_record(record: dict[str, Any]) -> list[dict[str, Any]]:
