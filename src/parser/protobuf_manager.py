@@ -185,11 +185,7 @@ class LibManager(ABC):
             except Exception:
                 logger.error(f"protobuf_manager: Error while downloading proto for network '{network}' (version {hash})")
         if not resp or not resp.ok:
-            logger.error(f"protobuf_manager: Proto for network '{network}' (version {hash}) not downloaded")
-            if resp:
-                logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
-            else:
-                logger.error(f"protobuf_manager: No response received for network '{network}' (version {hash})")
+            logger.warning(f"protobuf_manager: Proto for network '{network}' (version {hash}) not downloaded {resp.status_code if resp else 'No response'}")
             return False
         try:
             if not os.path.exists(LibManager.CACHE_DIR):

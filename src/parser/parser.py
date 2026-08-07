@@ -133,20 +133,31 @@ class Parser(Thread):
             records (Any): The records to be committed, which can be a dictionary or any other type. If it's a dictionary, it will be processed to create a Line object.
             tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
         """
+        additional_signals: dict[str, str] = {}
+        if 'antenna_name' in message_content:
+            additional_signals['antenna_name'] = message_content['antenna_name']
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
         for measurement, records in message_content.items():
             if isinstance(records, list):
                 for record in records:
                     try:
+                        if additional_signals and additional_signals != {} and isinstance(record, dict):
+                            record.update(additional_signals)
+                    except Exception:
+                        #logger.warning(f"parser: Failed to update record with additional signals for measurement '{measurement}': {record}")
+                        pass
+                    try:
+                        #logger.info(f"parser: Measurement '{measurement}': {record}")
                         self.push(measurement, record, tags)
-                    except ValueError as e:
+                    except ValueError:
                         #logger.error(f"parser: Skipping invalid record for measurement '{measurement}': {e}")
                         pass
                 continue
             else:
                 try:
+                    #logger.info(f"parser: Non List Measurement '{measurement}': {records}")
                     self.push(measurement, records, tags)
-                except ValueError as e:
+                except ValueError:
                     #logger.error(f"parser: Skipping invalid record for measurement '{measurement}': {e}")
                     pass
     
@@ -158,6 +169,7 @@ class Parser(Thread):
             record (Any): The record to be pushed, which can be a dictionary or any other type. If it's a dictionary, it will be processed to create a Line object.
             tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
         '''
+        #logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
         # Check if the record is a dictionary; if not, log a warning and return early
         if isinstance(record, dict):
             # Check if the record contains a "valuesMap" key, indicating a columnar format.
@@ -168,17 +180,15 @@ class Parser(Thread):
                         for row in Parser._expand_columnar_record(record):
                             # Push each row-wise record to the line repository
                             line: Line = Line.from_object(row, measurement, tags)
-                            logger.info(f"parser: Line: {line}")
+                            #logger.info(f"parser: Line: {line}")
                             self.__append_to_destination_list(line)
                         return
             # Create a Line object from the record and add it to the destination list
             line: Line = Line.from_object(record, measurement, tags)
-            logger.info(f"parser: Line: {line}")
+            #logger.info(f"parser: Line: {line}")
             self.__append_to_destination_list(line)
-            exit(0)
         elif isinstance(record, str):
-            # TODO Implement
-            logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
+            #logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
             return
         else:
             logger.warning(f"Handler: Invalid tags received from device for measurement '{measurement}', type: {type(record)}.")

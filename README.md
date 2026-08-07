@@ -74,7 +74,6 @@ It should be written like this:
     },
     "github_token" : "optional_github_personal_access_token"
 }
-
 ```
 ### Python
 #### Requirements
