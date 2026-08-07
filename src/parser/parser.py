@@ -10,7 +10,7 @@ from src.parser.protobuf_manager import ProtobufManager, LibcanManager, LibgpsMa
 class Parser(Thread):
     def __init__(self, excluded_networks: list[str] = []) -> None:
         super().__init__(name="Parser")
-        self.excluded_networks: list[str] = excluded_networks
+        self.excluded_networks: list[str] = excluded_networks if excluded_networks is not None else []
         '''List of network identifiers to be excluded from parsing. Messages from these networks will be ignored.'''
         self.protobuf_manager: ProtobufManager = ProtobufManager()
         '''ProtobufManager instance to handle .proto descriptor management and message decoding.'''

@@ -139,7 +139,12 @@ class HandlerFSM(Thread, StateMachine):
         logger.info(f"{self.get_log_header()} - Entering running state")
         # Set the InfluxWriter and MQTT connection in the MsgDispatcher
         self.msg_dispatcher.set(
-            influx_writer=InfluxWriter(client=self.handler.influx_adr, adr_bucket=self.config.influx.buckets["adr"], log_bucket=self.config.influx.buckets["logs"]),
+            influx_writer=InfluxWriter(
+                client=self.handler.influx_adr, 
+                adr_bucket=self.config.influx.buckets["adr"], 
+                log_bucket=self.config.influx.buckets["logs"],
+                excluded_networks=self.config.excluded_networks
+            ),
             influx_reader=None, # TODO: Add InfluxReader if needed
             mqtt=self.handler.mqtt,
         )

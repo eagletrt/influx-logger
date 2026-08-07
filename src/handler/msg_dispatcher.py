@@ -128,7 +128,6 @@ class MsgDispatcher:
                 logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
         else:
             logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered")
-
     
     def handle_libcan_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
         '''

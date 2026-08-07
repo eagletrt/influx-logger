@@ -20,7 +20,7 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
+    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, excluded_networks: list = None, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.
@@ -37,7 +37,7 @@ class InfluxWriter(InfluxManager):
         '''The name of the InfluxDB bucket where address points will be written. This bucket is specified in the InfluxConnection instance and is used to organize and store time-series data in InfluxDB.'''
         self.log_bucket = log_bucket
         '''The name of the InfluxDB bucket where log points will be written. This bucket is specified in the InfluxConnection instance and is used to organize and store log data in InfluxDB.'''
-        self.parser: Parser = Parser()
+        self.parser: Parser = Parser(excluded_networks=excluded_networks)
         '''Parser instance for processing incoming data and converting it into InfluxDB points. The parser will handle the parsing of messages and the creation of Point objects.'''
         self.__lock__: Lock = Lock()
         '''Lock for synchronizing access to shared resources, ensuring thread safety when preparing and committing points to InfluxDB.'''
