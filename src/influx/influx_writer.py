@@ -76,9 +76,8 @@ class InfluxWriter(InfluxManager):
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
-        committed: bool = False
-        '''Flag indicating whether the commit was successful. This is set to True if the write operation to InfluxDB returns None, indicating success.'''
         bucket: str = self.adr_bucket
+        '''Target bucket for committing points to InfluxDB'''
         if bucket is None:
             logger.error("influx_writer: No bucket specified for committing points")
             return False
