@@ -48,7 +48,7 @@ class Line:
             ValueError: If the timestamp is missing or invalid in the input object.
         '''
         #logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
-        timestamp = obj.get("_innerTimestamp")
+        timestamp = obj.get(TIMESTAMP_KEYS[0])
         # Check for timestamp in the possible keys defined in TIMESTAMP_KEYS
         for key in TIMESTAMP_KEYS:
             if timestamp is not None:
