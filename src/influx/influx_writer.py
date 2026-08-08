@@ -20,12 +20,12 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, excluded_networks: list = None, batch_size:int = 5_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
+    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, excluded_networks: list = None, batch_size:int = 1_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.
-            flush_interval=10_000,  # Flush every 10 seconds
-            retry_interval=5_000,  # Retry every 5 seconds if the write fails
+            flush_interval=1_000,  # Flush every 1 seconds
+            retry_interval=1_000,  # Retry every 1 second if the write fails
             max_retries=3,  # Maximum number of retries
             write_type=SYNCHRONOUS  # Use synchronous write type for immediate feedback on write success or failure
         )
