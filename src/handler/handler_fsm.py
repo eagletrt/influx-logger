@@ -7,6 +7,7 @@ from statemachine.contrib.diagram import DotGraphMachine
 from src.utils.logger_utils import logger
 from src.utils.configuration import Configuration
 from src.influx.influx_writer import InfluxWriter
+from src.influx.influx_reader import InfluxReader
 from src.handler.msg_dispatcher import MsgDispatcher
 from src.parser.protobuf_manager import LibcanManager
 from src.connections.connection_handler import ConnectionHandler
@@ -147,6 +148,7 @@ class HandlerFSM(Thread, StateMachine):
             ),
             influx_reader=InfluxReader(
                 client=self.handler.influx_adr,
+                mqtt_client=self.handler.mqtt,
                 log_bucket=self.config.influx.buckets["adr"]
             ),
             mqtt=self.handler.mqtt,

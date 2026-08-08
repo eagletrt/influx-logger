@@ -1,7 +1,10 @@
 import json
 import csv
 import io
+import gzip
+
 from queue import Queue, Empty
+from datetime import datetime
 
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
@@ -38,7 +41,7 @@ class InfluxReader(InfluxManager):
                 logger.error(f"InfluxReader: Error in main loop: {e}")
 
     def _process_query(self, vehicle_id: str, device_id: str, transaction_id: str, payload: bytes) -> None:
-        logger.info(f"InfluxReader: Processing query {transaction_id} for {vehicle_id}/{device_id}")
+        logger.info(f"InfluxReader: Inizio elaborazione query {transaction_id} per {vehicle_id}/{device_id}")
         
         try:
             req_data = json.loads(payload.decode('utf-8'))
@@ -46,18 +49,19 @@ class InfluxReader(InfluxManager):
             stop_time = req_data.get("stop")
 
             if not start_time or not stop_time:
-                raise ValueError("Payload must contain 'start' and 'stop' timestamps.")
+                raise ValueError("Payload JSON non valido: 'start' e 'stop' sono obbligatori.")
 
-            # Build the Flux query to fetch data from InfluxDB
-            # Pivot(): transform the data so that each field becomes a column
-            # group(): separates the results into distinct tables for each message (e.g., INVERTER, BMS, etc.)
+            start_dt = datetime.utcfromtimestamp(int(start_time) / 1000000.0).strftime('%Y-%m-%dT%H:%M:%SZ')
+            stop_dt = datetime.utcfromtimestamp(int(stop_time) / 1000000.0).strftime('%Y-%m-%dT%H:%M:%SZ')
+
             flux_query = f'''
                 from(bucket: "{self.log_bucket}")
-                |> range(start: {start_time}, stop: {stop_time})
+                |> range(start: {start_dt}, stop: {stop_dt})
                 |> filter(fn: (r) => r["vehicle-id"] == "{vehicle_id}")
                 |> filter(fn: (r) => r["device-id"] == "{device_id}")
-                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                |> group(columns: ["_measurement"])
+                |> drop(columns: ["_time"])
+                |> pivot(rowKey:["_start"], columnKey: ["_field"], valueColumn: "_value")
+                |> group(columns: ["network", "_measurement"])
             '''
 
             tables = self.query_api.query(flux_query, org=self.client.org)
@@ -65,14 +69,14 @@ class InfluxReader(InfluxManager):
             if not tables:
                 logger.warning(f"InfluxReader: Nessun dato trovato per la query {transaction_id}")
 
-            # Elaborate each table (each measurement) and generate CSV content
             for table in tables:
                 if not table.records:
                     continue
 
                 measurement_name = table.records[0].values.get("_measurement", "unknown")
 
-                # Identify the columns to include in the CSV, excluding certain keys
+                network_name = table.records[0].values.get("network", "unknown")
+
                 exclude_keys = {"_start", "_stop", "_measurement", "result", "table", "_time", "vehicle-id", "device-id", "network"}
                 columns_set = set()
                 for record in table.records:
@@ -80,45 +84,42 @@ class InfluxReader(InfluxManager):
                         if key not in exclude_keys:
                             columns_set.add(key)
                 
-                # C++ expected to have a consistent order of columns, so we sort them
                 fieldnames = ["_timestamp"] + sorted(list(columns_set))
 
-                # generate CSV content
                 csv_buffer = io.StringIO()
                 writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
                 writer.writeheader()
 
                 for record in table.records:
                     row = {}
-                    # get the timestamp in microseconds
-                    dt = record.values.get("_time")
-                    if dt:
-                        row["_timestamp"] = int(dt.timestamp() * 1_000_000)
+                    dt = record.values.get("_time") or record.values.get("_start")
+                    if dt is not None:
+                        if isinstance(dt, (int, float)):
+                            row["_timestamp"] = int(dt * TimestampPrecision.get_factor(self.timestamp_precision))
+                        elif hasattr(dt, 'timestamp'):
+                            row["_timestamp"] = int(dt.timestamp() * TimestampPrecision.get_factor(self.timestamp_precision))
+                        else:
+                            row["_timestamp"] = 0
                     
-                    # populate the row with the values for each column
                     for key in columns_set:
                         row[key] = record.values.get(key, "")
                     
                     writer.writerow(row)
 
                 csv_content = csv_buffer.getvalue()
-
-                # Compress the CSV content using gzip
                 compressed_content = gzip.compress(csv_content.encode('utf-8'))
 
-                #publish the compressed CSV content to the MQTT topic
-                topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/content/{measurement_name}"
+                topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{network_name}--{measurement_name}"
                 self.mqtt.connection.publish(topic_out, compressed_content)
-                logger.info(f"InfluxReader: Inviato CSV per '{measurement_name}' ({len(table.records)} righe).")
+                logger.info(f"InfluxReader: Inviato CSV compresso per '{network_name}--{measurement_name}' ({len(table.records)} righe).")
 
-            # report the end of the query processing by sending an EOF message
-            eof_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/content/eof"
+            eof_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/eof"
             self.mqtt.connection.publish(eof_topic, b"")
             logger.info(f"InfluxReader: Query {transaction_id} completata (inviato EOF).")
 
         except Exception as e:
             logger.error(f"InfluxReader: Errore durante la query {transaction_id}: {e}", exc_info=True)
-            error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/content/error"
+            error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/error"
             if self.mqtt and self.mqtt.connection:
                 error_payload = json.dumps({"error": str(e)}).encode('utf-8')
                 self.mqtt.connection.publish(error_topic, error_payload)
