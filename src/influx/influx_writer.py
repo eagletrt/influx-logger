@@ -1,5 +1,5 @@
 from threading import Condition, Lock
-from influxdb_client.client.write_api import WriteOptions, WriteApi, Point
+from influxdb_client.client.write_api import WriteOptions, WriteApi, Point, SYNCHRONOUS
 
 from src.utils.line import Line
 from src.parser.parser import Parser
@@ -27,6 +27,7 @@ class InfluxWriter(InfluxManager):
             flush_interval=10_000,  # Flush every 10 seconds
             retry_interval=5_000,  # Retry every 5 seconds if the write fails
             max_retries=3,  # Maximum number of retries
+            write_type=SYNCHRONOUS  # Use synchronous write type for immediate feedback on write success or failure
         )
         '''Write options for the InfluxDB write API, including batch size, flush interval, retry interval, and maximum retries. These options control how data is written to InfluxDB in batches, with automatic handling of retries and flush intervals.'''
         self.write_api:WriteApi = self.client.connection.write_api(
