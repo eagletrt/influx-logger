@@ -145,7 +145,10 @@ class HandlerFSM(Thread, StateMachine):
                 log_bucket=self.config.influx.buckets["logs"],
                 excluded_networks=self.config.excluded_networks
             ),
-            influx_reader=None, # TODO: Add InfluxReader if needed
+            influx_reader=InfluxReader(
+                client=self.handler.influx_adr,
+                log_bucket=self.config.influx.buckets["adr"]
+            ),
             mqtt=self.handler.mqtt,
         )
         # Check if there are already messages on the MQTT broker and handle them before starting the main operation
