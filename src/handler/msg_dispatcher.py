@@ -14,6 +14,7 @@ class MsgDispatcher:
             "+/+/info/version/gpslib":  self.handle_libgps_version_message,
             #"+/+/version":              self.handle_canlib_version_message,
             "+/+/data/+":               self.handle_data_message,
+            "+/+/query/+/data/get":          self.handle_query_request,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
@@ -173,6 +174,26 @@ class MsgDispatcher:
             return
         row_msg: tuple[list[str], bytes] = (ids, payload)
         self.influx_writer.parser.add_to_queue(row_msg)
+
+    def handle_query_request(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+        """
+        Handles incoming query requests from the GUI.
+        ids will contain: [vehicle_id, device_id, transaction_id]
+        """
+        if not self.influx_reader:
+            logger.warning("msg_dispatcher: InfluxReader is not set. Cannot handle query request.")
+            return
+        
+        if len(ids) < 3:
+            logger.error(f"msg_dispatcher: Query topic malformed. ids found: {ids}")
+            return
+
+        vehicle_id = ids[0]
+        device_id = ids[1]
+        transaction_id = ids[2]
+        
+        # Send the query to the InfluxReader to be processed
+        self.influx_reader.add_query_to_queue(vehicle_id, device_id, transaction_id, payload)
 
     def stop(self) -> None:
         '''

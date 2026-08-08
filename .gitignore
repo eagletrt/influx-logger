@@ -193,3 +193,5 @@ __pycache__/
 # Cache
 .cache/
 cache/
+
+repomix-output.xml
