@@ -185,7 +185,7 @@ class Parser(Thread):
                         return
             # Create a Line object from the record and add it to the destination list
             line: Line = Line.from_object(record, measurement, tags)
-            logger.info(f"parser: Line: {line}")
+            #logger.info(f"parser: Line: {line}")
             self.__append_to_destination_list(line)
         elif isinstance(record, str):
             #logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")

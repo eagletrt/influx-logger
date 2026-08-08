@@ -27,8 +27,8 @@ class InfluxWriter(InfluxManager):
             flush_interval=1_000,  # Flush every 1 seconds
             retry_interval=1_000,  # Retry every 1 second if the write fails
             max_retries=3,  # Maximum number of retries
-            write_type=SYNCHRONOUS  # Use synchronous write type for immediate feedback on write success or failure
-        )
+            type=SYNCHRONOUS  # Use synchronous writes to have real-time feedback
+        ) 
         '''Write options for the InfluxDB write API, including batch size, flush interval, retry interval, and maximum retries. These options control how data is written to InfluxDB in batches, with automatic handling of retries and flush intervals.'''
         self.write_api:WriteApi = self.client.connection.write_api(
             write_options=self.write_options
@@ -77,6 +77,7 @@ class InfluxWriter(InfluxManager):
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
+        record: str = InfluxWriter.__pack_lines(points, self.timestamp_precision)
         bucket: str = self.adr_bucket
         '''Target bucket for committing points to InfluxDB'''
         if bucket is None:
@@ -84,11 +85,11 @@ class InfluxWriter(InfluxManager):
             return False
         logger.info(f"influx_writer: Sending {len(points)} lines to bucket '{bucket}'")
         try:
-            #logger.info(f"influx_writer: bucket: {self.client.bucket}, org: {self.client.org}, write_precision: {self.timestamp_precision}")
+            #logger.info(f"influx_writer: bucket: {bucket}, org: {self.client.org}, record: {record}, write_precision: {self.timestamp_precision}")
             result = self.write_api.write(
                 bucket=bucket,
                 org=self.client.org,
-                record=points,
+                record=record,
                 write_precision=self.timestamp_precision,
             )
             if result is None:
