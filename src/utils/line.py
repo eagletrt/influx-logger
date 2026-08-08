@@ -109,7 +109,8 @@ class Line:
             point.tag(key, value)
         for field, value in self.fields.items():
             point.field(field, value)
-        point.time(self.timestamp, write_precision=timestamp_precision)
+        normalized_timestamp = self._normalize_timestamp(self.timestamp, timestamp_precision)
+        point.time(normalized_timestamp, write_precision=timestamp_precision)
         return point
 
     def __str__(self) -> str:
