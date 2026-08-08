@@ -51,75 +51,88 @@ class InfluxReader(InfluxManager):
             if not start_time or not stop_time:
                 raise ValueError("Payload JSON non valido: 'start' e 'stop' sono obbligatori.")
 
-            start_dt = datetime.utcfromtimestamp(int(start_time) / 1000000.0).strftime('%Y-%m-%dT%H:%M:%SZ')
-            stop_dt = datetime.utcfromtimestamp(int(stop_time) / 1000000.0).strftime('%Y-%m-%dT%H:%M:%SZ')
+            start_ns = int(start_time) * 1000
+            stop_ns = int(stop_time) * 1000
 
             flux_query = f'''
                 from(bucket: "{self.log_bucket}")
-                |> range(start: {start_dt}, stop: {stop_dt})
+                |> range(start: time(v: {start_ns}), stop: time(v: {stop_ns}))
                 |> filter(fn: (r) => r["vehicle-id"] == "{vehicle_id}")
                 |> filter(fn: (r) => r["device-id"] == "{device_id}")
-                |> drop(columns: ["_time"])
-                |> pivot(rowKey:["_start"], columnKey: ["_field"], valueColumn: "_value")
+                |> rename(columns: {{_time: "timestamp"}})
+                |> pivot(rowKey:["timestamp"], columnKey: ["_field"], valueColumn: "_value")
                 |> group(columns: ["network", "_measurement"])
             '''
 
             tables = self.query_api.query(flux_query, org=self.client.org)
 
-            if not tables:
-                logger.warning(f"InfluxReader: Nessun dato trovato per la query {transaction_id}")
-
             for table in tables:
-                if not table.records:
+                records = table.records
+                if not records:
                     continue
 
-                measurement_name = table.records[0].values.get("_measurement", "unknown")
+                network_name = records[0].values.get("network", "unknown")
+                measurement_name = records[0].values.get("_measurement", "unknown")
 
-                network_name = table.records[0].values.get("network", "unknown")
+                antenna = records[0].values.get("antenna_name")
+                if antenna:
 
-                exclude_keys = {"_start", "_stop", "_measurement", "result", "table", "_time", "vehicle-id", "device-id", "network"}
+                    network_name = antenna
+
+                    measurement_name = f"{antenna}_{measurement_name}"
+
                 columns_set = set()
-                for record in table.records:
+                for record in records:
                     for key in record.values.keys():
-                        if key not in exclude_keys:
-                            columns_set.add(key)
+                        clean_key = key.strip().lower()
+                        
+                        if not clean_key.startswith("_") and clean_key not in [
+                            "result", "table", "network", "antenna_name", 
+                            "vehicle-id", "device-id", "vehicle_id", "device_id"
+                        ]:
+                            columns_set.add(clean_key)
                 
-                fieldnames = ["_timestamp"] + sorted(list(columns_set))
+                if "timestamp" in columns_set:
+                    columns_set.remove("timestamp")
+
+                columns_list = ["_timestamp"] + sorted(list(columns_set))
 
                 csv_buffer = io.StringIO()
-                writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+                writer = csv.DictWriter(csv_buffer, fieldnames=columns_list, lineterminator='\n')
                 writer.writeheader()
 
                 for record in table.records:
                     row = {}
-                    dt = record.values.get("_time") or record.values.get("_start")
+                    
+                    dt = record.values.get("timestamp")
                     if dt is not None:
                         if isinstance(dt, (int, float)):
-                            row["_timestamp"] = int(dt * TimestampPrecision.get_factor(self.timestamp_precision))
+                            row["_timestamp"] = int(dt / 1000)
                         elif hasattr(dt, 'timestamp'):
-                            row["_timestamp"] = int(dt.timestamp() * TimestampPrecision.get_factor(self.timestamp_precision))
+                            row["_timestamp"] = int(dt.timestamp()) * 1000000 + dt.microsecond
                         else:
                             row["_timestamp"] = 0
                     
-                    for key in columns_set:
-                        row[key] = record.values.get(key, "")
+                    for key, value in record.values.items():
+                        clean_key = key.strip().lower()
+                        if clean_key in columns_set and value is not None and value != "":
+                            row[clean_key] = value
                     
                     writer.writerow(row)
 
                 csv_content = csv_buffer.getvalue()
                 compressed_content = gzip.compress(csv_content.encode('utf-8'))
 
-                topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{network_name}--{measurement_name}"
-                self.mqtt.connection.publish(topic_out, compressed_content)
-                logger.info(f"InfluxReader: Inviato CSV compresso per '{network_name}--{measurement_name}' ({len(table.records)} righe).")
+                topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{network_name}--{measurement_name.lower()}"
+                
+                self.mqtt.connection.publish(topic_out, compressed_content, qos=0)  
+                logger.info(f"InfluxReader: Inviato CSV compresso per '{network_name}--{measurement_name.lower()}' ({len(records)} righe).")
 
             eof_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/eof"
-            self.mqtt.connection.publish(eof_topic, b"")
+            self.mqtt.connection.publish(eof_topic, b"", qos=0)  # <-- Aggiunto .connection
             logger.info(f"InfluxReader: Query {transaction_id} completata (inviato EOF).")
 
         except Exception as e:
-            logger.error(f"InfluxReader: Errore durante la query {transaction_id}: {e}", exc_info=True)
+            logger.error(f"InfluxReader: Errore durante la query {transaction_id}: {e}")
             error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/error"
-            if self.mqtt and self.mqtt.connection:
-                error_payload = json.dumps({"error": str(e)}).encode('utf-8')
-                self.mqtt.connection.publish(error_topic, error_payload)
+            self.mqtt.connection.publish(error_topic, json.dumps({"error": str(e)}).encode('utf-8'), qos=0)  
