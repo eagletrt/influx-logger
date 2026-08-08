@@ -20,14 +20,14 @@ class InfluxWriter(InfluxManager):
         points (list[Point]): A list of points to be written to InfluxDB, which will be prepared and committed in batches based on the specified batch size.
         ready_to_flush_list (list[str]): A list of identifiers for points that are ready to be flushed to InfluxDB, which can be used
     """
-    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, excluded_networks: list = None, batch_size:int = 1_000, timestamp_precision: str = TimestampPrecision.us.name) -> None:
+    def __init__(self, client:InfluxConnection, adr_bucket:str = None, log_bucket:str = None, excluded_networks: list = None, batch_size:int = 2_500, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options:WriteOptions = WriteOptions(
             batch_size=batch_size, # The maximum number of points to be written in a single batch. When this limit is reached, the points will be flushed to InfluxDB.
             flush_interval=1_000,  # Flush every 1 seconds
             retry_interval=1_000,  # Retry every 1 second if the write fails
             max_retries=3,  # Maximum number of retries
-            type=SYNCHRONOUS  # Use synchronous writes to have real-time feedback
+            write_type=SYNCHRONOUS  # Use synchronous write type for immediate feedback on write success or failure
         ) 
         '''Write options for the InfluxDB write API, including batch size, flush interval, retry interval, and maximum retries. These options control how data is written to InfluxDB in batches, with automatic handling of retries and flush intervals.'''
         self.write_api:WriteApi = self.client.connection.write_api(
@@ -78,6 +78,7 @@ class InfluxWriter(InfluxManager):
             logger.debug("influx_writer: No points available to commit")
             return False
         record: str = InfluxWriter.__pack_lines(points, self.timestamp_precision)
+        '''Record to send to InfluxDB'''
         bucket: str = self.adr_bucket
         '''Target bucket for committing points to InfluxDB'''
         if bucket is None:
@@ -104,7 +105,7 @@ class InfluxWriter(InfluxManager):
             logger.debug(f"influx_writer: Lines that failed to commit: {pack}")
 
     @staticmethod
-    def __pack_lines(lines: list[Line], timestamp_precision: str) -> str:
+    def __pack_lines(lines: list, timestamp_precision: str) -> str:
         """
         Packs a list of InfluxDB points into a single string representation.
 
@@ -114,11 +115,18 @@ class InfluxWriter(InfluxManager):
         Returns:
             str: A string representation of the packed points, where each point is converted to its line protocol format and separated by newlines.
         """
-        valid_lines = [line for line in lines if line is not None]
-        return "\n".join([
+        valid_lines: list = [line for line in lines if line is not None]
+        lines_str: str = "\n".join([
             line.to_point(timestamp_precision=timestamp_precision).to_line_protocol()
             for line in valid_lines
         ])
+        record: str = ""
+        for line in lines_str.splitlines():
+            line_segments: list = line.split(" ")
+            time:str = "_time=" + line_segments[-1]
+            final_line: str = " ".join(line_segments[:-1]) + "," + time
+            record += final_line + "\n"
+        return record
     
     def check_to_commit(self) -> bool:
         '''

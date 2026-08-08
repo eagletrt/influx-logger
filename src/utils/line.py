@@ -72,7 +72,7 @@ class Line:
         if len(fields) == 0:
             raise ValueError("Missing fields")
         #logger.info(f"Influx Connection: Measurement '{measurement}' and timestamp {timestamp_value}")
-        return Line(measurement, tags, {k: v for k, v in fields.items()}, timestamp_value)
+        return Line(measurement=measurement, tags=tags, fields={k: v for k, v in fields.items()}, timestamp=timestamp_value)
 
     @staticmethod
     def _normalize_timestamp(timestamp: int, timestamp_precision: str = TimestampPrecision.us.name) -> int:
