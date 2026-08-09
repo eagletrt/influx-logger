@@ -8,20 +8,21 @@ from src.connections.mqtt_connection import MQTTConnection
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 
 class MsgDispatcher:
-    def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None) -> None:
+    def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None, vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
             "+/+/info/version/libcan":  self.handle_libcan_version_message,
             "+/+/info/version/gpslib":  self.handle_libgps_version_message,
             #"+/+/version":              self.handle_canlib_version_message,
             "+/+/data/+":               self.handle_data_message,
-            "+/+/query/+/data/get":          self.handle_query_request,
+            "+/+/query/+/data/get":     self.handle_query_request,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
         self.mqtt: MQTTConnection = mqtt
+        self.vehicle_whitelist: list = vehicle_whitelist if vehicle_whitelist and vehicle_whitelist != [] else None
         self.__run_if_set()
 
-    def set(self, influx_writer: InfluxWriter=None, influx_reader: InfluxReader=None, mqtt: MQTTConnection=None) -> None:
+    def set(self, influx_writer: InfluxWriter=None, influx_reader: InfluxReader=None, mqtt: MQTTConnection=None, vehicle_whitelist: list=None) -> None:
         '''
         Sets the InfluxWriter instance for the MsgDispatcher.
         Args:
@@ -33,6 +34,8 @@ class MsgDispatcher:
             self.influx_reader = influx_reader
         if mqtt is not None:
             self.mqtt = mqtt
+        if vehicle_whitelist is not None and vehicle_whitelist != []:
+            self.vehicle_whitelist = vehicle_whitelist
         self.__run_if_set()
 
     def __run_if_set(self) -> None:
@@ -112,6 +115,9 @@ class MsgDispatcher:
         logger.info(f"msg_dispatcher: Received version message from {ids}'")
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
         device_id: str = ids[1] if len(ids) > 1 else "unknown_id"
+        if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
+            #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}/{device_id}' is not in the whitelist.")
+            return
         logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
         check = library.check_commit_existence(version)
         if check:
@@ -173,6 +179,10 @@ class MsgDispatcher:
             logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle data message.")
             return
         row_msg: tuple[list[str], bytes] = (ids, payload)
+        vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
+        if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
+            #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}' is not in the whitelist.")
+            return
         self.influx_writer.parser.add_to_queue(row_msg)
 
     def handle_query_request(self, _topic: str, payload: bytes, ids: list[str]) -> None:
