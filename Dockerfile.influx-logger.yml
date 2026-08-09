@@ -1,18 +1,11 @@
-FROM alpine:3.18
-# Install Python 3 and pip
-RUN apk add --no-cache python3 py3-pip python3-dev && \
-    # cleanup
-    rm -rf /var/cache/apk/*
-# Install Python dependencies
-RUN pip install --upgrade pip && \
-    #install dependencies
-    pip install paho-mqtt requests python_http_client protobuf grpcio-tools influxdb-client python-statemachine pydot && \
-    # cleanup
-    apk del --no-cache py3-pip python3-dev
+FROM python:3.12-alpine
 
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY ./src /app/src
-# Bidirectionally mount cache directory to persist downloaded .proto files across container runs
-#VOLUME /app/cache
 
-CMD ["python3", "-m", "src.main", "config.json"]
+# Bidirectionally mount cache directory to persist downloaded .proto files across container runs
+# VOLUME /app/cache
+
+ENTRYPOINT ["python", "-m", "src.main", "config.json"]
