@@ -88,7 +88,7 @@ class HandlerFSM(Thread, StateMachine):
         logger.info(f"{self.get_log_header()} - {message}")
         topic = "lorenzo/onboard/info/status/influx-logger"
         msg = f"{self.current_state}"
-        if self.config.log_on_mqtt:
+        if self.config.log_on_mqtt and self.handler.mqtt and self.handler.mqtt.is_connected():
             try:
                 result = self.handler.mqtt.connection.publish(
                     topic=self.config.log_on_mqtt,
