@@ -39,7 +39,7 @@ $(DOCKER_SERVICE_FILE):
 	@echo 'User = $(CURRENT_USER)' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'Restart = on-failure' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'WorkingDirectory = $(WORKING_DIR)' 								>> $(DOCKER_SERVICE_FILE)
-	@echo 'ExecStart = /bin/sh ./tools/script/run.sh' 								>> $(DOCKER_SERVICE_FILE)
+	@echo 'ExecStart = $(WORKING_DIR)/tools/script/run.sh' 								>> $(DOCKER_SERVICE_FILE)
 	@echo '' 																>> $(DOCKER_SERVICE_FILE)
 	@echo '[Install]' 														>> $(DOCKER_SERVICE_FILE)
 	@echo 'WantedBy = multi-user.target'									>> $(DOCKER_SERVICE_FILE)
@@ -60,11 +60,13 @@ uninstall:
 	sudo systemctl disable $(SERVICE_FILE)
 	sudo rm -f /etc/systemd/system/$(SERVICE_FILE)
 	sudo systemctl daemon-reload
+	make clean
 
 uninstall-docker:
 	sudo systemctl disable $(DOCKER_SERVICE_FILE)
 	sudo rm -f /etc/systemd/system/$(DOCKER_SERVICE_FILE)
 	sudo systemctl daemon-reload
+	make clean
 
 clean:
 	rm -f $(SERVICE_FILE)
