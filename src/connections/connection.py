@@ -24,7 +24,8 @@ class Connection(ABC):
         Returns:
             str: full link
         """
-        full_link = f"{self.url}:{self.port}"
+        full_link: str = f"{self.url}:{self.port}"
+        '''Full link'''
         if "http" not in full_link:
             return full_link
         return f"http://{full_link}"
