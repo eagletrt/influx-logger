@@ -7,7 +7,6 @@ DOCKER_SERVICE_FILE = influx-logger-docker.service
 CURRENT_USER := $(shell whoami)
 WORKING_DIR := $(shell pwd)
 PYTHON := $(shell which python3)
-DOCKER := $(shell which docker)
 
 all: generate
 
@@ -40,8 +39,7 @@ $(DOCKER_SERVICE_FILE):
 	@echo 'User = $(CURRENT_USER)' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'Restart = on-failure' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'WorkingDirectory = $(WORKING_DIR)' 								>> $(DOCKER_SERVICE_FILE)
-	@echo 'ExecStart = $(DOCKER) compose up --remove-orphans' 				>> $(DOCKER_SERVICE_FILE)
-	@echo 'ExecStop = $(DOCKER) compose down --remove-orphans' 				>> $(DOCKER_SERVICE_FILE)
+	@echo 'ExecStart = ./tools/script/run.sh' 								>> $(DOCKER_SERVICE_FILE)
 	@echo '' 																>> $(DOCKER_SERVICE_FILE)
 	@echo '[Install]' 														>> $(DOCKER_SERVICE_FILE)
 	@echo 'WantedBy = multi-user.target'									>> $(DOCKER_SERVICE_FILE)
