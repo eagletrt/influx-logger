@@ -46,13 +46,26 @@ $(DOCKER_SERVICE_FILE):
 
 install: $(SERVICE_FILE)
 	sudo cp $(SERVICE_FILE) /etc/systemd/system/
+	sudo chmod +770 /etc/systemd/system/${SERVICE_FILE}
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(SERVICE_FILE)
 
 install-docker: $(DOCKER_SERVICE_FILE)
 	sudo cp $(DOCKER_SERVICE_FILE) /etc/systemd/system/
+	sudo chmod +770 /etc/systemd/system/${DOCKER_SERVICE_FILE}
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(DOCKER_SERVICE_FILE)
+
+uninstall:
+	sudo systemctl disable $(SERVICE_FILE)
+	sudo rm -f /etc/systemd/system/$(SERVICE_FILE)
+	sudo systemctl daemon-reload
+
+uninstall-docker:
+	sudo systemctl disable $(DOCKER_SERVICE_FILE)
+	sudo rm -f /etc/systemd/system/$(DOCKER_SERVICE_FILE)
+	sudo systemctl daemon-reload
+
 clean:
 	rm -f $(SERVICE_FILE)
 	rm -f $(DOCKER_SERVICE_FILE)
