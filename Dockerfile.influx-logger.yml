@@ -1,8 +1,11 @@
 FROM python:3.12-alpine
-
+# Set working directory
 WORKDIR /app
+# Copy requirements.txt first to leverage Docker cache
 COPY requirements.txt .
+# Install Dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+# Copy source code to working directory
 COPY ./src /app/src
 
 # Bidirectionally mount cache directory to persist downloaded .proto files across container runs
