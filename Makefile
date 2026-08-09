@@ -45,14 +45,14 @@ $(DOCKER_SERVICE_FILE):
 	@echo 'WantedBy = multi-user.target'									>> $(DOCKER_SERVICE_FILE)
 
 install: $(SERVICE_FILE)
-	sudo cp $(SERVICE_FILE) /etc/systemd/system/
-	sudo chmod +770 /etc/systemd/system/${SERVICE_FILE}
+	sudo chmod +770 ${SERVICE_FILE}
+	ln -sf $(WORKING_DIR)/$(SERVICE_FILE) /etc/systemd/system/$(SERVICE_FILE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(SERVICE_FILE)
 
 install-docker: $(DOCKER_SERVICE_FILE)
-	sudo cp $(DOCKER_SERVICE_FILE) /etc/systemd/system/
 	sudo chmod +770 /etc/systemd/system/${DOCKER_SERVICE_FILE}
+	ln -sf $(WORKING_DIR)/$(DOCKER_SERVICE_FILE) /etc/systemd/system/$(DOCKER_SERVICE_FILE)
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(DOCKER_SERVICE_FILE)
 
