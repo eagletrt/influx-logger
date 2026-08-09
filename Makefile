@@ -39,7 +39,7 @@ $(DOCKER_SERVICE_FILE):
 	@echo 'User = $(CURRENT_USER)' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'Restart = on-failure' 											>> $(DOCKER_SERVICE_FILE)
 	@echo 'WorkingDirectory = $(WORKING_DIR)' 								>> $(DOCKER_SERVICE_FILE)
-	@echo 'ExecStart = ./tools/script/run.sh' 								>> $(DOCKER_SERVICE_FILE)
+	@echo 'ExecStart = /bin/sh ./tools/script/run.sh' 								>> $(DOCKER_SERVICE_FILE)
 	@echo '' 																>> $(DOCKER_SERVICE_FILE)
 	@echo '[Install]' 														>> $(DOCKER_SERVICE_FILE)
 	@echo 'WantedBy = multi-user.target'									>> $(DOCKER_SERVICE_FILE)
