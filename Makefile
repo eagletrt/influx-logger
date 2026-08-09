@@ -50,32 +50,32 @@ $(DOCKER_SERVICE_FILE):
 # Install and enable the service with systemd
 install: $(SERVICE_FILE)
 	@mkdir -p $(SYSTEMD_DIR)
-	@$(SUDO) install -m 644 $(SERVICE_FILE) $(SYSTEMD_DIR)/$(SERVICE_FILE)
-	@$(SYSTEMCTL) daemon-reload
-	@$(SYSTEMCTL) enable $(SERVICE_FILE)
-	@$(SYSTEMCTL) restart $(SERVICE_FILE) || true
+	@install -m 644 $(SERVICE_FILE) $(SYSTEMD_DIR)/$(SERVICE_FILE)
+	@$(SYSTEMCTL) daemon-reload 2>/dev/null || true
+	@$(SYSTEMCTL) enable $(SERVICE_FILE) 2>/dev/null || true
+	@$(SYSTEMCTL) restart $(SERVICE_FILE) 2>/dev/null || true
 
 # Install and enable the service with systemd for docker
 install-docker: $(DOCKER_SERVICE_FILE)
 	@mkdir -p $(SYSTEMD_DIR)
-	@$(SUDO) install -m 644 $(DOCKER_SERVICE_FILE) $(SYSTEMD_DIR)/$(DOCKER_SERVICE_FILE)
-	@$(SYSTEMCTL) daemon-reload
-	@$(SYSTEMCTL) enable $(DOCKER_SERVICE_FILE)
-	@$(SYSTEMCTL) restart $(DOCKER_SERVICE_FILE) || true
+	@install -m 644 $(DOCKER_SERVICE_FILE) $(SYSTEMD_DIR)/$(DOCKER_SERVICE_FILE)
+	@$(SYSTEMCTL) daemon-reload 2>/dev/null || true
+	@$(SYSTEMCTL) enable $(DOCKER_SERVICE_FILE) 2>/dev/null || true
+	@$(SYSTEMCTL) restart $(DOCKER_SERVICE_FILE) 2>/dev/null || true
 
 # Remove the service file and disable the service with systemd
 uninstall: $(SERVICE_FILE)
-	@$(SYSTEMCTL) disable $(SERVICE_FILE) || true
-	@$(SYSTEMCTL) stop $(SERVICE_FILE) || true
-	@$(SUDO) rm -f $(SYSTEMD_DIR)/$(SERVICE_FILE)
-	@$(SYSTEMCTL) daemon-reload
+	@$(SYSTEMCTL) disable $(SERVICE_FILE) 2>/dev/null || true
+	@$(SYSTEMCTL) stop $(SERVICE_FILE) 2>/dev/null || true
+	@rm -f $(SYSTEMD_DIR)/$(SERVICE_FILE)
+	@$(SYSTEMCTL) daemon-reload 2>/dev/null || true
 
 # Remove the service file and disable the service with systemd for docker
 uninstall-docker: $(DOCKER_SERVICE_FILE)
-	@$(SYSTEMCTL) disable $(DOCKER_SERVICE_FILE) || true
-	@$(SYSTEMCTL) stop $(DOCKER_SERVICE_FILE) || true
-	@$(SUDO) rm -f $(SYSTEMD_DIR)/$(DOCKER_SERVICE_FILE)
-	@$(SYSTEMCTL) daemon-reload
+	@$(SYSTEMCTL) disable $(DOCKER_SERVICE_FILE) 2>/dev/null || true
+	@$(SYSTEMCTL) stop $(DOCKER_SERVICE_FILE) 2>/dev/null || true
+	@rm -f $(SYSTEMD_DIR)/$(DOCKER_SERVICE_FILE)
+	@$(SYSTEMCTL) daemon-reload 2>/dev/null || true
 
 clean:
 	rm -f $(SERVICE_FILE)
