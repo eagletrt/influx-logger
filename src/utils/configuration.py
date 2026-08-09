@@ -133,11 +133,13 @@ class Configuration:
         influx: InfluxConfig = None,
         excluded_networks: list = None,
         github_token: str = None,
+        log_on_mqtt: str = None
     ):
         self.mqtt: MQTTConfig = mqtt
         self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []
-        self.github_token: str = github_token
+        self.github_token: str = github_token if github_token and github_token != "" else None
+        self.log_on_mqtt: str = log_on_mqtt if log_on_mqtt and log_on_mqtt != "" else None
 
     @staticmethod
     def load_from_file(file_path: str = "config.json") -> "Configuration":
@@ -155,6 +157,7 @@ class Configuration:
         mqtt_data = data.get("mqtt", None)
         influx_data = data.get("influx", None)
         github_token = data.get("github_token", None)
+        log_on_mqtt = data.get("log_on_mqtt", None)
 
         mqtt = MQTTConfig.from_dict(mqtt_data) if mqtt_data else None
 
@@ -164,7 +167,8 @@ class Configuration:
             mqtt=mqtt,
             influx=influx,
             excluded_networks=data.get("excluded_networks", None),
-            github_token=github_token
+            github_token=github_token,
+            log_on_mqtt=log_on_mqtt
         )
 
     @staticmethod
@@ -190,12 +194,14 @@ class Configuration:
             port=int(os.getenv("MQTT_PORT", 1883)),
         )
         github_token = os.getenv("GITHUB_TOKEN", "")
+        log_on_mqtt = os.getenv("LOG_ON_MQTT", None)
 
         return Configuration(
             mqtt=mqtt,
             influx=influx,
             excluded_networks=json.loads(os.getenv("EXCLUDED_NETWORKS", "[]")),
-            github_token=github_token
+            github_token=github_token,
+            log_on_mqtt=log_on_mqtt
         )
 
     def __str__(self):
@@ -203,6 +209,7 @@ class Configuration:
             "mqtt": self.mqtt.to_dict() if self.mqtt else None,
             "influx": self.influx.to_dict() if self.influx else None,
             "excluded_networks": self.excluded_networks,
-            "github_token": self.github_token
+            "github_token": self.github_token,
+            "log_on_mqtt": self.log_on_mqtt
         }
         return json.dumps(conf, indent=4)

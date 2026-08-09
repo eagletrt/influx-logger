@@ -99,9 +99,13 @@ class InfluxWriter(InfluxManager):
                 logger.warning(f"influx_writer: Commit returned unexpected result: {result}")
             return result is None
         except Exception as e:
-            pack: str = InfluxWriter.__pack_lines(points, self.timestamp_precision)
             logger.error(f"influx_writer: Failed to commit lines: {e}", exc_info=True)
-            logger.debug(f"influx_writer: Lines that failed to commit: {pack}")
+            try:
+                pack: str = InfluxWriter.__pack_lines(points, self.timestamp_precision)
+                logger.debug(f"influx_writer: Lines that failed to commit: {pack}")
+            except Exception:
+                pass
+            return False
 
     @staticmethod
     def __pack_lines(lines: list, timestamp_precision: str) -> str:
