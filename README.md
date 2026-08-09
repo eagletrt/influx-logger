@@ -74,7 +74,7 @@ It should be written like this:
     },
     "vehicle_whitelist" : [ 
         "kraken"
-    ]
+    ],
     "github_token" : "optional_github_personal_access_token",
     "log_on_mqtt" : "kraken/onboard/info/status/influx-logger",
     "excluded_networks" : [
