@@ -1,2 +1,2 @@
 #!/bin/bash
-docker stop influx-logger:latest
+docker stop influx-logger
