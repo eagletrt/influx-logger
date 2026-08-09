@@ -1,7 +1,5 @@
 import json
 import os
-from typing import Dict, List, Optional
-
 
 class InfluxConfig:
     """
@@ -132,12 +130,14 @@ class Configuration:
         mqtt: MQTTConfig = None,
         influx: InfluxConfig = None,
         excluded_networks: list = None,
+        vehicle_whitelist: list = None,
         github_token: str = None,
         log_on_mqtt: str = None
     ):
         self.mqtt: MQTTConfig = mqtt
         self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []
+        self.vehicle_whitelist: list = vehicle_whitelist if vehicle_whitelist and vehicle_whitelist != [] else None
         self.github_token: str = github_token if github_token and github_token != "" else None
         self.log_on_mqtt: str = log_on_mqtt if log_on_mqtt and log_on_mqtt != "" else None
 
@@ -156,6 +156,7 @@ class Configuration:
 
         mqtt_data = data.get("mqtt", None)
         influx_data = data.get("influx", None)
+        vehicle_whitelist = data.get("vehicle_whitelist", None)
         github_token = data.get("github_token", None)
         log_on_mqtt = data.get("log_on_mqtt", None)
 
@@ -167,6 +168,7 @@ class Configuration:
             mqtt=mqtt,
             influx=influx,
             excluded_networks=data.get("excluded_networks", None),
+            vehicle_whitelist=vehicle_whitelist,
             github_token=github_token,
             log_on_mqtt=log_on_mqtt
         )
@@ -193,13 +195,16 @@ class Configuration:
             url=os.getenv("MQTT_URL", "localhost"),
             port=int(os.getenv("MQTT_PORT", 1883)),
         )
+        vehicle_whitelist = json.loads(os.getenv("VEHICLE_WHITELIST", "[]"))
+        excluded_networks = json.loads(os.getenv("EXCLUDED_NETWORKS", "[]"))
         github_token = os.getenv("GITHUB_TOKEN", "")
         log_on_mqtt = os.getenv("LOG_ON_MQTT", None)
 
         return Configuration(
             mqtt=mqtt,
             influx=influx,
-            excluded_networks=json.loads(os.getenv("EXCLUDED_NETWORKS", "[]")),
+            excluded_networks=excluded_networks,
+            vehicle_whitelist=vehicle_whitelist,
             github_token=github_token,
             log_on_mqtt=log_on_mqtt
         )
@@ -209,6 +214,7 @@ class Configuration:
             "mqtt": self.mqtt.to_dict() if self.mqtt else None,
             "influx": self.influx.to_dict() if self.influx else None,
             "excluded_networks": self.excluded_networks,
+            "vehicle_whitelist": self.vehicle_whitelist,
             "github_token": self.github_token,
             "log_on_mqtt": self.log_on_mqtt
         }

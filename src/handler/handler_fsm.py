@@ -49,7 +49,7 @@ class HandlerFSM(Thread, StateMachine):
     )
 
     def __init__(self, config: Configuration, name: str = "HandlerFSM") -> None:
-        self.msg_dispatcher: MsgDispatcher = MsgDispatcher()
+        self.msg_dispatcher: MsgDispatcher = MsgDispatcher(vehicle_whitelist=config.vehicle_whitelist)
         '''MsgDispatcher object responsible for handling incoming MQTT messages and dispatching them to the appropriate handlers.'''
         self.config: Configuration = config
         '''Configuration object containing settings for MQTT and InfluxDB connections.'''
