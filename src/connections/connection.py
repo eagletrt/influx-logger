@@ -24,7 +24,10 @@ class Connection(ABC):
         Returns:
             str: full link
         """
-        return f"http://{self.url}:{self.port}"
+        full_link = f"{self.url}:{self.port}"
+        if "http" not in full_link:
+            return full_link
+        return f"http://{full_link}"
 
     @abstractmethod
     def connect(self) -> bool:
