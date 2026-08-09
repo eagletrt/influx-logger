@@ -11,8 +11,10 @@ class MQTTConnection(Connection):
         broker: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
     """
-    def __init__(self, url: str, port: int = 1883, on_state_change=None, on_message=None):
+    def __init__(self, url: str, port: int = 1883, username: str = None, password: str = None, on_state_change=None, on_message=None):
         super().__init__(url=url, port=port)
+        self.username = username
+        self.password = password
         self.on_state_change = on_state_change
         self.message_callback = on_message
 
@@ -46,6 +48,8 @@ class MQTTConnection(Connection):
         """
         try:
             self.connection = mqtt.Client()
+            if self.username and self.password:
+                self.connection.username_pw_set(self.username, self.password)
             self.connection.on_connect = self.on_connect
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message

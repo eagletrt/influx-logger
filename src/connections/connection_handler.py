@@ -48,6 +48,8 @@ class ConnectionHandler:
         self.mqtt = MQTTConnection(
             url=config.mqtt.url,
             port=config.mqtt.port,
+            username=config.mqtt.username,
+            password=config.mqtt.password,
             on_state_change=self.on_state_change,
             on_message=on_message,
         ) if config and config.mqtt else None
