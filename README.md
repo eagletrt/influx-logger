@@ -72,7 +72,14 @@ It should be written like this:
             "logs" : "telemetry_log"
         }
     },
-    "github_token" : "optional_github_personal_access_token"
+    "vehicle_whitelist" : [ 
+        "kraken"
+    ]
+    "github_token" : "optional_github_personal_access_token",
+    "log_on_mqtt" : "kraken/onboard/info/status/influx-logger",
+    "excluded_networks" : [
+        "odometer"
+    ]
 }
 ```
 ### Python
