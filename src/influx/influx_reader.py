@@ -20,8 +20,8 @@ class InfluxReader(InfluxManager):
     def __init__(self, client: InfluxConnection, mqtt_client: MQTTConnection, log_bucket: str, timestamp_precision: str = TimestampPrecision.us.name) -> None:
         super().__init__(client, timestamp_precision, name="InfluxReader")
         self.query_api = self.client.connection.query_api()
-        self.mqtt = mqtt_client
-        self.log_bucket = log_bucket
+        self.mqtt: MQTTConnection = mqtt_client
+        self.log_bucket: str = log_bucket
         self.query_queue: Queue = Queue()
 
     def add_query_to_queue(self, vehicle_id: str, device_id: str, transaction_id: str, payload: bytes) -> None:

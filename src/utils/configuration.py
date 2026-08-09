@@ -76,11 +76,15 @@ class MQTTConfig:
     Attributes:
         url (str): The URL of the MQTT broker.
         port (int): The port number of the MQTT broker.
+        username (str): The username for MQTT authentication (optional).
+        password (str): The password for MQTT authentication (optional).
     """
 
-    def __init__(self, url: str, port: int):
+    def __init__(self, url: str, port: int, username: str = None, password: str = None):
         self.url: str = url
         self.port: int = int(port)
+        self.username: str = username
+        self.password: str = password
 
     @staticmethod
     def from_dict(data: dict) -> "MQTTConfig":
@@ -94,6 +98,8 @@ class MQTTConfig:
         return MQTTConfig(
             url=data.get("url"),
             port=data.get("port", 1883),
+            username=data.get("username", None),
+            password=data.get("password", None)
         )
 
     def to_dict(self) -> dict:
@@ -105,6 +111,8 @@ class MQTTConfig:
         return {
             "url": self.url,
             "port": self.port,
+            "username": self.username,
+            "password": self.password
         }
 
     def __str__(self):
@@ -194,6 +202,8 @@ class Configuration:
         mqtt = MQTTConfig(
             url=os.getenv("MQTT_URL", "localhost"),
             port=int(os.getenv("MQTT_PORT", 1883)),
+            username=os.getenv("MQTT_USERNAME", None),
+            password=os.getenv("MQTT_PASSWORD", None)
         )
         vehicle_whitelist = json.loads(os.getenv("VEHICLE_WHITELIST", "[]"))
         excluded_networks = json.loads(os.getenv("EXCLUDED_NETWORKS", "[]"))

@@ -116,7 +116,7 @@ class MsgDispatcher:
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
         device_id: str = ids[1] if len(ids) > 1 else "unknown_id"
         if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
-            logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}/{device_id}' is not in the whitelist.")
+            #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}/{device_id}' is not in the whitelist.")
             return
         logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
         check = library.check_commit_existence(version)

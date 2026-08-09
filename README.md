@@ -60,7 +60,9 @@ It should be written like this:
 {
     "mqtt" : {
         "url" : "mosquitto",
-        "port" : 1883
+        "port" : 1883,
+        "username" : "optional_username",
+        "password" : "optional_password"
     },
     "influx" : {
         "url" : "influxdb",
@@ -112,5 +114,5 @@ You must first execute it once and retrives the Influxdb token from https://loca
 run tests using mosquitto at port 8883 (change the port in the configuration file).
 To run the docker compose file use:
 ```sh
-docker compose up --build --remove-orphans
+docker compose --file docker-compose.test.yml up --build --remove-orphans
 ```
