@@ -50,6 +50,7 @@ class MQTTConnection(Connection):
             self.connection = mqtt.Client()
             if self.username and self.password:
                 self.connection.username_pw_set(self.username, self.password)
+                self.connection.tls_set()  # Enable TLS for secure connection
             self.connection.on_connect = self.on_connect
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message
