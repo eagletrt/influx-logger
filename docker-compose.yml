@@ -4,16 +4,41 @@ services:
             context: .
             dockerfile: Dockerfile.influx-logger.yml
         volumes:
-            - ./configuration.json:/app/config.json:ro
+            - ./config.json:/app/config.json:ro
             - ./cache:/app/cache:rw
-        depends_on:
-            - influxdb2
-            - mosquitto
+        networks:
+            - default
+    influxdb2:
+        image: influxdb:2
+        container_name: influxdb2
+        hostname: influxdb
+        ports:
+            - "8086:8086"
+        env_file:
+            - ./.env.influxdb2
+        volumes:
+            - type: volume
+              source: influxdb2-data
+              target: /var/lib/influxdb2
+            - type: volume
+              source: influxdb2-config
+              target: /etc/influxdb2
         networks:
             - default
 secrets:
+    influxdb2-admin-username:
+        file: ./.env.influxdb2-admin-username
+    influxdb2-admin-password:
+        file: ./.env.influxdb2-admin-password
+    influxdb2-admin-token:
+        file: ./.env.influxdb2-admin-token
     logger-config:
         file: ./config.json
+volumes:
+    influxdb2-data:
+        driver: local
+    influxdb2-config:
+        driver: local
 networks:
     default:
         driver: bridge
