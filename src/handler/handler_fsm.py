@@ -79,13 +79,11 @@ class HandlerFSM(Thread, StateMachine):
         """
         DotGraphMachine(HandlerFSM).get_graph().write_png(filename)
 
-    def log_status(self, message: str):
+    def log_on_mqtt(self) -> None:
         """
-        Logs a message with the FSM name and current state.
-        Args:
-            message (str): The message to log.
+        Logs the current state of the FSM to the configured MQTT topic if the MQTT connection is established
+        and the log_on_mqtt configuration is set. It publishes a message containing the current state of the FSM to the specified MQTT topic.
         """
-        logger.info(f"{self.get_log_header()} - {message}")
         msg = f"{self.current_state}"
         if self.config.log_on_mqtt and self.handler.mqtt and self.handler.mqtt.is_connected():
             try:
@@ -97,6 +95,15 @@ class HandlerFSM(Thread, StateMachine):
                     logger.error(f"{self.get_log_header()} - Failed to publish log message to MQTT, return code: {result.rc}")
             except Exception as e:
                 logger.error(f"{self.get_log_header()} - Failed to publish log message to MQTT: {e}")
+
+    def log_status(self, message: str):
+        """
+        Logs a message with the FSM name and current state.
+        Args:
+            message (str): The message to log.
+        """
+        logger.info(f"{self.get_log_header()} - {message}")
+        self.log_on_mqtt()
 
     def get_log_header(self) -> str:
         """
