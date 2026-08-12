@@ -17,19 +17,46 @@ class MQTTConnection(Connection):
         self.password = password
         self.on_state_change = on_state_change
         self.message_callback = on_message
+        self._connected = False
+        self._connecting = False
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
             self.on_state_change()
 
     def on_connect(self, client, _userdata, _flags, reason_code, properties=None) -> None:
+        try:
+            success = int(reason_code) == 0
+        except Exception:
+            success = not reason_code
+
+        self._connecting = False
+        if not success:
+            self._connected = False
+            logger.error(
+                f"mqtt-connection: MQTT broker at {self.url}:{self.port} rejected the connection with reason code {reason_code}"
+            )
+            self.__notify_state_change()
+            return
+
         logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
+        self._connected = True
+        self.__subscribe_topics()
         self.__notify_state_change()
 
     def on_disconnect(self, client, _userdata, reason_code, properties=None) -> None:
         logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
         self.connection = None
+        self._connecting = False
+        self._connected = False
         self.__notify_state_change()
+
+    def __subscribe_topics(self) -> None:
+        if not self.connection:
+            return
+        #self.connection.subscribe("+/+/version")
+        self.connection.subscribe("+/+/info/version/libcan")
+        self.connection.subscribe("+/+/info/version/gpslib")
 
     def on_message(self, client, _userdata, msg) -> None:
         logger.debug(f"mqtt-connection: Received message on topic {msg.topic} with payload {msg.payload}")
@@ -47,22 +74,25 @@ class MQTTConnection(Connection):
             bool: True if the connection was successful, False otherwise.
         """
         try:
+            if self._connected or self._connecting:
+                return True
             self.connection = mqtt.Client()
+            self._connecting = True
             if self.username and self.password:
                 self.connection.username_pw_set(self.username, self.password)
                 self.connection.tls_set()  # Enable TLS for secure connection
             self.connection.on_connect = self.on_connect
             self.connection.on_disconnect = self.on_disconnect
             self.connection.on_message = self.on_message
+            logger.info(f"mqtt-connection: Attempting to connect to MQTT broker at {self.url}:{self.port}")
             self.connection.connect(host=self.url, port=self.port)
-            #self.connection.subscribe("+/+/version")
-            self.connection.subscribe("+/+/info/version/libcan")
-            self.connection.subscribe("+/+/info/version/gpslib")
             self.connection.loop_start()
-            logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
-            return True
+            logger.info(f"mqtt-connection: Connection attempt to MQTT broker at {self.url}:{self.port} initiated")
+            return self.is_connected()
         except Exception as e:
             self.connection = None
+            self._connecting = False
+            self._connected = False
             logger.error(f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}")
             return False
         
@@ -75,7 +105,9 @@ class MQTTConnection(Connection):
         """
         try:
             if self.connection:
+                self._connecting = False
                 self.connection.loop_stop()
+                self._connected = False
                 self.connection.disconnect()
                 self.connection = None
                 return True
@@ -89,12 +121,12 @@ class MQTTConnection(Connection):
         Returns:
             bool: True if the connection is established, False otherwise.
         """
-        if not super().is_connected():
+        connected:bool = super().is_connected() and self._connected
+        if not connected:
             return False
-        # Ping the broker to check if the connection is still alive
+        # Ping the broker to check if the connection is still alive.
         try:
-            self.connection.loop_read()
-            return True
+            return bool(self.connection.is_connected())
         except Exception as e:
             logger.warning(f"mqtt-connection: Connection to MQTT broker at {self.url}:{self.port} is not alive: {e}")
             return False

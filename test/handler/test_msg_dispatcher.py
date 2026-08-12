@@ -34,9 +34,12 @@ if "influxdb_client" not in sys.modules:
     class Point:
         pass
 
+    SYNCHRONOUS = object()
+
     write_api_module.WriteOptions = WriteOptions
     write_api_module.WriteApi = WriteApi
     write_api_module.Point = Point
+    write_api_module.SYNCHRONOUS = SYNCHRONOUS
     influxdb_client_module.Point = Point
     client_module.write_api = write_api_module
 
@@ -209,7 +212,10 @@ class TestMsgDispatcher(TestCase):
 
         mqtt_module.mqtt.Client = Client
         try:
-            self.assertTrue(MQTTConnection(url="broker", port=1883).connect())
+            connection = MQTTConnection(url="broker", port=1883)
+            self.assertTrue(connection.connect())
+            self.assertFalse(connection.is_connected())
+            connection.on_connect(connection.connection, None, None, 0)
         finally:
             mqtt_module.mqtt.Client = original_client
 
@@ -221,3 +227,42 @@ class TestMsgDispatcher(TestCase):
                 "+/+/info/version/gpslib",
             ],
         )
+
+    def test_mqtt_connection_only_reports_connected_after_on_connect(self):
+        import src.connections.mqtt_connection as mqtt_module
+
+        original_client = mqtt_module.mqtt.Client
+
+        class Client:
+            def __init__(self, *args, **kwargs):
+                self.on_connect = None
+                self.on_disconnect = None
+                self.on_message = None
+
+            def connect(self, *args, **kwargs):
+                return None
+
+            def subscribe(self, *args, **kwargs):
+                return None
+
+            def loop_start(self):
+                return None
+
+            def loop_stop(self):
+                return None
+
+            def disconnect(self):
+                return None
+
+            def loop_read(self):
+                return None
+
+        mqtt_module.mqtt.Client = Client
+        try:
+            connection = MQTTConnection(url="broker", port=1883)
+            self.assertTrue(connection.connect())
+            self.assertFalse(connection.is_connected())
+            connection.on_connect(connection.connection, None, None, 0)
+            self.assertTrue(connection.is_connected())
+        finally:
+            mqtt_module.mqtt.Client = original_client
