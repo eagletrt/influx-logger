@@ -1,0 +1,19 @@
+services:
+    influx-logger:
+        build:
+            context: .
+            dockerfile: Dockerfile.influx-logger.yml
+        volumes:
+            - ./configuration.json:/app/config.json:ro
+            - ./cache:/app/cache:rw
+        depends_on:
+            - influxdb2
+            - mosquitto
+        networks:
+            - default
+secrets:
+    logger-config:
+        file: ./config.json
+networks:
+    default:
+        driver: bridge
