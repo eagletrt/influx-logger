@@ -379,6 +379,26 @@ class TestFluxQuery(TestCase):
 
         self.assertIn('r["vehicle-id"] == "kra\\"ken"', query_api.last_query)
 
+    def test_a_request_cannot_raise_the_row_cap(self):
+        reader = make_reader(tables=[])
+        reader.max_rows = 100
+        query_api = reader.query_api
+        payload = json.dumps({"start": 1_000, "stop": 2_000, "maxRows": 5_000}).encode("utf-8")
+
+        reader._process_query(VEHICLE, DEVICE, TRANSACTION, payload)
+
+        self.assertIn("limit(n: 100)", query_api.last_query)
+
+    def test_a_request_can_lower_the_row_cap(self):
+        reader = make_reader(tables=[])
+        reader.max_rows = 100
+        query_api = reader.query_api
+        payload = json.dumps({"start": 1_000, "stop": 2_000, "maxRows": 10}).encode("utf-8")
+
+        reader._process_query(VEHICLE, DEVICE, TRANSACTION, payload)
+
+        self.assertIn("limit(n: 10)", query_api.last_query)
+
     def test_filters_and_limit_are_applied(self):
         reader = make_reader(tables=[])
         query_api = reader.query_api

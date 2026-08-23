@@ -143,6 +143,19 @@ class InfluxReader(InfluxManager):
                 QueryError.QUERY_ERROR_UNAVAILABLE, STAGE_REQUEST, "InfluxReader stopped before running the query"
             )
 
+    def _effective_max_rows(self, request: QueryRequest) -> int:
+        '''
+        Returns the row cap actually applied to a request. A request can lower the cap the
+        reader was configured with, never raise it above it.
+
+        Args:
+            request (QueryRequest): The validated request.
+        Returns:
+            int: The strictest cap between the request and the reader, 0 when neither caps.
+        '''
+        limits = [limit for limit in (request.maxRows, self.max_rows) if limit > 0]
+        return min(limits) if limits else 0
+
     def _build_flux_query(self, vehicle_id: str, device_id: str, request: QueryRequest) -> str:
         '''
         Builds the Flux query for a request. Every interpolated value is escaped: vehicle and
@@ -166,8 +179,8 @@ class InfluxReader(InfluxManager):
                 f'r["_measurement"] == "{escape_flux_string(measurement)}"' for measurement in request.measurements
             )
             filters += f"\n                |> filter(fn: (r) => {measurements})"
-        max_rows = request.maxRows if request.maxRows > 0 else self.max_rows
-        limit = f"\n                |> limit(n: {int(max_rows)})" if max_rows > 0 else ""
+        max_rows = self._effective_max_rows(request)
+        limit = f"\n                |> limit(n: {max_rows})" if max_rows > 0 else ""
         return f'''
                 from(bucket: "{escape_flux_string(self.log_bucket)}")
                 |> range(start: time(v: {start_ns}), stop: time(v: {stop_ns}))
@@ -210,7 +223,7 @@ class InfluxReader(InfluxManager):
 
         chunks: list[QueryChunkInfo] = []
         total_rows: int = 0
-        max_rows = request.maxRows if request.maxRows > 0 else self.max_rows
+        max_rows = self._effective_max_rows(request)
         truncated: bool = False
 
         for table in tables:
