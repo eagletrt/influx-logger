@@ -6,6 +6,8 @@ from src.influx.influx_writer import InfluxWriter
 from src.influx.influx_reader import InfluxReader
 from src.connections.mqtt_connection import MQTTConnection
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
+from src.serializer.query_publisher import QueryPublisher
+from src.serializer.query_protocol import STAGE_REQUEST, QueryError
 
 class MsgDispatcher:
     def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None, vehicle_whitelist: list = None) -> None:
@@ -189,19 +191,36 @@ class MsgDispatcher:
         """
         Handles incoming query requests from the GUI.
         ids will contain: [vehicle_id, device_id, transaction_id]
+
+        A request that cannot be taken in charge is refused on the status topic of its
+        transaction instead of being dropped silently: without an answer the requester has
+        no way to tell a rejected request from one that is still running.
         """
-        if not self.influx_reader:
-            logger.warning("msg_dispatcher: InfluxReader is not set. Cannot handle query request.")
-            return
-        
         if len(ids) < 3:
+            # Without a transaction id there is no topic to answer on, the log is all we have.
             logger.error(f"msg_dispatcher: Query topic malformed. ids found: {ids}")
             return
 
         vehicle_id = ids[0]
         device_id = ids[1]
         transaction_id = ids[2]
-        
+        publisher = QueryPublisher(self.mqtt, vehicle_id, device_id, transaction_id)
+
+        if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
+            publisher.publish_failure(
+                QueryError.QUERY_ERROR_NOT_AUTHORIZED,
+                STAGE_REQUEST,
+                f"vehicle '{vehicle_id}' is not in the whitelist",
+            )
+            return
+
+        if not self.influx_reader:
+            logger.warning("msg_dispatcher: InfluxReader is not set. Cannot handle query request.")
+            publisher.publish_failure(
+                QueryError.QUERY_ERROR_UNAVAILABLE, STAGE_REQUEST, "InfluxReader is not available"
+            )
+            return
+
         # Send the query to the InfluxReader to be processed
         self.influx_reader.add_query_to_queue(vehicle_id, device_id, transaction_id, payload)
 
@@ -226,7 +245,7 @@ class MsgDispatcher:
             self.influx_writer.graceful_stop()
             self.influx_writer.join()
         if self.influx_reader:
-            self.influx_reader.stop() # TODO: Implement graceful stop for InfluxReader if needed
+            self.influx_reader.graceful_stop()
             self.influx_reader.join()
         
 __all__ = ["MsgDispatcher"]

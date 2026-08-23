@@ -5,6 +5,11 @@ WORKDIR /app
 COPY requirements.txt .
 # Install Dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+# Copy the serializers submodule and generate the protobuf modules of the query protocol
+COPY ./external /app/external
+RUN mkdir -p /app/.generated && \
+    python -m grpc_tools.protoc -I external/serializer/proto --python_out=.generated \
+    $(find external/serializer/proto -name '*.proto')
 # Copy source code to working directory
 COPY ./src /app/src
 

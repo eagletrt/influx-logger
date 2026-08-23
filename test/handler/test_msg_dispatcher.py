@@ -96,61 +96,8 @@ if "grpc_tools" not in sys.modules:
     sys.modules["grpc_tools"] = grpc_tools_module
     sys.modules["grpc_tools.protoc"] = protoc_module
 
-if "google.protobuf" not in sys.modules:
-    google_module = ModuleType("google")
-    protobuf_module = ModuleType("google.protobuf")
-
-    json_format_module = ModuleType("google.protobuf.json_format")
-
-    descriptor_pool_module = ModuleType("google.protobuf.descriptor_pool")
-
-    class DescriptorPool:
-        def Add(self, file_proto):
-            return None
-
-        def FindMessageTypeByName(self, name):
-            return object()
-
-    descriptor_pool_module.DescriptorPool = DescriptorPool
-
-    descriptor_pb2_module = ModuleType("google.protobuf.descriptor_pb2")
-
-    class FileDescriptorSet:
-        def __init__(self) -> None:
-            self.file = []
-
-        def ParseFromString(self, payload: bytes) -> None:
-            return None
-
-    descriptor_pb2_module.FileDescriptorSet = FileDescriptorSet
-
-    message_factory_module = ModuleType("google.protobuf.message_factory")
-
-    class MessageFactory:
-        def __init__(self, pool):
-            self.pool = pool
-
-        def GetPrototype(self, message_descriptor):
-            return object()
-
-    def GetMessageClass(message_descriptor):
-        return object()
-
-    message_factory_module.MessageFactory = MessageFactory
-    message_factory_module.GetMessageClass = GetMessageClass
-
-    protobuf_module.json_format = json_format_module
-    protobuf_module.descriptor_pool = descriptor_pool_module
-    protobuf_module.descriptor_pb2 = descriptor_pb2_module
-    protobuf_module.message_factory = message_factory_module
-    google_module.protobuf = protobuf_module
-
-    sys.modules["google"] = google_module
-    sys.modules["google.protobuf"] = protobuf_module
-    sys.modules["google.protobuf.json_format"] = json_format_module
-    sys.modules["google.protobuf.descriptor_pool"] = descriptor_pool_module
-    sys.modules["google.protobuf.descriptor_pb2"] = descriptor_pb2_module
-    sys.modules["google.protobuf.message_factory"] = message_factory_module
+# google.protobuf is not stubbed: the query protocol deserializes real protobuf messages
+# generated from the telemetry-serializers submodule, so the runtime must be the real one.
 
 from src.handler.msg_dispatcher import MsgDispatcher
 from src.connections.mqtt_connection import MQTTConnection
