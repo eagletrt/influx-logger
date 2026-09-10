@@ -61,6 +61,9 @@ class MsgDispatcher:
             logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle existing messages.")
             return
         logger.info("msg_dispatcher: Handling existing messages on the MQTT broker")
+        if not self.mqtt.connection:
+            logger.warning("msg_dispatcher: MQTTConnection is not connected. Cannot handle existing messages.")
+            return
         # Subscribe to the relevant topics to receive existing messages
         for topic in self.topic_callbacks.keys():
             self.mqtt.connection.subscribe(topic)
