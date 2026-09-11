@@ -169,7 +169,7 @@ class Parser(Thread):
             record (Any): The record to be pushed, which can be a dictionary or any other type. If it's a dictionary, it will be processed to create a Line object.
             tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
         '''
-        logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
+        #logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
         # Check if the record is a dictionary; if not, log a warning and return early
         if isinstance(record, dict):
             #logger.info(f"parser: Received record for measurement '{measurement}': {record}")
