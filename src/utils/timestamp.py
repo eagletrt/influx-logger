@@ -37,6 +37,7 @@ INFLUX_INT64_MAX: int = 2**63 - 1
 '''InfluxDB's maximum value for a 64-bit signed integer. This constant is used to ensure that timestamp values do not exceed the maximum limit that InfluxDB can handle.'''
 
 TIMESTAMP_KEYS: list[str] = [
+    "inner_timestamp",
     "_inner_timestamp", 
     "_innerTimestamp", 
     "_timestamp", 

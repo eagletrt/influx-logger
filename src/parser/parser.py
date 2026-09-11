@@ -110,8 +110,8 @@ class Parser(Thread):
         if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
             message_content = message_content["valuesPack"]
             logger.info(f"parser: Unpacked valuesPack for network '{network}' with version {version}: {message_content}")
-        #logger.info(f"parser: message_content: {message_content}")
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
+        #logger.info(f"parser: Committing message content for network '{network}' with version {version}: {message_content}")
         self.commit(message_content, message_content, tags)
 
     def __append_to_destination_list(self, line: Line) -> None:
@@ -169,11 +169,13 @@ class Parser(Thread):
             record (Any): The record to be pushed, which can be a dictionary or any other type. If it's a dictionary, it will be processed to create a Line object.
             tags (dict[str, str]): A dictionary of tags associated with the record, where the keys are tag names and the values are tag values.
         '''
-        #logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
+        logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
         # Check if the record is a dictionary; if not, log a warning and return early
         if isinstance(record, dict):
+            #logger.info(f"parser: Received record for measurement '{measurement}': {record}")
             # Check if the record contains a "valuesMap" key, indicating a columnar format.
             if "valuesMap" in record:
+                #logger.info(f"parser: Received columnar record for measurement '{measurement}': {record}")
                 for timestamp_key in TIMESTAMP_KEYS:
                     if timestamp_key in record:
                         # Expand the columnar record into row-wise records
@@ -183,12 +185,17 @@ class Parser(Thread):
                             #logger.info(f"parser: Line: {line}")
                             self.__append_to_destination_list(line)
                         return
+            #logger.info(f"parser: Received row-wise record for measurement '{measurement}': {record}")
             # Create a Line object from the record and add it to the destination list
-            line: Line = Line.from_object(record, measurement, tags)
+            try:
+                line: Line = Line.from_object(record, measurement, tags)
+            except Exception as e:
+                #logger.error(f"parser: Error creating Line from record for measurement '{measurement}': {e}")
+                return
             #logger.info(f"parser: Line: {line}")
             self.__append_to_destination_list(line)
         elif isinstance(record, str):
-            #logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
+            logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
             return
         else:
             logger.warning(f"Handler: Invalid tags received from device for measurement '{measurement}', type: {type(record)}.")
