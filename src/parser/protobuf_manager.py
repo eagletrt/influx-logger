@@ -131,7 +131,7 @@ class LibManager(ABC):
                 if resp.ok:
                     return True
                 else:
-                    logger.error(f"protobuf_manager: Response: {resp.status_code} - {resp.text}")
+                    logger.warning(f"protobuf_manager: Request to {check_url} failed with status code {resp.status_code}: {resp.text}")
             except Exception as e:
                 logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
                 logger.error(f"protobuf_manager: {e}")

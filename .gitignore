@@ -201,3 +201,9 @@ repomix-output.xml
 
 # Non example evironment files
 .env.influxdb2
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
