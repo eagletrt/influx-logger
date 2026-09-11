@@ -1,13 +1,21 @@
-name: influx-test-env
 services:
+    influx-logger:
+        build:
+            context: .
+            dockerfile: Dockerfile.influx-logger.yml
+        volumes:
+            - ./config.json:/app/config.json:ro
+            - ./cache:/app/cache:rw
+        networks:
+            - default
     influxdb2:
         image: influxdb:2
-        container_name: influxdb2-test
+        container_name: influxdb2
         hostname: influxdb
         ports:
             - "8086:8086"
         env_file:
-            - ./.env.influxdb2.example
+            - ./.env.influxdb2
         volumes:
             - type: volume
               source: influxdb2-data
@@ -15,30 +23,6 @@ services:
             - type: volume
               source: influxdb2-config
               target: /etc/influxdb2
-        networks:
-            - default
-    mosquitto:
-        hostname: mosquitto
-        build:
-            context: .
-            dockerfile: Dockerfile.mosquitto.yml
-        container_name: mosquitto-test
-        ports:
-            - "1884:1884"
-        networks:
-            - default
-    influx-logger:
-        hostname: influx-logger
-        build:
-            context: .
-            dockerfile: Dockerfile.influx-logger.yml
-        container_name: influx-logger-test
-        volumes:
-            - ./configuration.json:/app/config.json:ro
-            - ./cache:/app/cache:rw
-        depends_on:
-            - influxdb2
-            - mosquitto
         networks:
             - default
 secrets:

@@ -27,7 +27,7 @@ class Connection(ABC):
         full_link: str = f"{self.url}:{self.port}"
         '''Full link for influx connection is <protocol>://<url>:<port>'''
         if "http" not in full_link:
-            full_link += "http://" + full_link
+            full_link = "http://" + full_link
         return full_link
 
     @abstractmethod

@@ -198,3 +198,6 @@ repomix-output.xml
 
 # Services
 *.service
+
+# Non example evironment files
+.env.influxdb2
