@@ -51,7 +51,7 @@ class MQTTConnection(Connection):
             logger.info(f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}")
             self._connected = True
             self._connecting = False
-            #self.__subscribe_topics()
+            self.__subscribe_topics()
         self.__notify_state_change()
 
     def on_disconnect(self, client, _userdata, reason_code, properties=None) -> None:

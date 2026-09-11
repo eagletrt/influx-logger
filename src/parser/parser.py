@@ -79,7 +79,7 @@ class Parser(Thread):
         try:
             version = self.device_versions[key][library]
         except KeyError:
-            logger.error(f"parser: Device '{key}' with library '{library.__name__}' not found in device versions. Skipping")
+            logger.error(f"parser: Device '{key}' with library '{library.__name__}' not found in device versions. Skipping.")
             return
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
         if network not in self.protobuf_manager.version_descriptors.get(version, {}):
