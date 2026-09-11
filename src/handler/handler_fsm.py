@@ -85,7 +85,7 @@ class HandlerFSM(Thread, StateMachine):
         and the log_on_mqtt configuration is set. It publishes a message containing the current state of the FSM to the specified MQTT topic.
         """
         msg = f"{self.current_state}"
-        if self.config.log_on_mqtt and self.handler.mqtt and self.handler.mqtt.is_connected():
+        if self.config and self.config.log_on_mqtt and self.handler and self.handler.mqtt and self.handler.mqtt.is_connected():
             try:
                 result = self.handler.mqtt.connection.publish(
                     topic=self.config.log_on_mqtt,
