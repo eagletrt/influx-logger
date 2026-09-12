@@ -31,7 +31,7 @@ class InfluxReader(InfluxManager):
         logger.info("InfluxReader: Thread started for query processing.")
         while not self.stopped():
             try:
-                # 1 second timout to avoid blocking the check of self.stopped()
+                # 1 second timeout to avoid blocking the check of self.stopped()
                 vehicle_id, device_id, transaction_id, payload = self.query_queue.get(timeout=1.0)
                 self._process_query(vehicle_id, device_id, transaction_id, payload)
             except Empty:
@@ -47,11 +47,15 @@ class InfluxReader(InfluxManager):
             start_time = req_data.get("start")
             stop_time = req_data.get("stop")
 
+            logger.info(f"InfluxReader: Query {transaction_id} - Start: {start_time}, Stop: {stop_time}")
+
             if not start_time or not stop_time:
                 raise ValueError("JSON Payload invalid: 'start' and 'stop' are mandatory.")
 
             start_ns = int(start_time) * 1000
             stop_ns = int(stop_time) * 1000
+
+            logger.info(f"InfluxReader: Query {transaction_id} - Converted Start: {start_ns}, Stop: {stop_ns}")
 
             flux_query = f'''
                 from(bucket: "{self.log_bucket}")
