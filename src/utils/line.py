@@ -1,7 +1,7 @@
 from typing import Any
 from influxdb_client import Point
 
-from src.utils.logger_utils import logger
+#from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision, INFLUX_INT64_MAX, TIMESTAMP_KEYS
 
 class Line:

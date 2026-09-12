@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 
-
 class _TraceLevel:
     TRACE = 5
 

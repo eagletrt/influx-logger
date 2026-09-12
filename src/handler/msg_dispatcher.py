@@ -1,5 +1,5 @@
 from typing import Callable
-from re import Pattern, compile, sub
+from re import Pattern, compile
 
 from src.utils.logger_utils import logger
 from src.influx.influx_writer import InfluxWriter

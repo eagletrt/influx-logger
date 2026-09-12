@@ -1,6 +1,6 @@
 from typing import Any
 from influxdb_client import Point
-from threading import Condition, Event, Thread, Lock
+from threading import Condition, Thread, Lock
 
 from src.utils.line import Line
 from src.utils.logger_utils import logger
