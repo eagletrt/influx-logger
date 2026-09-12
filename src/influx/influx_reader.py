@@ -64,10 +64,12 @@ class InfluxReader(InfluxManager):
             '''
 
             tables = self.query_api.query(flux_query, org=self.client.org)
-
+            logger.info(f"InfluxReader: Query {transaction_id} returned {len(tables)} tables.")
             for table in tables:
+                logger.info(f"InfluxReader: Processing table with {len(table.records)} records.")
                 records = table.records
                 if not records:
+                    logger.warning(f"InfluxReader: Table with no records found for query {transaction_id}.")
                     continue
 
                 network_name = records[0].values.get("network", "unknown")
@@ -75,9 +77,7 @@ class InfluxReader(InfluxManager):
 
                 antenna = records[0].values.get("antenna_name")
                 if antenna:
-
                     network_name = antenna
-
                     measurement_name = f"{antenna}_{measurement_name}"
 
                 columns_set = set()
