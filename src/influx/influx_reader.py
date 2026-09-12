@@ -4,7 +4,6 @@ import io
 import gzip
 
 from queue import Queue, Empty
-from datetime import datetime
 
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
@@ -32,7 +31,7 @@ class InfluxReader(InfluxManager):
         logger.info("InfluxReader: Thread started for query processing.")
         while not self.stopped():
             try:
-                # Timeout di 1 secondo per non bloccare il controllo di self.stopped()
+                # 1 second timout to avoid blocking the check of self.stopped()
                 vehicle_id, device_id, transaction_id, payload = self.query_queue.get(timeout=1.0)
                 self._process_query(vehicle_id, device_id, transaction_id, payload)
             except Empty:
@@ -41,7 +40,7 @@ class InfluxReader(InfluxManager):
                 logger.error(f"InfluxReader: Error in main loop: {e}")
 
     def _process_query(self, vehicle_id: str, device_id: str, transaction_id: str, payload: bytes) -> None:
-        logger.info(f"InfluxReader: Inizio elaborazione query {transaction_id} per {vehicle_id}/{device_id}")
+        logger.info(f"InfluxReader: Starting query {transaction_id} for {vehicle_id}/{device_id}")
         
         try:
             req_data = json.loads(payload.decode('utf-8'))
@@ -49,7 +48,7 @@ class InfluxReader(InfluxManager):
             stop_time = req_data.get("stop")
 
             if not start_time or not stop_time:
-                raise ValueError("Payload JSON non valido: 'start' e 'stop' sono obbligatori.")
+                raise ValueError("JSON Payload invalid: 'start' and 'stop' are mandatory.")
 
             start_ns = int(start_time) * 1000
             stop_ns = int(stop_time) * 1000
@@ -65,10 +64,12 @@ class InfluxReader(InfluxManager):
             '''
 
             tables = self.query_api.query(flux_query, org=self.client.org)
-
+            logger.info(f"InfluxReader: Query {transaction_id} returned {len(tables)} tables.")
             for table in tables:
+                logger.info(f"InfluxReader: Processing table with {len(table.records)} records.")
                 records = table.records
                 if not records:
+                    logger.warning(f"InfluxReader: Table with no records found for query {transaction_id}.")
                     continue
 
                 network_name = records[0].values.get("network", "unknown")
@@ -76,9 +77,7 @@ class InfluxReader(InfluxManager):
 
                 antenna = records[0].values.get("antenna_name")
                 if antenna:
-
                     network_name = antenna
-
                     measurement_name = f"{antenna}_{measurement_name}"
 
                 columns_set = set()
@@ -126,13 +125,13 @@ class InfluxReader(InfluxManager):
                 topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{network_name}--{measurement_name.lower()}"
                 
                 self.mqtt.connection.publish(topic_out, compressed_content, qos=0)  
-                logger.info(f"InfluxReader: Inviato CSV compresso per '{network_name}--{measurement_name.lower()}' ({len(records)} righe).")
+                logger.info(f"InfluxReader: Sent compressed CSV for '{network_name}--{measurement_name.lower()}' ({len(records)} rows).")
 
             eof_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/eof"
-            self.mqtt.connection.publish(eof_topic, b"", qos=0)  # <-- Aggiunto .connection
-            logger.info(f"InfluxReader: Query {transaction_id} completata (inviato EOF).")
+            self.mqtt.connection.publish(eof_topic, b"", qos=0)  # <-- Added .connection
+            logger.info(f"InfluxReader: Query {transaction_id} completed (EOF sent).")
 
         except Exception as e:
-            logger.error(f"InfluxReader: Errore durante la query {transaction_id}: {e}")
+            logger.error(f"InfluxReader: Error during query {transaction_id}: {e}")
             error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/error"
             self.mqtt.connection.publish(error_topic, json.dumps({"error": str(e)}).encode('utf-8'), qos=0)  
