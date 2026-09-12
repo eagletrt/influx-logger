@@ -49,8 +49,7 @@ class Parser(Thread):
             parsed_message = self.parse_msg(message)
         if parsed_message is None:
             return
-        with self.__destination_list_lock:
-            self.destination_list.append(parsed_message)
+        self.__append_to_destination_list(parsed_message)
     
     def parse_msg(self, msg: tuple[list[str], bytes]) -> Point:
         """

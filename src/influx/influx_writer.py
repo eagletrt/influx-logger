@@ -137,9 +137,7 @@ class InfluxWriter(InfluxManager):
         Returns:
             bool: True if the number of points in the parser has reached or exceeded the batch size limit, False otherwise.
         '''
-        return self.is_list_limit_reached(
-            self.parser.get_points_count()
-            )
+        return self.is_list_limit_reached(self.parser.get_points_count())
     
     def run(self) -> None:
         try:
