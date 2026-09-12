@@ -39,8 +39,8 @@ INFLUX_INT64_MAX: int = 2**63 - 1
 TIMESTAMP_KEYS: list[str] = [
     "inner_timestamp",
     "_inner_timestamp", 
-    "_innerTimestamp", 
     "_timestamp", 
     "timestamp", 
+    "_innerTimestamp", 
     "innerTimestamp"
 ]
