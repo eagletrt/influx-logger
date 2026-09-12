@@ -67,6 +67,8 @@ class InfluxReader(InfluxManager):
                 |> group(columns: ["network", "_measurement"])
             '''
 
+            logger.info(f"InfluxReader: Query {transaction_id} - Executing Flux query:\n{flux_query}")
+
             tables = self.query_api.query(flux_query, org=self.client.org)
             logger.info(f"InfluxReader: Query {transaction_id} returned {len(tables)} tables.")
             for table in tables:
