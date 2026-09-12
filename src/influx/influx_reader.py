@@ -52,8 +52,8 @@ class InfluxReader(InfluxManager):
             if not start_time or not stop_time:
                 raise ValueError("JSON Payload invalid: 'start' and 'stop' are mandatory.")
 
-            start_ns = int(start_time) * 1000
-            stop_ns = int(stop_time) * 1000
+            start_ns = int(start_time) * 1_000_000_000
+            stop_ns = int(stop_time) * 1_000_000_000
 
             logger.info(f"InfluxReader: Query {transaction_id} - Converted Start: {start_ns}, Stop: {stop_ns}")
 
