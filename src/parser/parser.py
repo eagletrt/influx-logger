@@ -1,6 +1,6 @@
 from typing import Any
 from influxdb_client import Point
-from threading import Condition, Thread, Lock
+from threading import Condition, Thread, Lock, Timer
 
 from src.utils.line import Line
 from src.utils.logger_utils import logger
@@ -8,6 +8,25 @@ from src.utils.timestamp import TIMESTAMP_KEYS
 from src.parser.protobuf_manager import ProtobufManager, LibcanManager, LibgpsManager
 
 class Parser(Thread):
+    '''
+    A parser for processing incoming messages and converting them into InfluxDB points.
+
+    Attributes:
+        excluded_networks (list[str]): A list of network identifiers to be excluded from parsing.
+        protobuf_manager (ProtobufManager): An instance of ProtobufManager to handle .proto descriptor management and message decoding.
+        device_versions (dict[str, dict[type, str]]): A dictionary to store device versions, where the key is a combination of vehicle_id and device_id, and the value is a dictionary mapping library types to their respective versions.
+        row_messages (list[tuple[list[str], bytes]]): A list to store incoming messages, where each message is a tuple containing a list of identifiers and a bytes payload.
+        __row_message_lock (Lock): A lock to synchronize access to the row_messages list, ensuring thread safety when adding or removing messages.
+        destination_list (list[Point]): A list to store parsed InfluxDB Point objects, which are the result of parsing incoming messages.
+        __destination_list_lock (Lock): A lock to synchronize access to the destination_list, ensuring thread safety when adding parsed points.
+        stop (bool): A flag to indicate whether the parser should stop processing messages.
+        row_queue_not_empty (Condition): A condition variable to signal when the row_messages list is not empty, allowing the parser to start processing messages.
+        __new_points_event_lock__ (Lock): A lock to synchronize access to the new points event, ensuring thread safety when signaling that new points have been added to the destination_list.
+        points_increased (Condition): An event to signal when new points have been added to the destination_list, allowing other threads to wait for new points to be available.
+        last_parse_timer (Timer): A timer to track the last time a message was parsed, which can be used for monitoring and debugging purposes.
+    '''
+    TIMER_TIMEOUT: int = 5
+    '''Timeout in seconds indicating how long to wait before the system is considered inactive.'''
     def __init__(self, excluded_networks: list[str] = []) -> None:
         super().__init__(name="Parser")
         self.excluded_networks: list[str] = excluded_networks if excluded_networks is not None else []
@@ -32,6 +51,28 @@ class Parser(Thread):
         '''Lock to synchronize access to the new points event, ensuring thread safety when signaling that new points have been added to the destination_list.'''
         self.points_increased: Condition = Condition(lock=self.__new_points_event_lock__)
         '''Event to signal when new points have been added to the destination_list, allowing other threads to wait for new points to be available.'''
+        self.last_parse_timer: Timer = Timer(Parser.TIMER_TIMEOUT, self._handle_inactivity)
+        '''A timer to track the last time a message was parsed'''
+        self.timer_expired: bool = False
+        '''Flag to indicate whether the last_parse_timer has expired, which can be used for monitoring and debugging purposes.'''
+
+    def _handle_inactivity(self) -> None:
+        """
+        Handles inactivity by logging a warning message when the parser has not processed any messages for a specified timeout period.
+        This method is called when the last_parse_timer expires, indicating that no messages have been parsed within the defined timeout.
+        """
+        with self.__row_message_lock:
+            if len(self.row_messages)  <= 0:
+                with self.__destination_list_lock:
+                    self.timer_expired = True
+                logger.warning(f"parser: No messages have been parsed for {Parser.TIMER_TIMEOUT} seconds.")
+                with self.__new_points_event_lock__:
+                    self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+            else:
+                logger.warning(f"parser: Messages are still being processed. Resetting the inactivity timer for {Parser.TIMER_TIMEOUT} seconds.")
+                with self.__destination_list_lock:
+                    self.timer_expired = False
+                self.timer_touch()  # Reset the timer if there are still messages in the queue
 
     def add_to_queue(self, message: tuple[list[str], bytes]) -> None:
         with self.__row_message_lock:
@@ -113,6 +154,26 @@ class Parser(Thread):
         #logger.info(f"parser: Committing message content for network '{network}' with version {version}: {message_content}")
         self.commit(message_content, message_content, tags)
 
+    def timer_touch(self) -> None:
+        """
+        Resets the last_parse_timer to prevent it from expiring due to inactivity.
+        This method should be called whenever a new message is parsed, indicating that the parser is active.
+        """
+        if self.last_parse_timer is not None:
+            self.last_parse_timer.cancel()  # Cancel the existing timer
+        self.last_parse_timer = Timer(Parser.TIMER_TIMEOUT, self._handle_inactivity)  # Create a new timer instance
+        self.last_parse_timer.start()  # Start or restart the timer whenever a new message is parsed
+
+    def reset_timer(self) -> None:
+        """
+        Resets the last_parse_timer to prevent it from expiring due to inactivity.
+        This method should be called whenever a new message is parsed, indicating that the parser is active.
+        """
+        with self.__row_message_lock:
+            self.timer_expired = False  # Reset the timer_expired flag to indicate that the parser is active
+            if self.last_parse_timer is not None:
+                self.last_parse_timer.cancel()  # Cancel the existing timer
+
     def __append_to_destination_list(self, line: Line) -> None:
         """
         Appends a Line object to the destination list in a thread-safe manner.
@@ -121,6 +182,7 @@ class Parser(Thread):
         """
         with self.__destination_list_lock:
             self.destination_list.append(line)
+            self.timer_touch()
         with self.__new_points_event_lock__:
             self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
 

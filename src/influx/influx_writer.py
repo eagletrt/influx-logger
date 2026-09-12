@@ -72,6 +72,7 @@ class InfluxWriter(InfluxManager):
         Returns:
             bool: True if the commit was successful, False otherwise.
         '''
+        self.parser.reset_timer()  # Reset the parser's timer to prevent it from expiring due to inactivity
         points: list[Point] = self.prepare_for_commit()
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
@@ -137,7 +138,7 @@ class InfluxWriter(InfluxManager):
         Returns:
             bool: True if the number of points in the parser has reached or exceeded the batch size limit, False otherwise.
         '''
-        return self.is_list_limit_reached(self.parser.get_points_count())
+        return self.is_list_limit_reached(self.parser.get_points_count()) or self.parser.timer_expired
     
     def run(self) -> None:
         try:
