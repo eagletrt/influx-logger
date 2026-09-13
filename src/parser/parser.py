@@ -181,6 +181,7 @@ class Parser(Thread):
             line (Line): The Line object to be appended to the destination list.
         """
         with self.__destination_list_lock:
+            #logger.info(f"parser: Appending line to destination list: {line}")
             self.destination_list.append(line)
             self.timer_touch()
         with self.__new_points_event_lock__:
@@ -256,10 +257,10 @@ class Parser(Thread):
             #logger.info(f"parser: Line: {line}")
             self.__append_to_destination_list(line)
         elif isinstance(record, str):
-            logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
+            #logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
             return
         else:
-            logger.warning(f"Handler: Invalid tags received from device for measurement '{measurement}', type: {type(record)}.")
+            logger.warning(f"Handler: Invalid record received from device for measurement '{measurement}', type: {type(record)}.")
             return
 
     @staticmethod
