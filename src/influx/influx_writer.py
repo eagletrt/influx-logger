@@ -137,7 +137,7 @@ class InfluxWriter(InfluxManager):
             lines_str: str = "\n".join(points_str)
         except Exception as e:
             logger.error(f"influx_writer: Failed to pack lines: {e}", exc_info=True)
-            logger.debug(f"influx_writer: Lines that failed to pack: {lines}")
+            logger.error(f"influx_writer: Lines that failed to pack: {lines}")
             lines_str = ""
         record: str = ""
         for line in lines_str.splitlines():
