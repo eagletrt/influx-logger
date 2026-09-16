@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from influxdb_client import Point
 
@@ -108,6 +109,8 @@ class Line:
         for key, value in self.tags.items():
             point.tag(key, value)
         for field, value in self.fields.items():
+            if isinstance(value, (dict, list, tuple)):
+                value = json.dumps(value, separators=(",", ":"), default=str)
             point.field(field, value)
         normalized_timestamp = self._normalize_timestamp(self.timestamp, timestamp_precision)
         point.time(normalized_timestamp, write_precision=timestamp_precision)
