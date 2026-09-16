@@ -50,3 +50,15 @@ class TestLine(TestCase):
         self.assertIsInstance(point.fields["float_field"], float)
         self.assertTrue(point.fields["bool_field"])
         self.assertIsInstance(point.fields["bool_field"], bool)
+
+    def test_to_point_serializes_nested_field_values(self):
+        line = Line(
+            measurement="sample",
+            tags={},
+            fields={"group_mux1": {"channel": 2, "enabled": True}},
+            timestamp=123,
+        )
+
+        point = line.to_point()
+
+        self.assertEqual(point.fields["group_mux1"], '{"channel":2,"enabled":true}')
