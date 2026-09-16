@@ -1,6 +1,7 @@
 from threading import Condition, Lock
 from influxdb_client.client.write_api import WriteOptions, WriteApi, Point, SYNCHRONOUS
 
+from src.parser.parser import Line
 from src.parser.parser import Parser
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
@@ -120,10 +121,24 @@ class InfluxWriter(InfluxManager):
             str: A string representation of the packed points, where each point is converted to its line protocol format and separated by newlines.
         """
         valid_lines: list = [line for line in lines if line is not None]
-        lines_str: str = "\n".join([
-            line.to_point(timestamp_precision=timestamp_precision).to_line_protocol()
-            for line in valid_lines
-        ])
+        try:
+            points_str: list = []
+            for line in valid_lines:
+                if line is not None:
+                    if not isinstance(line, Point):
+                        if isinstance(line, dict):
+                            line: Point = Point.from_dict(line)
+                        elif isinstance(line, Line):
+                            line: Point = line.to_point()
+                        else:
+                            logger.warning(f"influx_writer: Invalid line type: {type(line)}. Expected Point or dict. Skipping line: {line}")
+                            continue
+                    points_str.append(line.to_line_protocol())
+            lines_str: str = "\n".join(points_str)
+        except Exception as e:
+            logger.error(f"influx_writer: Failed to pack lines: {e}", exc_info=True)
+            logger.debug(f"influx_writer: Lines that failed to pack: {lines}")
+            lines_str = ""
         record: str = ""
         for line in lines_str.splitlines():
             line_segments: list = line.split(" ")
