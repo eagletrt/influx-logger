@@ -132,8 +132,8 @@ class InfluxWriter(InfluxManager):
                             line: Point = line.to_point()
                         else:
                             logger.warning(f"influx_writer: Invalid line type: {type(line)}. Expected Point or dict. Skipping line: {line}")
-                            continue
-                    points_str.append(line.to_line_protocol())
+                    if isinstance(line, Point):
+                        points_str.append(line.to_line_protocol())
             lines_str: str = "\n".join(points_str)
         except Exception as e:
             logger.error(f"influx_writer: Failed to pack lines: {e}", exc_info=True)
