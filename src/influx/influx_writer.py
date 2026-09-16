@@ -123,15 +123,15 @@ class InfluxWriter(InfluxManager):
         valid_lines: list = [line for line in lines if line is not None]
         try:
             points_str: list = []
-            for line in valid_lines:
-                if line is not None:
-                    if isinstance(line, dict):
-                        line: Point = Point.from_dict(line)
-                    elif isinstance(line, Line):
-                        line: Point = line.to_point()
+            for point in valid_lines:
+                if point is not None:
+                    if isinstance(point, dict):
+                        point: Point = Point.from_dict(point)
+                    elif isinstance(point, Line):
+                        point: Point = point.to_point()
                     else:
-                        logger.warning(f"influx_writer: Invalid line type: {type(line)}. Expected Point or dict. Skipping line: {line}")
-                    if isinstance(line, Point):
+                        logger.warning(f"influx_writer: Invalid line type: {type(point)}. Expected Point or dict. Skipping line: {point}")
+                    if isinstance(point, Point):
                         points_str.append(line.to_line_protocol())
             lines_str: str = "\n".join(points_str)
         except Exception as e:
