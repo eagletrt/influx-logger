@@ -27,13 +27,27 @@ def main(argv=None):
     #    logger.error(f"Failed to load configuration from {conf}: {e}")
     #    sys.exit(1)
     logger.info(f"Configuration loaded from {conf}: {configuration}")
-    try:
-        handler:HandlerFSM = HandlerFSM(configuration)
-        handler.start()
-        handler.join()
-    except KeyboardInterrupt:
-        logger.info("Ctrl+C received, stopping handler")
-        safe_stop(handler)
+    stop: bool = False
+    '''
+    Flag to restart in case of unexpected error.
+    '''
+    while not stop:
+        stop = True
+        try:
+            handler:HandlerFSM = HandlerFSM(configuration)
+            handler.start()
+            handler.join()
+        except KeyboardInterrupt:
+            logger.info("Ctrl+C received, stopping handler")
+            safe_stop(handler)
+        except Exception as e:
+            logger.error(f"HandlerFSM encountered an error: {e}")
+            try:
+                handler.stop_machine()
+                handler.join()
+            except Exception:
+                pass
+            stop = False
 
 def print_fsm():
     """
