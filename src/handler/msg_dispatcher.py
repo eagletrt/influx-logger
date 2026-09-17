@@ -66,9 +66,12 @@ class MsgDispatcher:
             return
         # Subscribe to the relevant topics to receive existing messages
         for topic in self.topic_callbacks.keys():
-            self.mqtt.connection.subscribe(topic)
-            logger.info(f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages")
-        
+            try:
+                self.mqtt.connection.subscribe(topic)
+                logger.info(f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages")
+            except Exception as e:
+                logger.error(f"msg_dispatcher: Failed to subscribe to topic '{topic}': {e}")
+
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
         Handles incoming MQTT messages by dispatching them to the appropriate handler based on the topic.
