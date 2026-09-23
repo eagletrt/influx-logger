@@ -69,7 +69,7 @@ class Parser(Thread):
                 with self.__new_points_event_lock__:
                     self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
             else:
-                logger.warning(f"parser: Messages are still being processed. Resetting the inactivity timer for {Parser.TIMER_TIMEOUT} seconds.")
+                #logger.warning(f"parser: Messages are still being processed. Resetting the inactivity timer for {Parser.TIMER_TIMEOUT} seconds.")
                 with self.__destination_list_lock:
                     self.timer_expired = False
                 self.timer_touch()  # Reset the timer if there are still messages in the queue
@@ -83,11 +83,12 @@ class Parser(Thread):
         with self.row_queue_not_empty:
             while len(self.row_messages) == 0 and not self.stop:
                 self.row_queue_not_empty.wait()
-        if self.stop:
-            return
-        with self.__row_message_lock:
+            if self.stop:
+                return
             message = self.row_messages.pop(0)
-            parsed_message = self.parse_msg(message)
+            if len(self.row_messages) == 0:
+                self.row_queue_not_empty.notify_all()
+        parsed_message = self.parse_msg(message)
         if parsed_message is None:
             return
         self.__append_to_destination_list(parsed_message)
@@ -310,18 +311,21 @@ class Parser(Thread):
         """
         Method to gracefully stop the parser. It sets the stop flag to True, which will signal the run method to exit its loop and stop the thread.
         """
-        cond: Condition = Condition(lock=self.__row_message_lock)
-        while len(self.row_messages) > 0:
-            cond.wait()
-        self.stop_parser()
+        with self.row_queue_not_empty:
+            while len(self.row_messages) > 0:
+                self.row_queue_not_empty.wait()
+            self.stop = True
+            self.row_queue_not_empty.notify_all()
+        with self.__new_points_event_lock__:
+            self.points_increased.notify_all()
     
     def stop_parser(self) -> None:
         '''
         Method to stop the parser thread. It sets the stop flag to True and notifies the parser thread to wake up and check the stop condition. This allows the parser to exit its loop and stop processing messages.
         If you want to stop the parser gracefully, use the `graceful_stop` method instead, which will wait for the message queue to be empty before stopping.
         '''
-        self.stop = True
         with self.row_queue_not_empty:
+            self.stop = True
             self.row_queue_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
         with self.__new_points_event_lock__:
             self.points_increased.notify_all()  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
