@@ -60,8 +60,10 @@ class MQTTConnection(Connection):
             if client is not self.connection:
                 logger.debug(f"mqtt-connection: Ignoring on_disconnect from stale client at {self.url}:{self.port}")
                 return
-            logger.info(f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}")
-            self.connection = None
+            logger.warning(
+                f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} "
+                f"with reason code {reason_code} ({mqtt.error_string(reason_code)})"
+            )
             self._connecting = False
             self._connected = False
         self.__notify_state_change()
@@ -106,10 +108,14 @@ class MQTTConnection(Connection):
                 client = mqtt.Client()
                 self.connection = client
                 self._connecting = True
-                client.enable_logger(logger)
+                if hasattr(client, "enable_logger"):
+                    client.enable_logger(logger)
                 if self.username and self.password:
                     client.username_pw_set(self.username, self.password)
+                if self.port == 8883:
                     client.tls_set()  # Enable TLS for secure connection
+                if hasattr(client, "reconnect_delay_set"):
+                    client.reconnect_delay_set(min_delay=1, max_delay=60)
                 client.on_connect = self.on_connect
                 client.on_disconnect = self.on_disconnect
                 client.on_message = self.on_message
