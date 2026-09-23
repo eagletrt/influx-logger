@@ -266,3 +266,32 @@ class TestMsgDispatcher(TestCase):
             self.assertTrue(connection.is_connected())
         finally:
             mqtt_module.mqtt.Client = original_client
+
+    def test_mqtt_connection_cleans_up_client_when_connect_fails(self):
+        import src.connections.mqtt_connection as mqtt_module
+
+        original_client = mqtt_module.mqtt.Client
+        cleanup_calls = []
+
+        class Client:
+            def enable_logger(self, logger):
+                return None
+
+            def connect(self, *args, **kwargs):
+                raise OSError("broker unavailable")
+
+            def loop_stop(self):
+                cleanup_calls.append("loop_stop")
+
+            def disconnect(self):
+                cleanup_calls.append("disconnect")
+
+        mqtt_module.mqtt.Client = Client
+        try:
+            connection = MQTTConnection(url="broker", port=1883)
+            self.assertFalse(connection.connect())
+            self.assertFalse(connection.is_connected())
+        finally:
+            mqtt_module.mqtt.Client = original_client
+
+        self.assertEqual(cleanup_calls, ["loop_stop", "disconnect"])
