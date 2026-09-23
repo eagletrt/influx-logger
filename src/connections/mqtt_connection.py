@@ -101,21 +101,29 @@ class MQTTConnection(Connection):
                 except Exception:
                     pass
                 self.connection = None
+            client = None
             try:
-                self.connection = mqtt.Client()
+                client = mqtt.Client()
+                self.connection = client
                 self._connecting = True
-                self.connection.enable_logger(logger)
+                client.enable_logger(logger)
                 if self.username and self.password:
-                    self.connection.username_pw_set(self.username, self.password)
-                    self.connection.tls_set()  # Enable TLS for secure connection
-                self.connection.on_connect = self.on_connect
-                self.connection.on_disconnect = self.on_disconnect
-                self.connection.on_message = self.on_message
+                    client.username_pw_set(self.username, self.password)
+                    client.tls_set()  # Enable TLS for secure connection
+                client.on_connect = self.on_connect
+                client.on_disconnect = self.on_disconnect
+                client.on_message = self.on_message
                 logger.info(f"mqtt-connection: Attempting to connect to MQTT broker at {self.url}:{self.port}")
-                self.connection.connect(host=self.url, port=self.port)
-                self.connection.loop_start()
+                client.connect(host=self.url, port=self.port)
+                client.loop_start()
                 logger.info(f"mqtt-connection: Connection attempt to MQTT broker at {self.url}:{self.port} initiated")
             except Exception as e:
+                if client is not None:
+                    try:
+                        client.loop_stop()
+                        client.disconnect()
+                    except Exception:
+                        pass
                 self.connection = None
                 self._connecting = False
                 self._connected = False
