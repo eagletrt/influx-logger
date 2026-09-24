@@ -1,7 +1,7 @@
-from asyncio.log import logger
 import sys
-from pathlib import Path
+from asyncio.log import logger
 from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 from unittest import FunctionTestCase, TestLoader, TestSuite, TextTestRunner
 
 ROOT_DIR = Path(__file__).resolve().parents[1]

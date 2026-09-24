@@ -2,8 +2,8 @@ import threading
 
 import paho.mqtt.client as mqtt
 
-from src.utils.logger_utils import logger
 from src.connections.connection import Connection
+from src.utils.logger_utils import logger
 
 
 class MQTTConnection(Connection):

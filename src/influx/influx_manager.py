@@ -1,8 +1,8 @@
 from abc import ABC
 from threading import Lock, Thread
 
-from src.utils.timestamp import TimestampPrecision
 from src.connections.influx_connection import InfluxConnection
+from src.utils.timestamp import TimestampPrecision
 
 
 class InfluxManager(Thread, ABC):

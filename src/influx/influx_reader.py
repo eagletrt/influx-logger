@@ -1,15 +1,14 @@
-import json
 import csv
-import io
 import gzip
+import io
+import json
+from queue import Empty, Queue
 
-from queue import Queue, Empty
-
-from src.utils.logger_utils import logger
-from src.utils.timestamp import TimestampPrecision
-from src.influx.influx_manager import InfluxManager
 from src.connections.influx_connection import InfluxConnection
 from src.connections.mqtt_connection import MQTTConnection
+from src.influx.influx_manager import InfluxManager
+from src.utils.logger_utils import logger
+from src.utils.timestamp import TimestampPrecision
 
 
 class InfluxReader(InfluxManager):

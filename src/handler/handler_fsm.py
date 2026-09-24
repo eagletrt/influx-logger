@@ -1,16 +1,17 @@
-from threading import Thread, Condition
-from statemachine import StateMachine, State
+from threading import Condition, Thread
+
+from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 
-# Info about FSM at https://github.com/fgmacedo/python-statemachine
-
-from src.utils.logger_utils import logger
-from src.utils.configuration import Configuration
-from src.influx.influx_writer import InfluxWriter
-from src.influx.influx_reader import InfluxReader
-from src.handler.msg_dispatcher import MsgDispatcher
-from src.parser.protobuf_manager import LibcanManager
 from src.connections.connection_handler import ConnectionHandler
+from src.handler.msg_dispatcher import MsgDispatcher
+from src.influx.influx_reader import InfluxReader
+from src.influx.influx_writer import InfluxWriter
+from src.parser.protobuf_manager import LibcanManager
+from src.utils.configuration import Configuration
+
+# Info about FSM at https://github.com/fgmacedo/python-statemachine
+from src.utils.logger_utils import logger
 
 
 class HandlerFSM(Thread, StateMachine):
@@ -129,34 +130,34 @@ class HandlerFSM(Thread, StateMachine):
         If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
         If neither connection is established, it remains in the idle state and continues to check for both connections.
         """
-        self.log_status(f"on_connection event triggered")
+        self.log_status("on_connection event triggered")
 
     def on_disconnection(self):
         """
         Event triggered when a disconnection occurs. It checks if both connections are still established and transitions to the appropriate state.
         If both connections are still established, it remains in the running state. If one or both connections are lost, it transitions to the idle state and continues to check for both connections.
         """
-        self.log_status(f"on_disconnection event triggered")
+        self.log_status("on_disconnection event triggered")
         self.msg_dispatcher.stop()
 
     def on_finish(self):
         """
         Event triggered when the finish event is called. It transitions to the final state and performs any necessary cleanup operations.
         """
-        self.log_status(f"on_finish event triggered")
+        self.log_status("on_finish event triggered")
 
     def on_enter_starting(self):
         """
         Method called when entering the start state. It initializes the connections and prepares the handler for operation.
         """
-        self.log_status(f"Entering start state")
+        self.log_status("Entering start state")
 
     def on_enter_idling(self):
         """
         Method called when entering the idle state. It starts the connections and waits for both connections to be established before transitioning to the running state.
         If both connections are not established, it remains in the idle state and continues to check for both connections.
         """
-        self.log_status(f"Entering idle state")
+        self.log_status("Entering idle state")
         self.do_idle()
 
     def on_enter_running(self):
@@ -164,7 +165,7 @@ class HandlerFSM(Thread, StateMachine):
         Method called when entering the running state. It starts the handler's main operation, which involves processing incoming data and logging it to InfluxDB.
         If either connection is lost while in the running state, it transitions back to the idle state and continues to check for both connections.
         """
-        self.log_status(f"Entering running state")
+        self.log_status("Entering running state")
         # Set the InfluxWriter and MQTT connection in the MsgDispatcher
         self.msg_dispatcher.set(
             influx_writer=InfluxWriter(
@@ -186,7 +187,7 @@ class HandlerFSM(Thread, StateMachine):
         """
         Method called when entering the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
         """
-        self.log_status(f"Entering stop state")
+        self.log_status("Entering stop state")
         self.do_stop()
 
     def do_start(self):

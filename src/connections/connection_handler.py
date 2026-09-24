@@ -18,7 +18,7 @@ class ConnectionHandler:
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(ConnectionHandler, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self,

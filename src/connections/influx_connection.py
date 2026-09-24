@@ -1,8 +1,9 @@
-from threading import Thread, Event
+from threading import Event, Thread
+
 from influxdb_client import InfluxDBClient
 
-from src.utils.logger_utils import logger
 from src.connections.connection import Connection
+from src.utils.logger_utils import logger
 
 
 class InfluxConnection(Connection):
@@ -209,7 +210,7 @@ class InfluxConnection(Connection):
                     "influx-connection: Ping returned None, indicating a potential issue with the connection."
                 )
                 return False
-        except Exception as e:
+        except Exception:
             # Check weather InfluxDB is up
             health_api = self.connection.health()
             if health_api.status == "pass":
@@ -260,5 +261,5 @@ class ConnectionChecker(Thread):
         self._stop_event.set()
         try:
             self.join()  # Wait for the thread to finish
-        except Exception as e:
+        except Exception:
             pass

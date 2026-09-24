@@ -1,17 +1,17 @@
-from abc import ABC, abstractmethod
 import json
 import os
 import sys
-
-from typing import Any
-from requests import get
-from types import ModuleType
-from grpc_tools import protoc
-from google.protobuf import json_format
+from abc import ABC, abstractmethod
 from importlib.util import spec_from_loader
-from google.protobuf.descriptor_pool import DescriptorPool
+from types import ModuleType
+from typing import Any
+
+from google.protobuf import json_format
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
-from google.protobuf.message_factory import MessageFactory, GetMessageClass
+from google.protobuf.descriptor_pool import DescriptorPool
+from google.protobuf.message_factory import GetMessageClass, MessageFactory
+from grpc_tools import protoc
+from requests import get
 
 from src.utils.logger_utils import logger
 
@@ -422,7 +422,7 @@ class _DecoderWrapper:
             logger.info(f"protobuf_manager: Using cache directory '{cache}'")
         except Exception:
             logger.error(
-                f"protobuf_manager: Invalid lib_manager provided. It must have a CACHE_DIR attribute."
+                "protobuf_manager: Invalid lib_manager provided. It must have a CACHE_DIR attribute."
             )
             raise
         version_dir = os.path.join(cache, version)
@@ -455,7 +455,7 @@ class _DecoderWrapper:
                 f"--descriptor_set_out={descriptor_set_file}",
                 "--include_imports", proto_file
             ])
-        except Exception as e:
+        except Exception:
             logger.error(
                 f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}'"
             )

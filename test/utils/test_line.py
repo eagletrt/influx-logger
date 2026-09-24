@@ -2,7 +2,6 @@ import sys
 from types import ModuleType
 from unittest import TestCase
 
-
 if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
 

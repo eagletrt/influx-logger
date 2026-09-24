@@ -2,7 +2,6 @@ import sys
 from types import ModuleType
 from unittest import TestCase
 
-
 if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
 
@@ -152,8 +151,8 @@ if "google.protobuf" not in sys.modules:
     sys.modules["google.protobuf.descriptor_pb2"] = descriptor_pb2_module
     sys.modules["google.protobuf.message_factory"] = message_factory_module
 
-from src.handler.msg_dispatcher import MsgDispatcher
 from src.connections.mqtt_connection import MQTTConnection
+from src.handler.msg_dispatcher import MsgDispatcher
 
 
 class TestMsgDispatcher(TestCase):
@@ -205,7 +204,6 @@ class TestMsgDispatcher(TestCase):
 
             def subscribe(self, topic, *args, **kwargs):
                 subscribe_calls.append(topic)
-                return None
 
             def loop_start(self):
                 return None

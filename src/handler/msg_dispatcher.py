@@ -1,11 +1,11 @@
-from typing import Callable
+from collections.abc import Callable
 from re import Pattern, compile
 
-from src.utils.logger_utils import logger
-from src.influx.influx_writer import InfluxWriter
-from src.influx.influx_reader import InfluxReader
 from src.connections.mqtt_connection import MQTTConnection
+from src.influx.influx_reader import InfluxReader
+from src.influx.influx_writer import InfluxWriter
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
+from src.utils.logger_utils import logger
 
 
 class MsgDispatcher:
@@ -55,12 +55,12 @@ class MsgDispatcher:
         if self.influx_writer:
             try:
                 self.influx_writer.start()
-            except Exception as e:
+            except Exception:
                 pass
         if self.influx_reader:
             try:
                 self.influx_reader.start()
-            except Exception as e:
+            except Exception:
                 pass
 
     def handle_existing_messages(self) -> None:

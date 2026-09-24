@@ -1,11 +1,12 @@
+from threading import Condition, Lock, Thread, Timer
 from typing import Any
-from influxdb_client import Point
-from threading import Condition, Thread, Lock, Timer
 
+from influxdb_client import Point
+
+from src.parser.protobuf_manager import LibcanManager, LibgpsManager, ProtobufManager
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
-from src.parser.protobuf_manager import ProtobufManager, LibcanManager, LibgpsManager
 
 
 class Parser(Thread):
@@ -153,7 +154,7 @@ class Parser(Thread):
                     return
             except Exception:
                 logger.error(
-                    f"parser: Error while getting proto, skipping message")
+                    "parser: Error while getting proto, skipping message")
                 return
         # Deserialize the payload using the appropriate decoder for the given version and network
         try:
@@ -292,7 +293,7 @@ class Parser(Thread):
             # Create a Line object from the record and add it to the destination list
             try:
                 line: Line = Line.from_object(record, measurement, tags)
-            except Exception as e:
+            except Exception:
                 #logger.error(f"parser: Error creating Line from record for measurement '{measurement}': {e}")
                 return
             #logger.info(f"parser: Line: {line}")
@@ -408,4 +409,4 @@ class Parser(Thread):
         return points
 
 
-__all__ = ["parser", "Parser"]
+__all__ = ["Parser", "parser"]
