@@ -1,3 +1,6 @@
+"""
+Main entry point for the Influx Logger service.
+"""
 import sys
 
 from src.handler.handler_fsm import HandlerFSM
@@ -7,7 +10,8 @@ from src.utils.logger_utils import logger
 
 def safe_stop(handler: HandlerFSM):
     """
-    Safely stops the HandlerFSM instance by transitioning to the final state and waiting for the thread to finish.
+    Safely stops the HandlerFSM instance by transitioning to the final state and 
+    waiting for the thread to finish.
     Args:
         handler (HandlerFSM): The HandlerFSM instance to be stopped.
     """
@@ -17,6 +21,15 @@ def safe_stop(handler: HandlerFSM):
 
 
 def main(argv=None):
+    '''
+    Main function to start the Influx Logger service.
+    It can take an optional command line argument for the configuration file path.
+    If not provided, it defaults to "config.json".
+    Args:
+        argv (list, optional): Command line arguments. Defaults to None.
+    Returns:
+        None
+    '''
     argv = argv or sys.argv
     if len(argv) < 2:
         logger.warning(
@@ -27,13 +40,10 @@ def main(argv=None):
     #try:
     configuration: Configuration = Configuration.load_from_file(conf)
     #except Exception as e:
-    #    logger.error(f"Failed to load configuration from {conf}: {e}")
+    #    logger.error(f"Failed to load configuration from %s: %s", conf, e)
     #    sys.exit(1)
-    logger.info(f"Configuration loaded from {conf}: {configuration}")
+    logger.info("Configuration loaded from %s: %s", conf, configuration)
     stop: bool = False
-    '''
-    Flag to restart in case of unexpected error.
-    '''
     while not stop:
         stop = True
         try:
@@ -44,7 +54,7 @@ def main(argv=None):
             logger.info("Ctrl+C received, stopping handler")
             safe_stop(handler)
         except Exception as e:
-            logger.error(f"HandlerFSM encountered an error: {e}")
+            logger.error(f"HandlerFSM encountered an error: %s", e)
             try:
                 handler.stop_machine()
                 handler.join()
