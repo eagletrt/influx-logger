@@ -158,7 +158,7 @@ class Configuration:
         Returns:
             Configuration: An instance populated with data from the file.
         """
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             data = json.load(file)
 
         mqtt_data = data.get("mqtt", None)
