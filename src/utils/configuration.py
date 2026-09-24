@@ -1,6 +1,7 @@
 import json
 import os
 
+
 class InfluxConfig:
     """
     Configuration for a single InfluxDB connection.
@@ -13,19 +14,17 @@ class InfluxConfig:
         bucket (str): The bucket name in InfluxDB.
     """
 
-    def __init__(
-        self,
-        url: str,
-        port: int,
-        token: str,
-        org: str,
-        buckets: dict[str: str] = {}
-    ):
+    def __init__(self,
+                 url: str,
+                 port: int,
+                 token: str,
+                 org: str,
+                 buckets: dict[str:str] = {}):
         self.url: str = url
         self.port: int = int(port)
         self.token: str = token
         self.org: str = org
-        self.buckets: dict[str: str] = buckets
+        self.buckets: dict[str:str] = buckets
 
     @staticmethod
     def from_dict(data: dict) -> "InfluxConfig":
@@ -44,13 +43,11 @@ class InfluxConfig:
         buckets: dict[str, str] = {}
         for name, bucket in buckets_data.items():
             buckets[name] = bucket
-        return InfluxConfig(
-            url=url,
-            port=port,
-            token=token,
-            org=org,
-            buckets=buckets
-        )
+        return InfluxConfig(url=url,
+                            port=port,
+                            token=token,
+                            org=org,
+                            buckets=buckets)
 
     def to_dict(self) -> dict:
         '''
@@ -69,6 +66,7 @@ class InfluxConfig:
     def __str__(self):
         return json.dumps(self.to_dict(), indent=4)
 
+
 class MQTTConfig:
     """
     Configuration for an MQTT connection.
@@ -80,7 +78,11 @@ class MQTTConfig:
         password (str): The password for MQTT authentication (optional).
     """
 
-    def __init__(self, url: str, port: int, username: str = None, password: str = None):
+    def __init__(self,
+                 url: str,
+                 port: int,
+                 username: str = None,
+                 password: str = None):
         self.url: str = url
         self.port: int = int(port)
         self.username: str = username
@@ -95,12 +97,10 @@ class MQTTConfig:
         Returns:
             MQTTConfig: An instance of MQTTConfig populated with data from the dictionary.
         '''
-        return MQTTConfig(
-            url=data.get("url"),
-            port=data.get("port", 1883),
-            username=data.get("username", None),
-            password=data.get("password", None)
-        )
+        return MQTTConfig(url=data.get("url"),
+                          port=data.get("port", 1883),
+                          username=data.get("username", None),
+                          password=data.get("password", None))
 
     def to_dict(self) -> dict:
         '''
@@ -118,6 +118,7 @@ class MQTTConfig:
     def __str__(self):
         return json.dumps(self.to_dict(), indent=4)
 
+
 class Configuration:
     """
     Holds MQTT connection info plus an arbitrary number of named InfluxDB
@@ -133,15 +134,13 @@ class Configuration:
         }
     """
 
-    def __init__(
-        self,
-        mqtt: MQTTConfig = None,
-        influx: InfluxConfig = None,
-        excluded_networks: list = None,
-        vehicle_whitelist: list = None,
-        github_token: str = None,
-        log_on_mqtt: str = None
-    ):
+    def __init__(self,
+                 mqtt: MQTTConfig = None,
+                 influx: InfluxConfig = None,
+                 excluded_networks: list = None,
+                 vehicle_whitelist: list = None,
+                 github_token: str = None,
+                 log_on_mqtt: str = None):
         self.mqtt: MQTTConfig = mqtt
         self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []
@@ -172,14 +171,13 @@ class Configuration:
 
         influx = InfluxConfig.from_dict(influx_data) if influx_data else None
 
-        return Configuration(
-            mqtt=mqtt,
-            influx=influx,
-            excluded_networks=data.get("excluded_networks", None),
-            vehicle_whitelist=vehicle_whitelist,
-            github_token=github_token,
-            log_on_mqtt=log_on_mqtt
-        )
+        return Configuration(mqtt=mqtt,
+                             influx=influx,
+                             excluded_networks=data.get(
+                                 "excluded_networks", None),
+                             vehicle_whitelist=vehicle_whitelist,
+                             github_token=github_token,
+                             log_on_mqtt=log_on_mqtt)
 
     @staticmethod
     def load_from_env() -> "Configuration":
@@ -197,27 +195,24 @@ class Configuration:
         """
         influx_raw = json.loads(os.getenv("INFLUX", "{}"))
         influx = {
-            name: InfluxConfig.from_dict(cfg) for name, cfg in influx_raw.items()
+            name: InfluxConfig.from_dict(cfg)
+            for name, cfg in influx_raw.items()
         }
-        mqtt = MQTTConfig(
-            url=os.getenv("MQTT_URL", "localhost"),
-            port=int(os.getenv("MQTT_PORT", 1883)),
-            username=os.getenv("MQTT_USERNAME", None),
-            password=os.getenv("MQTT_PASSWORD", None)
-        )
+        mqtt = MQTTConfig(url=os.getenv("MQTT_URL", "localhost"),
+                          port=int(os.getenv("MQTT_PORT", 1883)),
+                          username=os.getenv("MQTT_USERNAME", None),
+                          password=os.getenv("MQTT_PASSWORD", None))
         vehicle_whitelist = json.loads(os.getenv("VEHICLE_WHITELIST", "[]"))
         excluded_networks = json.loads(os.getenv("EXCLUDED_NETWORKS", "[]"))
         github_token = os.getenv("GITHUB_TOKEN", "")
         log_on_mqtt = os.getenv("LOG_ON_MQTT", None)
 
-        return Configuration(
-            mqtt=mqtt,
-            influx=influx,
-            excluded_networks=excluded_networks,
-            vehicle_whitelist=vehicle_whitelist,
-            github_token=github_token,
-            log_on_mqtt=log_on_mqtt
-        )
+        return Configuration(mqtt=mqtt,
+                             influx=influx,
+                             excluded_networks=excluded_networks,
+                             vehicle_whitelist=vehicle_whitelist,
+                             github_token=github_token,
+                             log_on_mqtt=log_on_mqtt)
 
     def __str__(self):
         conf = {

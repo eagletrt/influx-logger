@@ -4,6 +4,7 @@ from src.utils.logger_utils import logger
 from src.handler.handler_fsm import HandlerFSM
 from src.utils.configuration import Configuration
 
+
 def safe_stop(handler: HandlerFSM):
     """
     Safely stops the HandlerFSM instance by transitioning to the final state and waiting for the thread to finish.
@@ -14,15 +15,17 @@ def safe_stop(handler: HandlerFSM):
     handler.stop_machine()
     handler.join()
 
+
 def main(argv=None):
     argv = argv or sys.argv
     if len(argv) < 2:
-        logger.warning("Configuration file path not provided, using default: config.json")
-        conf:str = "config.json"
+        logger.warning(
+            "Configuration file path not provided, using default: config.json")
+        conf: str = "config.json"
     else:
-        conf:str = argv[1]
+        conf: str = argv[1]
     #try:
-    configuration:Configuration = Configuration.load_from_file(conf)
+    configuration: Configuration = Configuration.load_from_file(conf)
     #except Exception as e:
     #    logger.error(f"Failed to load configuration from {conf}: {e}")
     #    sys.exit(1)
@@ -34,7 +37,7 @@ def main(argv=None):
     while not stop:
         stop = True
         try:
-            handler:HandlerFSM = HandlerFSM(configuration)
+            handler: HandlerFSM = HandlerFSM(configuration)
             handler.start()
             handler.join()
         except KeyboardInterrupt:
@@ -49,11 +52,13 @@ def main(argv=None):
                 pass
             stop = False
 
+
 def print_fsm():
     """
     Prints the FSM structure of the HandlerFSM instance.
     """
     HandlerFSM.draw()
+
 
 if __name__ == "__main__":
     #print_fsm()

@@ -7,6 +7,7 @@ from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
 from src.parser.protobuf_manager import ProtobufManager, LibcanManager, LibgpsManager
 
+
 class Parser(Thread):
     '''
     A parser for processing incoming messages and converting them into InfluxDB points.
@@ -27,9 +28,11 @@ class Parser(Thread):
     '''
     TIMER_TIMEOUT: int = 5
     '''Timeout in seconds indicating how long to wait before the system is considered inactive.'''
+
     def __init__(self, excluded_networks: list[str] = []) -> None:
         super().__init__(name="Parser")
-        self.excluded_networks: list[str] = excluded_networks if excluded_networks is not None else []
+        self.excluded_networks: list[
+            str] = excluded_networks if excluded_networks is not None else []
         '''List of network identifiers to be excluded from parsing. Messages from these networks will be ignored.'''
         self.protobuf_manager: ProtobufManager = ProtobufManager()
         '''ProtobufManager instance to handle .proto descriptor management and message decoding.'''
@@ -45,13 +48,16 @@ class Parser(Thread):
         '''Lock to synchronize access to the destination_list, ensuring thread safety when adding parsed points.'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
-        self.row_queue_not_empty: Condition = Condition(lock=self.__row_message_lock)
+        self.row_queue_not_empty: Condition = Condition(
+            lock=self.__row_message_lock)
         '''Condition variable to signal when the row_messages list is not empty, allowing the parser to start processing messages.'''
         self.__new_points_event_lock__: Lock = Lock()
         '''Lock to synchronize access to the new points event, ensuring thread safety when signaling that new points have been added to the destination_list.'''
-        self.points_increased: Condition = Condition(lock=self.__new_points_event_lock__)
+        self.points_increased: Condition = Condition(
+            lock=self.__new_points_event_lock__)
         '''Event to signal when new points have been added to the destination_list, allowing other threads to wait for new points to be available.'''
-        self.last_parse_timer: Timer = Timer(Parser.TIMER_TIMEOUT, self._handle_inactivity)
+        self.last_parse_timer: Timer = Timer(Parser.TIMER_TIMEOUT,
+                                             self._handle_inactivity)
         '''A timer to track the last time a message was parsed'''
         self.timer_expired: bool = False
         '''Flag to indicate whether the last_parse_timer has expired, which can be used for monitoring and debugging purposes.'''
@@ -62,23 +68,30 @@ class Parser(Thread):
         This method is called when the last_parse_timer expires, indicating that no messages have been parsed within the defined timeout.
         """
         with self.__row_message_lock:
-            if len(self.row_messages)  <= 0:
+            if len(self.row_messages) <= 0:
                 with self.__destination_list_lock:
                     self.timer_expired = True
-                logger.warning(f"parser: No messages have been parsed for {Parser.TIMER_TIMEOUT} seconds.")
+                logger.warning(
+                    f"parser: No messages have been parsed for {Parser.TIMER_TIMEOUT} seconds."
+                )
                 with self.__new_points_event_lock__:
-                    self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+                    self.points_increased.notify_all(
+                    )  # Notify any waiting threads that new points have been added to the destination list
             else:
-                logger.warning(f"parser: Messages are still being processed. Resetting the inactivity timer for {Parser.TIMER_TIMEOUT} seconds.")
+                logger.warning(
+                    f"parser: Messages are still being processed. Resetting the inactivity timer for {Parser.TIMER_TIMEOUT} seconds."
+                )
                 with self.__destination_list_lock:
                     self.timer_expired = False
-                self.timer_touch()  # Reset the timer if there are still messages in the queue
+                self.timer_touch(
+                )  # Reset the timer if there are still messages in the queue
 
     def add_to_queue(self, message: tuple[list[str], bytes]) -> None:
         with self.__row_message_lock:
             self.row_messages.append(message)
-            self.row_queue_not_empty.notify_all()  # Notify the parser thread that a new message has been added to the queue
-    
+            self.row_queue_not_empty.notify_all(
+            )  # Notify the parser thread that a new message has been added to the queue
+
     def __parse_next_message(self) -> None:
         with self.row_queue_not_empty:
             while len(self.row_messages) == 0 and not self.stop:
@@ -91,7 +104,7 @@ class Parser(Thread):
         if parsed_message is None:
             return
         self.__append_to_destination_list(parsed_message)
-    
+
     def parse_msg(self, msg: tuple[list[str], bytes]) -> Point:
         """
         Parses a message and returns an InfluxDB Point object.
@@ -100,9 +113,9 @@ class Parser(Thread):
         Returns:
             Point: The parsed InfluxDB Point object.
         """
-        ids:list[str] = msg[0]
+        ids: list[str] = msg[0]
         '''List of identifiers extracted from the message, typically containing vehicle_id, device_id, and network.'''
-        payload:bytes = msg[1]
+        payload: bytes = msg[1]
         '''The payload of the message, which is a bytes object containing the serialized data to be decoded.'''
         vehicle_id, device_id, network = ids
         '''Extracted identifiers from the message, where vehicle_id is the unique identifier for the vehicle, device_id is the unique identifier for the device, and network is the network identifier indicating the source of the message.'''
@@ -111,35 +124,51 @@ class Parser(Thread):
         library: type = LibcanManager if network != "gps" else LibgpsManager
         '''Library type to be used for decoding the message, determined based on the network identifier.'''
         if key not in self.device_versions:
-            logger.error(f"parser: Device '{key}' started streaming data before sending version. Skipping")
+            logger.error(
+                f"parser: Device '{key}' started streaming data before sending version. Skipping"
+            )
             return
         if network in self.excluded_networks:
-            logger.debug(f"parser: Network '{network}' is in the exclusion list. Skipping message")
+            logger.debug(
+                f"parser: Network '{network}' is in the exclusion list. Skipping message"
+            )
             return
         try:
             version = self.device_versions[key][library]
         except KeyError:
-            logger.error(f"parser: Device '{key}' with library '{library.__name__}' not found in device versions. Skipping.")
+            logger.error(
+                f"parser: Device '{key}' with library '{library.__name__}' not found in device versions. Skipping."
+            )
             return
         # Check if the network is already registered for the given version, if not, download the .proto descriptor
-        if network not in self.protobuf_manager.version_descriptors.get(version, {}):
+        if network not in self.protobuf_manager.version_descriptors.get(
+                version, {}):
             # If the proto descriptor is not already downloaded for the given version and network, download it
-            logger.info(f"parser: Network '{network}' with version {version} never seen before. Downloading .proto descriptor")
+            logger.info(
+                f"parser: Network '{network}' with version {version} never seen before. Downloading .proto descriptor"
+            )
             try:
-                if not self.protobuf_manager.download_proto_descriptor(version, network):
+                if not self.protobuf_manager.download_proto_descriptor(
+                        version, network):
                     return
             except Exception:
-                logger.error(f"parser: Error while getting proto, skipping message")
+                logger.error(
+                    f"parser: Error while getting proto, skipping message")
                 return
         # Deserialize the payload using the appropriate decoder for the given version and network
         try:
             # Use the appropriate decoder for the given version and network to deserialize the payload
-            decoder = self.protobuf_manager.version_descriptors[version][network]
+            decoder = self.protobuf_manager.version_descriptors[version][
+                network]
             # Expect decoder to provide a `decode` method returning a dict-like object
             message_content = decoder.decode(payload)
         except Exception as e:
-            logger.error(f"parser: Cannot deserialize payload with saved descriptor: {e}")
-            logger.error(f"parser: version descriptors: {self.protobuf_manager.version_descriptors}")
+            logger.error(
+                f"parser: Cannot deserialize payload with saved descriptor: {e}"
+            )
+            logger.error(
+                f"parser: version descriptors: {self.protobuf_manager.version_descriptors}"
+            )
             return
         tags = {
             "vehicle-id": vehicle_id,
@@ -147,9 +176,12 @@ class Parser(Thread):
             "network": network,
         }
         # If the message content contains a "valuesPack" key and its value is a dictionary, extract the inner dictionary for processing
-        if "valuesPack" in message_content and isinstance(message_content["valuesPack"], dict):
+        if "valuesPack" in message_content and isinstance(
+                message_content["valuesPack"], dict):
             message_content = message_content["valuesPack"]
-            logger.info(f"parser: Unpacked valuesPack for network '{network}' with version {version}: {message_content}")
+            logger.info(
+                f"parser: Unpacked valuesPack for network '{network}' with version {version}: {message_content}"
+            )
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
         #logger.info(f"parser: Committing message content for network '{network}' with version {version}: {message_content}")
         self.commit(message_content, message_content, tags)
@@ -161,8 +193,11 @@ class Parser(Thread):
         """
         if self.last_parse_timer is not None:
             self.last_parse_timer.cancel()  # Cancel the existing timer
-        self.last_parse_timer = Timer(Parser.TIMER_TIMEOUT, self._handle_inactivity)  # Create a new timer instance
-        self.last_parse_timer.start()  # Start or restart the timer whenever a new message is parsed
+        self.last_parse_timer = Timer(
+            Parser.TIMER_TIMEOUT,
+            self._handle_inactivity)  # Create a new timer instance
+        self.last_parse_timer.start(
+        )  # Start or restart the timer whenever a new message is parsed
 
     def reset_timer(self) -> None:
         """
@@ -185,9 +220,11 @@ class Parser(Thread):
             self.destination_list.append(line)
             self.timer_touch()
         with self.__new_points_event_lock__:
-            self.points_increased.notify_all()  # Notify any waiting threads that new points have been added to the destination list
+            self.points_increased.notify_all(
+            )  # Notify any waiting threads that new points have been added to the destination list
 
-    def commit(self, message_content: dict[str, Any], records: Any, tags: dict[str, str]) -> None:
+    def commit(self, message_content: dict[str, Any], records: Any,
+               tags: dict[str, str]) -> None:
         """
         Commits a record to the line repository by creating a Line object and adding it to the destination list.
         Args:
@@ -197,13 +234,15 @@ class Parser(Thread):
         """
         additional_signals: dict[str, str] = {}
         if 'antenna_name' in message_content:
-            additional_signals['antenna_name'] = message_content['antenna_name']
+            additional_signals['antenna_name'] = message_content[
+                'antenna_name']
         # Iterate through the measurements and their corresponding records in the message content, pushing each record to the line repository
         for measurement, records in message_content.items():
             if isinstance(records, list):
                 for record in records:
                     try:
-                        if additional_signals and additional_signals != {} and isinstance(record, dict):
+                        if additional_signals and additional_signals != {} and isinstance(
+                                record, dict):
                             record.update(additional_signals)
                     except Exception:
                         #logger.warning(f"parser: Failed to update record with additional signals for measurement '{measurement}': {record}")
@@ -222,8 +261,9 @@ class Parser(Thread):
                 except ValueError:
                     #logger.error(f"parser: Skipping invalid record for measurement '{measurement}': {e}")
                     pass
-    
-    def push(self, measurement: str, record: Any, tags: dict[str, str]) -> None:
+
+    def push(self, measurement: str, record: Any, tags: dict[str,
+                                                             str]) -> None:
         '''
         Pushes a record to the line repository by creating a Line object and adding it to the destination list.
         Args:
@@ -243,7 +283,8 @@ class Parser(Thread):
                         # Expand the columnar record into row-wise records
                         for row in Parser._expand_columnar_record(record):
                             # Push each row-wise record to the line repository
-                            line: Line = Line.from_object(row, measurement, tags)
+                            line: Line = Line.from_object(
+                                row, measurement, tags)
                             #logger.info(f"parser: Line: {line}")
                             self.__append_to_destination_list(line)
                         return
@@ -260,11 +301,14 @@ class Parser(Thread):
             #logger.warning(f"Handler: Received a string record for measurement '{measurement}': {record}. Skipping.")
             return
         else:
-            logger.warning(f"Handler: Invalid record received from device for measurement '{measurement}', type: {type(record)}.")
+            logger.warning(
+                f"Handler: Invalid record received from device for measurement '{measurement}', type: {type(record)}."
+            )
             return
 
     @staticmethod
-    def _expand_columnar_record(record: dict[str, Any]) -> list[dict[str, Any]]:
+    def _expand_columnar_record(
+            record: dict[str, Any]) -> list[dict[str, Any]]:
         '''
         Expands a columnar record into a list of row-wise records.
         Args:
@@ -314,7 +358,7 @@ class Parser(Thread):
         while len(self.row_messages) > 0:
             cond.wait()
         self.stop_parser()
-    
+
     def stop_parser(self) -> None:
         '''
         Method to stop the parser thread. It sets the stop flag to True and notifies the parser thread to wake up and check the stop condition. This allows the parser to exit its loop and stop processing messages.
@@ -322,9 +366,11 @@ class Parser(Thread):
         '''
         self.stop = True
         with self.row_queue_not_empty:
-            self.row_queue_not_empty.notify_all()  # Notify the parser thread to wake up and check the stop condition
+            self.row_queue_not_empty.notify_all(
+            )  # Notify the parser thread to wake up and check the stop condition
         with self.__new_points_event_lock__:
-            self.points_increased.notify_all()  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
+            self.points_increased.notify_all(
+            )  # Notify any waiting threads that the parser is stopping, allowing them to exit their wait state
 
     def run(self) -> None:
         while not self.stop:
@@ -350,10 +396,16 @@ class Parser(Thread):
         with self.__destination_list_lock:
             if max <= 0 or max > len(self.destination_list):
                 # Get all points
-                points: list[Point] = [self.destination_list.pop(0) for _ in range(len(self.destination_list))]
+                points: list[Point] = [
+                    self.destination_list.pop(0)
+                    for _ in range(len(self.destination_list))
+                ]
             else:
                 # Get the specified number of points
-                points: list[Point] = [self.destination_list.pop(0) for _ in range(max)]
+                points: list[Point] = [
+                    self.destination_list.pop(0) for _ in range(max)
+                ]
         return points
+
 
 __all__ = ["parser", "Parser"]

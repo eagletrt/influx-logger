@@ -7,14 +7,20 @@ from src.influx.influx_reader import InfluxReader
 from src.connections.mqtt_connection import MQTTConnection
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 
+
 class MsgDispatcher:
-    def __init__(self, influx_writer: InfluxWriter = None, influx_reader: InfluxReader = None, mqtt: MQTTConnection = None, vehicle_whitelist: list = None) -> None:
+
+    def __init__(self,
+                 influx_writer: InfluxWriter = None,
+                 influx_reader: InfluxReader = None,
+                 mqtt: MQTTConnection = None,
+                 vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
-            "+/+/info/version/libcan":  self.handle_libcan_version_message,
-            "+/+/info/version/gpslib":  self.handle_libgps_version_message,
+            "+/+/info/version/libcan": self.handle_libcan_version_message,
+            "+/+/info/version/gpslib": self.handle_libgps_version_message,
             #"+/+/version":              self.handle_canlib_version_message,
-            "+/+/data/+":               self.handle_data_message,
-            "+/+/query/+/data/get":     self.handle_query_request,
+            "+/+/data/+": self.handle_data_message,
+            "+/+/query/+/data/get": self.handle_query_request,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
@@ -22,7 +28,11 @@ class MsgDispatcher:
         self.vehicle_whitelist: list = vehicle_whitelist if vehicle_whitelist and vehicle_whitelist != [] else None
         self.__run_if_set()
 
-    def set(self, influx_writer: InfluxWriter=None, influx_reader: InfluxReader=None, mqtt: MQTTConnection=None, vehicle_whitelist: list=None) -> None:
+    def set(self,
+            influx_writer: InfluxWriter = None,
+            influx_reader: InfluxReader = None,
+            mqtt: MQTTConnection = None,
+            vehicle_whitelist: list = None) -> None:
         '''
         Sets the InfluxWriter instance for the MsgDispatcher.
         Args:
@@ -58,19 +68,28 @@ class MsgDispatcher:
         Handles any existing messages on the MQTT broker by subscribing to the relevant topics and processing the messages.
         '''
         if not self.mqtt:
-            logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle existing messages.")
+            logger.warning(
+                "msg_dispatcher: MQTTConnection is not set. Cannot handle existing messages."
+            )
             return
-        logger.info("msg_dispatcher: Handling existing messages on the MQTT broker")
+        logger.info(
+            "msg_dispatcher: Handling existing messages on the MQTT broker")
         if not self.mqtt.connection:
-            logger.warning("msg_dispatcher: MQTTConnection is not connected. Cannot handle existing messages.")
+            logger.warning(
+                "msg_dispatcher: MQTTConnection is not connected. Cannot handle existing messages."
+            )
             return
         # Subscribe to the relevant topics to receive existing messages
         for topic in self.topic_callbacks.keys():
             try:
                 self.mqtt.connection.subscribe(topic)
-                logger.info(f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages")
+                logger.info(
+                    f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages"
+                )
             except Exception as e:
-                logger.error(f"msg_dispatcher: Failed to subscribe to topic '{topic}': {e}")
+                logger.error(
+                    f"msg_dispatcher: Failed to subscribe to topic '{topic}': {e}"
+                )
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -79,7 +98,8 @@ class MsgDispatcher:
             topic (str): The topic of the incoming MQTT message.
             payload (bytes): The payload of the incoming MQTT message.
         '''
-        logger.debug(f"MQTT Connection: Handling incoming message on topic: {topic}")
+        logger.debug(
+            f"MQTT Connection: Handling incoming message on topic: {topic}")
         # Iterate through the registered topic handlers and invoke the appropriate handler for the incoming message
         for handler_topic, handler_function in self.topic_callbacks.items():
             # Check if the incoming topic matches the handler topic pattern
@@ -98,17 +118,25 @@ class MsgDispatcher:
         Returns:
             Pattern: A compiled regex pattern for matching incoming topics.
         '''
-        pattern = topic.replace("/", "\\/").replace("+", "([^\\/]+)").replace("#", ".*")
+        pattern = topic.replace("/",
+                                "\\/").replace("+",
+                                               "([^\\/]+)").replace("#", ".*")
         return compile(pattern)
 
-    def handle_version_message(self, library: type[LibcanManager]|type[LibgpsManager], version: str, ids: list[str]) -> None:
+    def handle_version_message(self, library: type[LibcanManager]
+                               | type[LibgpsManager], version: str,
+                               ids: list[str]) -> None:
         if not self.mqtt:
-            logger.warning("msg_dispatcher: MQTTConnection is not set. Cannot handle version message.")
+            logger.warning(
+                "msg_dispatcher: MQTTConnection is not set. Cannot handle version message."
+            )
             return
         if not self.influx_writer:
-            logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle version message.")
+            logger.warning(
+                "msg_dispatcher: InfluxWriter is not set. Cannot handle version message."
+            )
             return
-        VERSION_SANITIZE_REGEX = compile(r"^(\w+)",)
+        VERSION_SANITIZE_REGEX = compile(r"^(\w+)", )
         '''Regex pattern to sanitize the version string by extracting the commit hash from the version string.'''
         try:
             match = VERSION_SANITIZE_REGEX.search(version)
@@ -124,25 +152,42 @@ class MsgDispatcher:
         if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
             #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}/{device_id}' is not in the whitelist.")
             return
-        logger.info(f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'")
+        logger.info(
+            f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'"
+        )
         check = library.check_commit_existence(version)
         if check:
-            logger.info(f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})")
+            logger.info(
+                f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})"
+            )
             if self.mqtt.connection:
-                self.mqtt.connection.subscribe(f"{vehicle_id}/{device_id}/data/+")
-                logger.info(f"msg_dispatcher: Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered")
+                self.mqtt.connection.subscribe(
+                    f"{vehicle_id}/{device_id}/data/+")
+                logger.info(
+                    f"msg_dispatcher: Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered"
+                )
             try:
                 if f"{vehicle_id}/{device_id}" not in self.influx_writer.parser.device_versions:
-                    self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"] = {}
-                self.influx_writer.parser.device_versions[f"{vehicle_id}/{device_id}"][library] = version
-                self.influx_writer.parser.protobuf_manager.version_descriptors[version] = {}
-                logger.info(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics, version_descriptors: {self.influx_writer.parser.protobuf_manager.version_descriptors}")
+                    self.influx_writer.parser.device_versions[
+                        f"{vehicle_id}/{device_id}"] = {}
+                self.influx_writer.parser.device_versions[
+                    f"{vehicle_id}/{device_id}"][library] = version
+                self.influx_writer.parser.protobuf_manager.version_descriptors[
+                    version] = {}
+                logger.info(
+                    f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics, version_descriptors: {self.influx_writer.parser.protobuf_manager.version_descriptors}"
+                )
             except Exception as e:
-                logger.error(f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}")
+                logger.error(
+                    f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}"
+                )
         else:
-            logger.error(f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered")
-    
-    def handle_libcan_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+            logger.error(
+                f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered"
+            )
+
+    def handle_libcan_version_message(self, _topic: str, payload: bytes,
+                                      ids: list[str]) -> None:
         '''
         Handles incoming libcan version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
         Args:
@@ -152,7 +197,8 @@ class MsgDispatcher:
         '''
         self.handle_version_message(LibcanManager, payload.decode(), ids)
 
-    def handle_canlib_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+    def handle_canlib_version_message(self, _topic: str, payload: bytes,
+                                      ids: list[str]) -> None:
         '''
         Handles incoming CAN library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
         Args:
@@ -163,7 +209,8 @@ class MsgDispatcher:
         # We could think about moving this to a dedicated class
         self.handle_version_message(LibcanManager, payload.decode(), ids)
 
-    def handle_libgps_version_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+    def handle_libgps_version_message(self, _topic: str, payload: bytes,
+                                      ids: list[str]) -> None:
         '''
         Handles incoming GPS library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
         Args:
@@ -173,7 +220,8 @@ class MsgDispatcher:
         '''
         self.handle_version_message(LibgpsManager, payload.decode(), ids)
 
-    def handle_data_message(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+    def handle_data_message(self, _topic: str, payload: bytes,
+                            ids: list[str]) -> None:
         '''
         Handles incoming data messages by deserializing the payload and pushing the records to the line repository.
         Args:
@@ -182,7 +230,9 @@ class MsgDispatcher:
             ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
         '''
         if not self.influx_writer:
-            logger.warning("msg_dispatcher: InfluxWriter is not set. Cannot handle data message.")
+            logger.warning(
+                "msg_dispatcher: InfluxWriter is not set. Cannot handle data message."
+            )
             return
         row_msg: tuple[list[str], bytes] = (ids, payload)
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
@@ -191,25 +241,30 @@ class MsgDispatcher:
             return
         self.influx_writer.parser.add_to_queue(row_msg)
 
-    def handle_query_request(self, _topic: str, payload: bytes, ids: list[str]) -> None:
+    def handle_query_request(self, _topic: str, payload: bytes,
+                             ids: list[str]) -> None:
         """
         Handles incoming query requests from the GUI.
         ids will contain: [vehicle_id, device_id, transaction_id]
         """
         if not self.influx_reader:
-            logger.warning("msg_dispatcher: InfluxReader is not set. Cannot handle query request.")
+            logger.warning(
+                "msg_dispatcher: InfluxReader is not set. Cannot handle query request."
+            )
             return
-        
+
         if len(ids) < 3:
-            logger.error(f"msg_dispatcher: Query topic malformed. ids found: {ids}")
+            logger.error(
+                f"msg_dispatcher: Query topic malformed. ids found: {ids}")
             return
 
         vehicle_id = ids[0]
         device_id = ids[1]
         transaction_id = ids[2]
-        
+
         # Send the query to the InfluxReader to be processed
-        self.influx_reader.add_query_to_queue(vehicle_id, device_id, transaction_id, payload)
+        self.influx_reader.add_query_to_queue(vehicle_id, device_id,
+                                              transaction_id, payload)
 
     def stop(self) -> None:
         '''
@@ -232,7 +287,9 @@ class MsgDispatcher:
             self.influx_writer.graceful_stop()
             self.influx_writer.join()
         if self.influx_reader:
-            self.influx_reader.stop() # TODO: Implement graceful stop for InfluxReader if needed
+            self.influx_reader.stop(
+            )  # TODO: Implement graceful stop for InfluxReader if needed
             self.influx_reader.join()
-        
+
+
 __all__ = ["MsgDispatcher"]

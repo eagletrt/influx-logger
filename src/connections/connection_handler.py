@@ -21,14 +21,22 @@ class ConnectionHandler:
             cls._instance = super(ConnectionHandler, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config: Configuration = None, on_state_change=None, on_message=None):
+    def __init__(self,
+                 config: Configuration = None,
+                 on_state_change=None,
+                 on_message=None):
         if self._initialized:
             return
         self.on_state_change = on_state_change
-        self.set(config, on_state_change=on_state_change, on_message=on_message) if config else None
+        self.set(config,
+                 on_state_change=on_state_change,
+                 on_message=on_message) if config else None
         self._initialized = True
 
-    def set(self, config: Configuration = None, on_state_change=None, on_message=None) -> None:
+    def set(self,
+            config: Configuration = None,
+            on_state_change=None,
+            on_message=None) -> None:
         """
         Set the configuration for InfluxDB and MQTT connections.
         This method allows updating the connection settings after the ConnectionHandler instance has been created.
@@ -43,8 +51,8 @@ class ConnectionHandler:
             org=config.influx.org,
             port=config.influx.port,
             on_state_change=self.on_state_change,
-            buckets=list(config.influx.buckets.values())
-        ) if config and config.influx else None
+            buckets=list(config.influx.buckets.values()
+                         )) if config and config.influx else None
         self.mqtt = MQTTConnection(
             url=config.mqtt.url,
             port=config.mqtt.port,
@@ -60,7 +68,9 @@ class ConnectionHandler:
         If either connection is not configured, it will log an error message and return without attempting to connect.
         """
         if not self.influx_adr or not self.mqtt:
-            logger.error("No connections to start. Please provide a valid configuration.")
+            logger.error(
+                "No connections to start. Please provide a valid configuration."
+            )
             return
         if not self.influx_adr.is_connected():
             self.influx_adr.connect()
@@ -74,7 +84,9 @@ class ConnectionHandler:
         If either connection is not configured, it will log an error message and return without attempting to disconnect.
         """
         if not self.influx_adr and not self.mqtt:
-            logger.error("No connections to stop. Please provide a valid configuration.")
+            logger.error(
+                "No connections to stop. Please provide a valid configuration."
+            )
             return
         self.influx_adr.disconnect()
         self.mqtt.disconnect()
@@ -86,12 +98,9 @@ class ConnectionHandler:
         Returns:
             bool: True if both connections are established, False otherwise.
         """
-        return bool(
-            self.influx_adr
-            and self.mqtt
-            and self.influx_adr.is_connected()
-            and self.mqtt.is_connected()
-        )
+        return bool(self.influx_adr and self.mqtt
+                    and self.influx_adr.is_connected()
+                    and self.mqtt.is_connected())
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):

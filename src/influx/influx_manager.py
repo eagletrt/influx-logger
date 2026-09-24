@@ -15,12 +15,16 @@ class InfluxManager(Thread, ABC):
         client (InfluxConnection): The connection to the InfluxDB service.
         timestamp_precision (str): The precision of timestamps used in interactions with InfluxDB.
     """
-    def __init__(self, client:InfluxConnection, timestamp_precision: str = TimestampPrecision.us.name, name:str = "InfluxManager") -> None:
+
+    def __init__(self,
+                 client: InfluxConnection,
+                 timestamp_precision: str = TimestampPrecision.us.name,
+                 name: str = "InfluxManager") -> None:
         super().__init__(name=name)
-        self.client:InfluxConnection = client
-        self.timestamp_precision:str = timestamp_precision
-        self.__stop__:bool = False
-        self.__stop_lock__:Lock = Lock()
+        self.client: InfluxConnection = client
+        self.timestamp_precision: str = timestamp_precision
+        self.__stop__: bool = False
+        self.__stop_lock__: Lock = Lock()
 
     def stop(self):
         """
@@ -29,7 +33,7 @@ class InfluxManager(Thread, ABC):
         """
         with self.__stop_lock__:
             self.__stop__ = True
-    
+
     def stopped(self) -> bool:
         """
         Checks if the InfluxManager thread has been stopped.
@@ -38,5 +42,6 @@ class InfluxManager(Thread, ABC):
         """
         with self.__stop_lock__:
             return self.__stop__
+
 
 __all__ = ["InfluxManager"]
