@@ -1,3 +1,8 @@
+"""
+This module defines the MQTTConnection class, 
+which manages the connection to an MQTT broker.
+"""
+
 import threading
 
 import paho.mqtt.client as mqtt
@@ -9,7 +14,9 @@ from src.utils.logger_utils import logger
 class MQTTConnection(Connection):
     """
     This class manages the connection to an MQTT broker.
-    It extends the abstract Connection class and implements the connect method to establish a connection to the MQTT broker using the provided URL and port.
+    It extends the abstract Connection class and implements 
+    the connect method to establish a connection to the MQTT 
+    broker using the provided URL and port.
     Attributes:
         broker: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
@@ -29,8 +36,8 @@ class MQTTConnection(Connection):
         self.message_callback = on_message
         self._connected = False
         self._connecting = False
+        # Lock to synchronize access to the connection state and the underlying MQTT client.
         self._lock = threading.RLock()
-        '''Lock to synchronize access to the connection state and the underlying MQTT client.'''
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
@@ -42,12 +49,22 @@ class MQTTConnection(Connection):
                    _flags,
                    reason_code,
                    properties=None) -> None:
+        """
+        Callback function that is called when the
+        client receives a CONNACK response from the server.
+        It checks the reason code to determine if
+        the connection was successful or not.
+        If the connection was successful, it sets
+        the _connected flag to True and subscribes to the necessary topics.
+        If the connection was not successful, it
+        logs an error message and sets the _connected flag to False.
+        """
         with self._lock:
             # Ignore callbacks from a client instance we've already replaced/torn down.
             if client is not self.connection:
                 logger.debug(
-                    f"mqtt-connection: Ignoring on_connect from stale client at {self.url}:{self.port}"
-                )
+                    "mqtt-connection: Ignoring on_connect from stale client at %s:%d",
+                    self.url, self.port)
                 return
             try:
                 success = int(reason_code) == 0
@@ -58,14 +75,18 @@ class MQTTConnection(Connection):
                 self._connecting = False
                 self._connected = False
                 logger.error(
-                    f"mqtt-connection: MQTT broker at {self.url}:{self.port} rejected the connection with reason code {reason_code}"
+                    "mqtt-connection: MQTT broker at %s:%d rejected the " \
+                        "connection with reason code %d",
+                    self.url,
+                    self.port,
+                    reason_code
                 )
                 self.__notify_state_change()
                 return
 
             logger.info(
-                f"mqtt-connection: Successfully connected to MQTT broker at {self.url}:{self.port}"
-            )
+                "mqtt-connection: Successfully connected to MQTT broker at %s:%d",
+                self.url, self.port)
             self._connected = True
             self._connecting = False
             self.__subscribe_topics()
@@ -76,16 +97,20 @@ class MQTTConnection(Connection):
                       _userdata,
                       reason_code,
                       properties=None) -> None:
+        """
+        Callback function that is called when the client disconnects from the server.
+        It logs the disconnection event and sets the _connected flag to False.
+        """
         with self._lock:
             # Ignore callbacks from a client instance we've already replaced/torn down.
             if client is not self.connection:
                 logger.debug(
-                    f"mqtt-connection: Ignoring on_disconnect from stale client at {self.url}:{self.port}"
-                )
+                    "mqtt-connection: Ignoring on_disconnect from stale client at %s:%d",
+                    self.url, self.port)
                 return
             logger.info(
-                f"mqtt-connection: Disconnected from MQTT broker at {self.url}:{self.port} with reason code {reason_code}"
-            )
+                "mqtt-connection: Disconnected from MQTT broker at %s:%d with reason code %d",
+                self.url, self.port, reason_code)
             self.connection = None
             self._connecting = False
             self._connected = False
@@ -99,16 +124,20 @@ class MQTTConnection(Connection):
         self.connection.subscribe("+/+/info/version/gpslib")
 
     def on_message(self, client, _userdata, msg) -> None:
+        """
+        Callback function that is called when a message is received from the server.
+        It logs the received message and invokes the message callback if provided.
+        """
         logger.debug(
-            f"mqtt-connection: Received message on topic {msg.topic} with payload {msg.payload}"
-        )
+            "mqtt-connection: Received message on topic %s with payload %s",
+            msg.topic, msg.payload)
         try:
             if callable(self.message_callback):
                 self.message_callback(msg.topic, msg.payload)
         except Exception as e:
             logger.error(
-                f"mqtt-connection: Error while handling incoming message on topic {msg.topic}: {e}"
-            )
+                "mqtt-connection: Error while handling incoming message on topic %s: %s",
+                msg.topic, e)
 
     def connect(self) -> bool:
         """
@@ -143,20 +172,20 @@ class MQTTConnection(Connection):
                 self.connection.on_disconnect = self.on_disconnect
                 self.connection.on_message = self.on_message
                 logger.info(
-                    f"mqtt-connection: Attempting to connect to MQTT broker at {self.url}:{self.port}"
-                )
+                    "mqtt-connection: Attempting to connect to MQTT broker at %s:%d",
+                    self.url, self.port)
                 self.connection.connect(host=self.url, port=self.port)
                 self.connection.loop_start()
                 logger.info(
-                    f"mqtt-connection: Connection attempt to MQTT broker at {self.url}:{self.port} initiated"
-                )
+                    "mqtt-connection: Connection attempt to MQTT broker at %s:%d initiated",
+                    self.url, self.port)
             except Exception as e:
                 self.connection = None
                 self._connecting = False
                 self._connected = False
                 logger.error(
-                    f"mqtt-connection: Failed to connect to MQTT broker at {self.url}:{self.port}: {e}"
-                )
+                    "mqtt-connection: Failed to connect to MQTT broker at %s:%d: %s",
+                    self.url, self.port, e)
                 return False
         return self.is_connected()
 
@@ -178,8 +207,8 @@ class MQTTConnection(Connection):
                 return True
             except Exception as e:
                 logger.error(
-                    f"mqtt-connection: Failed to disconnect from MQTT broker at {self.url}:{self.port}: {e}"
-                )
+                    "mqtt-connection: Failed to disconnect from MQTT broker at %s:%d: %s",
+                    self.url, self.port, e)
                 return False
 
     def is_connected(self) -> bool:
@@ -199,6 +228,6 @@ class MQTTConnection(Connection):
                 return bool(self.connection.is_connected())
             except Exception as e:
                 logger.warning(
-                    f"mqtt-connection: Connection to MQTT broker at {self.url}:{self.port} is not alive: {e}"
-                )
+                    "mqtt-connection: Connection to MQTT broker at %s:%d is not alive: %s",
+                    self.url, self.port, str(e))
                 return False

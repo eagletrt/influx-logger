@@ -1,11 +1,22 @@
+"""
+    This module defines the Connection class,
+    which serves as an abstract base class for managing 
+    connections to different services.
+    It provides a common interface for establishing and 
+    checking the status of connections.
+    Subclasses should implement the connect method to 
+    handle specific connection logic for different services.
+"""
 from abc import ABC, abstractmethod
 
 
 class Connection(ABC):
     """
     Abstract base class for managing connections to different services.
-    This class provides a common interface for establishing and checking the status of connections.
-    Subclasses should implement the connect method to handle specific connection logic for different services.
+    This class provides a common interface for establishing 
+    and checking the status of connections.
+    Subclasses should implement the connect method to handle specific 
+    connection logic for different services.
     Attributes:
         connection: The actual connection object to the service.
         url: The URL of the service to connect to.
@@ -26,8 +37,8 @@ class Connection(ABC):
         Returns:
             str: full link
         """
+        # Full link for influx connection is <protocol>://<url>:<port>
         full_link: str = f"{self.url}:{self.port}"
-        '''Full link for influx connection is <protocol>://<url>:<port>'''
         if "http" not in full_link:
             full_link = "http://" + full_link
         return full_link
@@ -36,7 +47,8 @@ class Connection(ABC):
     def connect(self) -> bool:
         """
         Establishes a connection to the specified service.
-        This method should be implemented by subclasses to handle the specific connection logic for different services.
+        This method should be implemented by subclasses to handle
+        the specific connection logic for different services.
         Returns:
             bool: True if the connection was successful, False otherwise.
         """
@@ -47,7 +59,8 @@ class Connection(ABC):
     def disconnect(self) -> bool:
         """
         Disconnects from the specified service.
-        This method should be implemented by subclasses to handle the specific disconnection logic for different services.
+        This method should be implemented by subclasses to handle
+        the specific disconnection logic for different services.
         Returns:
             bool: True if the disconnection was successful, False otherwise.
         """

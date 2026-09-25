@@ -1,3 +1,12 @@
+"""
+This module contains the ConnectionHandler class, which is responsible for managing
+connections to InfluxDB and MQTT broker. It provides methods to start and stop
+connections, as well as to check the connection status of both InfluxDB and MQTT broker.
+The ConnectionHandler class is implemented as a singleton to ensure that only one
+instance of the connection handler exists throughout the application.
+Classes:
+    ConnectionHandler: A singleton class to manage InfluxDB and MQTT connections.
+"""
 from src.connections.influx_connection import InfluxConnection
 from src.connections.mqtt_connection import MQTTConnection
 from src.utils.configuration import Configuration
@@ -7,11 +16,14 @@ from src.utils.logger_utils import logger
 class ConnectionHandler:
     """
     Singleton class to manage InfluxDB and MQTT connections.
-    This class ensures that only one instance of the connection handler exists throughout the application.
-    It provides methods to start and stop connections, as well as to check the connection status of both InfluxDB and MQTT broker.
+    This class ensures that only one instance of the connection
+    handler exists throughout the application.
+    It provides methods to start and stop connections,
+    as well as to check the connection status of both InfluxDB
+    and MQTT broker.
     Attributes:
-        influx_connection: An instance of the InfluxConnection class to manage the InfluxDB connection
-        mqtt_connection: An instance of the MQTTConnection class to manage the MQTT broker connection
+        influx_connection: An instance of the InfluxConnection class.
+        mqtt_connection: An instance of the MQTTConnection class.
     """
     _instance = None
     _initialized = False
@@ -28,9 +40,10 @@ class ConnectionHandler:
         if self._initialized:
             return
         self.on_state_change = on_state_change
-        self.set(config,
-                 on_state_change=on_state_change,
-                 on_message=on_message) if config else None
+        if config:
+            self.set(config,
+                     on_state_change=on_state_change,
+                     on_message=on_message)
         self._initialized = True
 
     def set(self,
@@ -39,12 +52,15 @@ class ConnectionHandler:
             on_message=None) -> None:
         """
         Set the configuration for InfluxDB and MQTT connections.
-        This method allows updating the connection settings after the ConnectionHandler instance has been created.
+        This method allows updating the connection settings after
+        the ConnectionHandler instance has been created.
         Args:
-            config (Configuration): An instance of the Configuration class containing the new connection settings.
+            config (Configuration): Configuration to set.
         """
         if on_state_change is not None:
             self.on_state_change = on_state_change
+        if on_message is not None:
+            self.on_message = on_message
         self.influx_adr = InfluxConnection(
             url=config.influx.url,
             token=config.influx.token,
@@ -65,11 +81,14 @@ class ConnectionHandler:
     def start_connections(self) -> None:
         """
         Start both InfluxDB and MQTT connections.
-        If either connection is not configured, it will log an error message and return without attempting to connect.
+        If either connection is not configured,
+        it will log an error message and return without attempting
+        to connect.
         """
         if not self.influx_adr or not self.mqtt:
             logger.error(
-                "No connections to start. Please provide a valid configuration."
+                "No connections to start. " \
+                    "Please provide a valid configuration."
             )
             return
         if not self.influx_adr.is_connected():
@@ -81,11 +100,14 @@ class ConnectionHandler:
     def stop_connections(self) -> None:
         """
         Stop both InfluxDB and MQTT connections.
-        If either connection is not configured, it will log an error message and return without attempting to disconnect.
+        If either connection is not configured,
+        it will log an error message and return without attempting
+        to disconnect.
         """
         if not self.influx_adr and not self.mqtt:
             logger.error(
-                "No connections to stop. Please provide a valid configuration."
+                "No connections to stop. " \
+                    "Please provide a valid configuration."
             )
             return
         self.influx_adr.disconnect()
