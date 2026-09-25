@@ -1,3 +1,7 @@
+"""
+This module provides the InfluxConnection class, 
+which manages the connection to an InfluxDB service.
+"""
 from threading import Event, Thread
 
 from influxdb_client import InfluxDBClient
@@ -9,7 +13,9 @@ from src.utils.logger_utils import logger
 class InfluxConnection(Connection):
     """
     This class manages the connection to an InfluxDB service.
-    It extends the abstract Connection class and implements the connect method to establish a connection to InfluxDB using the provided URL, token, organizationb.
+    It extends the abstract Connection class and implements the
+    connect method to establish a connection to InfluxDB using the provided URL,
+    token, organization.
     Attributes:
         token: The authentication token for the InfluxDB service.
         org: The organization name for the InfluxDB service.
@@ -23,14 +29,15 @@ class InfluxConnection(Connection):
                  on_state_change=None,
                  buckets: list = None):
         """
-        Initializes the InfluxConnection instance with the provided URL, token, organization, and port.
+        Initializes the InfluxConnection instance with the provided URL,
+        token, organization, and port.
         Args:
             url (str): The URL of the InfluxDB service.
             token (str): The authentication token for the InfluxDB service.
             org (str): The organization name for the InfluxDB service.
             port (int, optional): The port of the InfluxDB service. Defaults to 8086.
-            on_state_change (callable, optional): A callback function to be called when the connection state changes. Defaults to None.
-            buckets (list, optional): A list of bucket names to be managed by the connection. Defaults to None.
+            on_state_change (callable, optional): Callback function.
+            buckets (list, optional): A list of bucket names to be managed by the connection.
         """
         super().__init__(url=url, port=port)
         self.token: str = token
@@ -47,16 +54,23 @@ class InfluxConnection(Connection):
         if callable(self.on_state_change):
             self.on_state_change()
 
-    def on_connect(self):
+    def on_connect(self) -> None:
+        """
+        Logs the successful connection to the InfluxDB service 
+        and notifies any registered state change callback.
+        """
         logger.info(
-            f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}"
-        )
+            "influx-connection: Successfully connected to InfluxDB at %s:%d",
+            self.url, self.port)
         self.__notify_state_change()
 
-    def on_disconnect(self):
-        logger.info(
-            f"influx-connection: Disconnected from InfluxDB at {self.url}:{self.port}"
-        )
+    def on_disconnect(self) -> None:
+        """
+        Logs the disconnection from the InfluxDB service and
+        notifies any registered state change callback.
+        """
+        logger.info("influx-connection: Disconnected from InfluxDB at %s:%d",
+                    self.url, self.port)
         self.__notify_state_change()
 
     def disconnect(self) -> bool:
@@ -73,23 +87,23 @@ class InfluxConnection(Connection):
                 self.connection_checker.stop(
                 )  # Stop the connection checker thread
                 logger.info(
-                    f"influx-connection: Successfully disconnected from InfluxDB at {self.url}:{self.port}"
-                )
+                    "influx-connection: Successfully disconnected from InfluxDB at %s:%d",
+                    self.url, self.port)
                 return True
-            else:
-                logger.warning(
-                    f"influx-connection: No active connection to disconnect from InfluxDB at {self.url}:{self.port}"
-                )
-                return False
+            logger.warning(
+                "influx-connection: No active connection to disconnect from InfluxDB at %s:%d",
+                self.url, self.port)
+            return False
         except Exception as e:
             logger.error(
-                f"influx-connection: Failed to disconnect from InfluxDB at {self.url}:{self.port}: {e}"
-            )
+                "influx-connection: Failed to disconnect from InfluxDB at %s:%d: %s",
+                self.url, self.port, str(e))
             return False
 
     def connect(self) -> bool:
         """
-        Establishes a connection to the InfluxDB service using the provided URL, token and organization.
+        Establishes a connection to the InfluxDB service using the provided URL,
+        token and organization.
         Logs the success or failure of the connection attempt.
         Returns:
             bool: True if the connection was successful, False otherwise.
@@ -107,18 +121,19 @@ class InfluxConnection(Connection):
             )  # Start the connection checker thread
             if self.is_connected():
                 logger.info(
-                    f"influx-connection: Successfully connected to InfluxDB at {self.url}:{self.port}"
-                )
+                    "influx-connection: Successfully connected to InfluxDB at %s:%d",
+                    self.url, self.port)
                 return True
-            else:
-                logger.warning(
-                    f"influx-connection: Connection to InfluxDB at {self.connection.url} Connection not established."
-                )
-                return False
+            logger.warning(
+                "influx-connection: " \
+                    "Connection to InfluxDB at %s not established.",
+                self.connection.url
+            )
+            return False
         except Exception as e:
             logger.error(
-                f"influx-connection: Failed to connect to InfluxDB at {self.url}:{self.port}: {e}"
-            )
+                "influx-connection: Failed to connect to InfluxDB at %s:%d: %s",
+                self.url, self.port, str(e))
             return False
 
     def is_connected(self) -> bool:
@@ -134,14 +149,15 @@ class InfluxConnection(Connection):
 
     def create_missing_bucket(self,
                               buckets: list,
-                              needed_buckets: list = [],
+                              needed_buckets: list = None,
                               daemon: bool = False) -> bool:
         '''
-        Creates any missing buckets from the needed_buckets list that are not present in the buckets list.
+        Creates any missing buckets from the needed_buckets list that
+        are not present in the buckets list.
         Args:
             buckets (list): A list of existing bucket names.
-            needed_buckets (list, optional): A list of bucket names that are required. Defaults to [].
-            daemon (bool, optional): If True, creates missing buckets in a separate daemon thread. Defaults to False.
+            needed_buckets (list, optional): A list of bucket names that are required.
+            daemon (bool, optional): If True, creates missing buckets in a separate daemon thread.
         Returns:
             bool: True if all needed buckets are present or created successfully, False otherwise.
         '''
@@ -163,7 +179,7 @@ class InfluxConnection(Connection):
         Creates a new bucket in the InfluxDB service.
         Args:
             bucket_name (str): The name of the bucket to create.
-            retention_rules (dict, optional): The retention rules for the bucket. Defaults to None.
+            retention_rules (dict, optional): The retention rules for the bucket.
         Returns:
             bool: True if the bucket was created successfully, False otherwise.
         """
@@ -173,14 +189,13 @@ class InfluxConnection(Connection):
                 retention_rules=retention_rules,
                 org=self.org,
             )
-            logger.info(
-                f"influx-connection: Bucket created successfully: {bucket_name}"
-            )
+            logger.info("influx-connection: Bucket created successfully: %s",
+                        bucket_name)
             return True
         except Exception as e:
             logger.error(
-                f"influx-connection: Failed to create bucket named {bucket_name}: {e}"
-            )
+                "influx-connection: Failed to create bucket named %s: %s",
+                bucket_name, str(e))
             return False
 
     def ping(self) -> bool:
@@ -205,17 +220,18 @@ class InfluxConnection(Connection):
                     needed_buckets=self.buckets,
                     daemon=True)
                 return True
-            else:
-                logger.warning(
-                    "influx-connection: Ping returned None, indicating a potential issue with the connection."
-                )
-                return False
+            logger.warning(
+                "influx-connection: " \
+                    "Ping returned None, indicating a potential issue with the connection."
+            )
+            return False
         except Exception:
             # Check weather InfluxDB is up
             health_api = self.connection.health()
             if health_api.status == "pass":
                 logger.warning(
-                    "influx-connection: InfluxDB up, but not connected. Check your token and permissions."
+                    "influx-connection: " \
+                        "InfluxDB up, but not connected. Check your token and permissions."
                 )
             return False
 
@@ -233,7 +249,7 @@ class ConnectionChecker(Thread):
         Initializes the ConnectionChecker thread with a specified check interval.
         Args:
             influx_connection (InfluxConnection): The InfluxConnection instance to check.
-            check_interval (int, optional): The interval (in seconds) between connection checks. Defaults to 2 seconds.
+            check_interval (int, optional): The interval (in seconds) between connection checks.
         """
         super().__init__(name="ConnectionChecker")
         self.influx_connection: InfluxConnection = influx_connection
