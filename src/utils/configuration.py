@@ -1,3 +1,7 @@
+"""
+Main configuration class for the application,
+all the modifiable settings required to run it.
+"""
 import json
 import os
 
@@ -19,11 +23,13 @@ class InfluxConfig:
                  port: int,
                  token: str,
                  org: str,
-                 buckets: dict[str:str] = {}):
+                 buckets: dict[str:str] = None):
         self.url: str = url
         self.port: int = int(port)
         self.token: str = token
         self.org: str = org
+        if buckets is None:
+            buckets = {}
         self.buckets: dict[str:str] = buckets
 
     @staticmethod
@@ -144,7 +150,9 @@ class Configuration:
         self.mqtt: MQTTConfig = mqtt
         self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []
-        self.vehicle_whitelist: list = vehicle_whitelist if vehicle_whitelist and vehicle_whitelist != [] else None
+        self.vehicle_whitelist: list = None
+        if vehicle_whitelist and vehicle_whitelist != []:
+            self.vehicle_whitelist = vehicle_whitelist
         self.github_token: str = github_token if github_token and github_token != "" else None
         self.log_on_mqtt: str = log_on_mqtt if log_on_mqtt and log_on_mqtt != "" else None
 
@@ -158,7 +166,7 @@ class Configuration:
         Returns:
             Configuration: An instance populated with data from the file.
         """
-        with open(file_path) as file:
+        with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
 
         mqtt_data = data.get("mqtt", None)
@@ -198,8 +206,13 @@ class Configuration:
             name: InfluxConfig.from_dict(cfg)
             for name, cfg in influx_raw.items()
         }
+        try:
+            port: int = int(os.getenv("MQTT_PORT", "1883"))
+        except ValueError:
+            raise ValueError("MQTT_PORT must be an integer.") from ValueError
+
         mqtt = MQTTConfig(url=os.getenv("MQTT_URL", "localhost"),
-                          port=int(os.getenv("MQTT_PORT", 1883)),
+                          port=port,
                           username=os.getenv("MQTT_USERNAME", None),
                           password=os.getenv("MQTT_PASSWORD", None))
         vehicle_whitelist = json.loads(os.getenv("VEHICLE_WHITELIST", "[]"))

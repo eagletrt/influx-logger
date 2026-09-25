@@ -23,13 +23,14 @@ class InfluxWriter(InfluxManager):
     """
 
     def __init__(
-            self,
-            client: InfluxConnection,
-            adr_bucket: str = None,
-            log_bucket: str = None,
-            excluded_networks: list = None,
-            batch_size: int = 2_500,
-            timestamp_precision: str = TimestampPrecision.us.name) -> None:
+        self,
+        client: InfluxConnection,
+        adr_bucket: str = None,
+        log_bucket: str = None,
+        excluded_networks: list = None,
+        batch_size: int = 2_500,
+        timestamp_precision: str = TimestampPrecision.MICROSECONDS.name
+    ) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
         self.write_options: WriteOptions = WriteOptions(
             batch_size=

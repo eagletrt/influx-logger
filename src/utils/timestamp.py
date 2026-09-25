@@ -1,3 +1,6 @@
+"""
+Timestamp utility module for InfluxDB interactions.
+"""
 from enum import Enum
 
 
@@ -5,13 +8,13 @@ class TimestampPrecision(Enum):
     """
     Enum representing the precision of timestamps.
     """
-    ns: int = 1
+    NANOSECONDS: int = 1
     '''Nanoseconds'''
-    us: int = 1_000
+    MICROSECONDS: int = 1_000
     '''Microseconds'''
-    ms: int = 1_000_000
+    MILLISECONDS: int = 1_000_000
     '''Milliseconds'''
-    s: int = 1_000_000_000
+    SECONDS: int = 1_000_000_000
     '''Seconds'''
 
     @staticmethod
@@ -21,24 +24,31 @@ class TimestampPrecision(Enum):
         Args:
             precision (str): The precision of the timestamp, which can be "ns", "us", "ms", or "s".
         Returns:
-            int: The factor corresponding to the specified precision, or None if the precision is invalid.
+            int: The factor corresponding to the specified precision.
         """
         if precision == "ns":
-            return TimestampPrecision.ns.value
-        elif precision == "us":
-            return TimestampPrecision.us.value
-        elif precision == "ms":
-            return TimestampPrecision.ms.value
-        elif precision == "s":
-            return TimestampPrecision.s.value
-        else:
-            return None
+            return TimestampPrecision.NANOSECONDS.value
+        if precision == "us":
+            return TimestampPrecision.MICROSECONDS.value
+        if precision == "ms":
+            return TimestampPrecision.MILLISECONDS.value
+        if precision == "s":
+            return TimestampPrecision.SECONDS.value
+        return None
 
 
 INFLUX_INT64_MAX: int = 2**63 - 1
-'''InfluxDB's maximum value for a 64-bit signed integer. This constant is used to ensure that timestamp values do not exceed the maximum limit that InfluxDB can handle.'''
+'''
+InfluxDB's maximum value for a 64-bit signed integer.
+This constant is used to ensure that timestamp values do not exceed
+the maximum limit that InfluxDB can handle.
+'''
 
 TIMESTAMP_KEYS: list[str] = [
     "inner_timestamp", "_inner_timestamp", "_timestamp", "timestamp",
     "_innerTimestamp", "innerTimestamp"
 ]
+'''
+List of keys that are commonly used to represent timestamps in data structures.
+This list is used to identify and extract timestamp values from various data formats.
+'''

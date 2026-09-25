@@ -18,11 +18,12 @@ class InfluxReader(InfluxManager):
     """
 
     def __init__(
-            self,
-            client: InfluxConnection,
-            mqtt_client: MQTTConnection,
-            log_bucket: str,
-            timestamp_precision: str = TimestampPrecision.us.name) -> None:
+        self,
+        client: InfluxConnection,
+        mqtt_client: MQTTConnection,
+        log_bucket: str,
+        timestamp_precision: str = TimestampPrecision.MICROSECONDS.name
+    ) -> None:
         super().__init__(client, timestamp_precision, name="InfluxReader")
         self.query_api = self.client.connection.query_api()
         self.mqtt: MQTTConnection = mqtt_client
