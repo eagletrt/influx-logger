@@ -421,8 +421,8 @@ class _DecoderWrapper:
         Returns:
             dict: A dictionary representation of the decoded protobuf message.
         '''
+        # Creates an instance of the message class to hold the decoded data
         message = self._message_class()
-        '''Creates an instance of the message class to hold the decoded data'''
         # Parse the payload into the message instance
         message.ParseFromString(payload)
         return self._json_format.MessageToDict(
@@ -445,38 +445,131 @@ class _DecoderWrapper:
         '''
         try:
             logger.info(
-                f"protobuf_manager: Lib_manager '{lib_manager.__name__}'")
+                "protobuf_manager: Lib_manager '%s'",
+                lib_manager.__name__
+            )
             # Cache directory used for storing .proto files and
             # descriptor sets for the specified library
             cache: str = lib_manager.CACHE_DIR
-            logger.info(f"protobuf_manager: Using cache directory '{cache}'")
+            logger.info(
+                "protobuf_manager: Using cache directory '%s'", 
+                cache
+                )
         except Exception:
             logger.error(
                 "protobuf_manager: Invalid lib_manager provided." \
                 "It must have a CACHE_DIR attribute."
             )
             raise
-        version_dir = os.path.join(cache, version)
-        '''Directory in the cache where the .proto file for the specified version will be stored'''
+        descriptor_set_file = _DecoderWrapper.compile_proto_files(version, network, cache)
+        # protobuf descriptor set that will be populated with the compiled descriptor data
+        file_set: FileDescriptorSet = FileDescriptorSet()
+        # Read the compiled descriptor set from the file and
+        # parse it into a FileDescriptorSet object
+        with open(descriptor_set_file, "rb") as fh:
+            file_set.ParseFromString(fh.read())
+        return _DecoderWrapper.build_message_prototype(network, lib_manager, file_set)
+
+    @staticmethod
+    def build_message_prototype(network: str, lib_manager: type, file_set: FileDescriptorSet):
+        '''
+        Builds a message prototype for the given protobuf descriptor and network.
+        Args:
+            network (str): The network for which the message prototype is being built.
+            lib_manager (type): The library manager class used to determine the top-level message type.
+            file_set (FileDescriptorSet): The protobuf descriptor set containing the compiled file descriptors.
+        Returns:
+            _DecoderWrapper: Message decoder for the given network.
+        '''
+        # Create a DescriptorPool to register the compiled file descriptors
+        # DescriptorPool that will be used to register the compiled file descriptors
+        pool: DescriptorPool = DescriptorPool()
+        # Add the compiled file descriptors to the DescriptorPool
+        for file_proto in file_set.file:
+            pool.Add(file_proto)
+        # Keep parity with the original TypeScript implementation, which expects
+        # the top-level message type `${network}.Pack`.
+        pack_name: str = "Pack"
+        if lib_manager == LibgpsManager:
+            pack_name = "GpsPack"
+        # Fully qualified name of the top-level message type expected in the DescriptorPool
+        full_name = f"{network}.{pack_name}"
+        # Descriptor for the top-level message type in the DescriptorPool
+        message_descriptor = None
+        try:
+            # Find the message descriptor for the top-level message type in the DescriptorPool
+            message_descriptor = pool.FindMessageTypeByName(full_name)
+        except KeyError:
+            # If the message type is not found, search for candidates with the name "Pack"
+            # Fully qualified names of message types named "Pack" found in the descriptor set
+            candidates = [
+                desc.full_name for file_proto in file_set.file
+                for desc in file_proto.message_type if desc.name == "Pack"
+            ]
+            # If no candidates are found,
+            # raise an error indicating that the protobuf message type cannot be found
+            if not candidates:
+                logger.error(
+                    "protobuf_manager: Cannot find protobuf message type '%s'",
+                    full_name
+                )
+                raise RuntimeError(
+                    "Cannot find protobuf message type '{full_name}'"
+                    ) from KeyError(full_name)
+            # If candidates are found,
+            # log a warning and use the first candidate as the message type
+            # Log a warning indicating that the expected message
+            # type was not found and that a candidate will be used instead
+            message_descriptor = pool.FindMessageTypeByName(candidates[0])
+            logger.warning(
+                "protobuf_manager: Cannot find protobuf message type '%s', using '%s' instead",
+                full_name,
+                candidates[0]
+            )
+        # Class corresponding to the found message descriptor,
+        # used for decoding protobuf messages
+        message_class = None
+        try:
+            # Get the message class for the found message descriptor using GetMessageClass
+            message_class = GetMessageClass(message_descriptor)
+        except AttributeError:
+            # If GetMessageClass is not available, use MessageFactory to get the message class
+            message_class = MessageFactory(pool).GetPrototype(
+                message_descriptor
+                )
+        return _DecoderWrapper(message_class, json_format)
+
+    @staticmethod
+    def compile_proto_files(version: str, network: str, cache: str):
+        '''
+        Compiles the .proto files for the specified version and network into a descriptor set.
+        Args:
+            version (str): The version for which the .proto files are being compiled.
+            network (str): The network for which the .proto files are being compiled.
+            cache (str): The cache directory where the .proto files and descriptor sets are stored.
+        Returns:
+            str: The path to the compiled descriptor set file.
+        '''
+        # Directory in the cache where the .proto file for the specified version will be stored
+        version_dir: str = os.path.join(cache, version)
         # If cache directory does not exist, create it
         if not os.path.exists(cache):
             os.makedirs(cache)
         if not os.path.exists(version_dir):
             os.makedirs(version_dir)
-        if not os.path.exists(os.path.join(version_dir, "proto")):
-            os.makedirs(os.path.join(version_dir, "proto"))
-        # Directory in the cache where the compiled descriptor
-        # set for the specified version will be stored
-        pb_dir: str = os.path.join(version_dir, "pb")
-        if not os.path.exists(pb_dir):
-            os.makedirs(pb_dir)
+        proto_dir = os.path.join(version_dir, "proto")
+        if not os.path.exists(proto_dir):
+            os.makedirs(proto_dir)
+        version_pb_dir = os.path.join(version_dir, "pb")
+        if not os.path.exists(version_pb_dir):
+            os.makedirs(version_pb_dir)
         # Create files for the .proto descriptor and the compiled descriptor set
+        # Path to the .proto file for the specified version and network
         proto_file: str = os.path.join(version_dir, "proto",
                                        f"{network}.proto")
-        '''Path to the .proto file for the specified version and network'''
+        # File that will store the compiled descriptor set
         descriptor_set_file: str = os.path.join(version_dir, "pb",
                                                 f"{network}.pb")
-        '''File that will store the compiled descriptor set'''
         # Compile the .proto file into a descriptor set using protoc
         logger.info(
             "protobuf_manager: protoc -I%s --descriptor_set_out=%s --include_imports %s",
@@ -506,70 +599,9 @@ class _DecoderWrapper:
                 version
             )
             raise RuntimeError(
-                "Failed to compile downloaded .proto descriptor")
-        file_set: FileDescriptorSet = FileDescriptorSet()
-        '''protobuf descriptor set that will be populated with the compiled descriptor data'''
-        # Read the compiled descriptor set from the file and
-        # parse it into a FileDescriptorSet object
-        with open(descriptor_set_file, "rb") as fh:
-            file_set.ParseFromString(fh.read())
-        # Create a DescriptorPool to register the compiled file descriptors
-        pool: DescriptorPool = DescriptorPool()
-        '''DescriptorPool that will be used to register the compiled file descriptors'''
-        # Add the compiled file descriptors to the DescriptorPool
-        for file_proto in file_set.file:
-            pool.Add(file_proto)
-        # Keep parity with the original TypeScript implementation, which expects
-        # the top-level message type `${network}.Pack`.
-        pack_name: str = "Pack"
-        if lib_manager == LibgpsManager:
-            pack_name = "GpsPack"
-        full_name = f"{network}.{pack_name}"
-        '''Fully qualified name of the top-level message type expected in the DescriptorPool'''
-        message_descriptor = None
-        '''Descriptor for the top-level message type in the DescriptorPool'''
-        try:
-            # Find the message descriptor for the top-level message type in the DescriptorPool
-            message_descriptor = pool.FindMessageTypeByName(full_name)
-        except KeyError:
-            # If the message type is not found, search for candidates with the name "Pack"
-            candidates = [
-                desc.full_name for file_proto in file_set.file
-                for desc in file_proto.message_type if desc.name == "Pack"
-            ]
-            '''Fully qualified names of message types named "Pack" found in the descriptor set'''
-            # If no candidates are found,
-            # raise an error indicating that the protobuf message type cannot be found
-            if not candidates:
-                logger.error(
-                    "protobuf_manager: Cannot find protobuf message type '%s'",
-                    full_name
+                "Failed to compile downloaded .proto descriptor"
                 )
-                raise RuntimeError(
-                    "Cannot find protobuf message type '%s'", 
-                    full_name
-                    )
-            # If candidates are found,
-            # log a warning and use the first candidate as the message type
-            # Log a warning indicating that the expected message
-            # type was not found and that a candidate will be used instead
-            message_descriptor = pool.FindMessageTypeByName(candidates[0])
-            logger.warning(
-                "protobuf_manager: Cannot find protobuf message type '%s', using '%s' instead",
-                full_name,
-                candidates[0]
-            )
-        # Class corresponding to the found message descriptor,
-        # used for decoding protobuf messages
-        message_class = None
-        try:
-            # Get the message class for the found message descriptor using GetMessageClass
-            message_class = GetMessageClass(message_descriptor)
-        except AttributeError:
-            # If GetMessageClass is not available, use MessageFactory to get the message class
-            message_class = MessageFactory(pool).GetPrototype(
-                message_descriptor)
-        return _DecoderWrapper(message_class, json_format)
+        return descriptor_set_file
 
     def __str__(self):
         return "_DecoderWrapper" \
