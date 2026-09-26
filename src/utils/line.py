@@ -1,3 +1,7 @@
+"""
+Represents a single measurement line for InfluxDB.
+"""
+
 import json
 from typing import Any
 
@@ -35,7 +39,7 @@ class Line:
         Args:
             obj (dict[str, Any]): The dictionary object to convert.
         Returns:
-            str: A string representation of the dictionary in the format "key1=value1, key2=value2, ...".
+            str: A string representation of the dictionary.
         '''
         return ", ".join(f"{k}={v}" for k, v in obj.items())
 
@@ -53,7 +57,12 @@ class Line:
         Raises:
             ValueError: If the timestamp is missing or invalid in the input object.
         '''
-        #logger.debug(f"Creating Line from object: {Line.obj_to_str(obj)} with measurement: {measurement} and tags: {tags}")
+        #logger.debug(
+        #    "Creating Line from object: %s with measurement: %s and tags: %s",
+        #    Line.obj_to_str(obj),
+        #    measurement,
+        #    Line.obj_to_str(tags)
+        #    )
         timestamp = obj.get(TIMESTAMP_KEYS[0])
         # Check for timestamp in the possible keys defined in TIMESTAMP_KEYS
         for key in TIMESTAMP_KEYS:
@@ -76,13 +85,14 @@ class Line:
         }
         if len(fields) == 0:
             raise ValueError("Missing fields")
-        #logger.info(f"Influx Connection: Measurement '{measurement}' and timestamp {timestamp_value}")
+        #logger.info(
+        #    "Influx Connection: Measurement '%s' and timestamp %s",
+        #    measurement,
+        #    timestamp_value
+        #)
         return Line(measurement=measurement,
                     tags=tags,
-                    fields={
-                        k: v
-                        for k, v in fields.items()
-                    },
+                    fields=dict(fields.items()),
                     timestamp=timestamp_value)
 
     @staticmethod
@@ -94,18 +104,20 @@ class Line:
         Normalizes a timestamp based on the specified precision.
         Args:
             timestamp (int): The original timestamp to normalize.
-            timestamp_precision (str): The precision of the timestamp, which can be "ns", "us", "ms", or "s".
+            timestamp_precision (str): The precision of the timestamp.
         Returns:
             int: The normalized timestamp.
         Raises:
-            ValueError: If the normalized timestamp exceeds InfluxDB's maximum value for a 64-bit signed integer.
+            ValueError: If the normalized timestamp exceeds InfluxDB's maximum value.
         '''
         factor: int = TimestampPrecision.get_factor(timestamp_precision)
         if factor is None:
             return timestamp
-        # Normalize the timestamp by dividing it by the factor corresponding to the specified precision
+        # Normalize the timestamp by dividing it by the factor
+        # corresponding to the specified precision
         normalized: int = timestamp // factor
-        # Check if the normalized timestamp exceeds InfluxDB's maximum value for a 64-bit signed integer
+        # Check if the normalized timestamp exceeds InfluxDB's
+        # maximum value for a 64-bit signed integer
         if normalized > INFLUX_INT64_MAX:
             raise ValueError(
                 f"Timestamp {timestamp} is out of range for InfluxDB")
@@ -118,7 +130,7 @@ class Line:
         '''
         Converts the Line object to an InfluxDB Point object.
         Args:
-            timestamp_precision (str): The precision of the timestamp for the InfluxDB Point, which can be "ns", "us", "ms", or "s". Default is "us".
+            timestamp_precision (str): The precision of the timestamp for the InfluxDB Point.
         Returns:
             influxdb_client.Point: The converted InfluxDB Point object.
         '''
@@ -141,10 +153,10 @@ class Line:
                 return f'{k}="{v.decode("utf-8", errors="replace")}"'
             if isinstance(v, str):
                 return f'{k}="{v}"'
-            else:
-                return f"{k}={v}"
+            return f"{k}={v}"
 
-        # Create a string representation of the fields in the format "key1=value1, key2=value2, ..."
+        # Create a string representation of the fields
+        # in the format "key1=value1, key2=value2, ..."
         fields_str = ",".join(
             field_to_str(k, v) for k, v in self.fields.items())
         tags_str = ",".join(f"{k}={v}" for k, v in self.tags.items())
