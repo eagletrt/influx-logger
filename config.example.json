@@ -1,0 +1,26 @@
+{
+    "mqtt" : {
+        "url" : "mosquitto",
+        "port" : 1883,
+        "username" : "optional_username",
+        "password" : "optional_password"
+    },
+    "influx" : {
+        "url" : "influxdb",
+        "port" : 8086,
+        "token" : "influx_token",
+        "org" : "eagletrt",
+        "buckets" : {
+            "adr" : "telemetry_adr",
+            "logs" : "telemetry_log"
+        }
+    },
+    "vehicle_whitelist" : [ 
+        "kraken"
+    ],
+    "github_token" : "optional_github_personal_access_token",
+    "log_on_mqtt" : "kraken/onboard/info/status/influx-logger",
+    "excluded_networks" : [
+        "odometer"
+    ]
+}
