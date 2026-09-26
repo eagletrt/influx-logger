@@ -15,7 +15,7 @@ yapf --in-place --parallel --recursive src/*
 echo "🔍 Running pylint..."
 
 set +e
-PYLINT_OUTPUT=$(pylint -r y src)
+PYLINT_OUTPUT=$(PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" pylint -r y src)
 set -e
 
 echo "$PYLINT_OUTPUT"

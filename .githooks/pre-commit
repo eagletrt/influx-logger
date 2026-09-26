@@ -13,11 +13,13 @@ fi
 if command -v docker &> /dev/null; then
     echo "🐳 Local tools not found. Running checks inside Docker..."
 
-    docker run --rm \
-        -v "$(pwd)":/workspace \
-        -w /workspace \
-        python:3.14-slim \
-        bash -c "pip install --quiet ruff yapf pylint && bash .githooks/check.sh"
+    # If it isn't already built, build the Docker image for linting
+    if ! docker image inspect repo-linter &> /dev/null; then
+        echo "📦 Building Docker image for linting..."
+        docker build -t repo-linter -f .githooks/Dockerfile.lint .
+    fi
+    # Mount repo root, install dependencies, and execute check.sh
+    docker run --rm -v "$(pwd)":/workspace -w /workspace repo-linter bash .githooks/check.sh
 
     # Re-stage files formatted by yapf inside Docker
     git add src/
