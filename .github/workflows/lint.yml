@@ -46,5 +46,5 @@ jobs:
           
           echo "Pylint score: $SCORE"
           
-          python3 -c "import sys; score=float(sys.argv[1]); sys.exit(0 if score >= 9.8 else 1)" "$SCORE" || \
-          (echo "❌ Pylint score ($SCORE) is below 9.8 threshold." && exit 1)
+          python3 -c "import sys; score=float(sys.argv[1]); sys.exit(0 if score >= 9.95 else 1)" "$SCORE" || \
+          (echo "❌ Pylint score ($SCORE) is below 9.95 threshold." && exit 1)

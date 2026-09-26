@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from google.protobuf import json_format
-from google.protobuf import descriptor_pb2
+from google.protobuf.descriptor_pb2 import FileDescriptorSet  # pylint: disable=no-name-in-module
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.message_factory import GetMessageClass, MessageFactory
 from grpc_tools import protoc
@@ -430,8 +430,7 @@ class _DecoderWrapper:
         descriptor_set_file = _DecoderWrapper.compile_proto_files(
             version, network, cache)
         # protobuf descriptor set that will be populated with the compiled descriptor data
-        file_set: descriptor_pb2.FileDescriptorSet = descriptor_pb2.FileDescriptorSet(  # pylint: disable=no-member
-        )
+        file_set: FileDescriptorSet = FileDescriptorSet()
         # Read the compiled descriptor set from the file and
         # parse it into a FileDescriptorSet object
         with open(descriptor_set_file, "rb") as fh:
@@ -441,7 +440,7 @@ class _DecoderWrapper:
 
     @staticmethod
     def build_message_prototype(network: str, lib_manager: type,
-                                file_set: descriptor_pb2.FileDescriptorSet):
+                                file_set: FileDescriptorSet):
         '''
         Builds a message prototype for the given protobuf descriptor and network.
         Args:

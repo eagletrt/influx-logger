@@ -250,6 +250,11 @@ class InfluxWriter(InfluxManager):
             self.parser.get_points_count()) or self.parser.timer_expired
 
     def run(self) -> None:
+        """
+        Main loop for processing incoming data and committing points to InfluxDB.
+        Continuously checks the parser for new points and commits them to InfluxDB
+        when the batch size limit is reached or the parser's timer expires.
+        """
         try:
             self.parser.start()
         except Exception:  # pylint: disable=broad-except

@@ -40,6 +40,10 @@ class InfluxReader(InfluxManager):
         self.query_queue.put((vehicle_id, device_id, transaction_id, payload))
 
     def run(self) -> None:
+        """
+        Main loop for processing incoming query requests.
+        Continuously checks the query queue for new requests and processes them.
+        """
         logger.info("InfluxReader: Thread started for query processing.")
         while not self.stopped():
             try:
