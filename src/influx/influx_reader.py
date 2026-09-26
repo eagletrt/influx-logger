@@ -1,3 +1,7 @@
+"""
+A reader for interacting with InfluxDB. Handles incoming query requests,
+fetches data, formats it as CSV, and publishes it back over MQTT.
+"""
 import csv
 import gzip
 import io
@@ -47,22 +51,20 @@ class InfluxReader(InfluxManager):
             except Empty:
                 continue
             except Exception as e:
-                logger.error(f"InfluxReader: Error in main loop: {e}")
+                logger.error("InfluxReader: Error in main loop: %s", e)
 
     def _process_query(self, vehicle_id: str, device_id: str,
                        transaction_id: str, payload: bytes) -> None:
-        logger.info(
-            f"InfluxReader: Starting query {transaction_id} for {vehicle_id}/{device_id}"
-        )
+        logger.info("InfluxReader: Starting query %s for %s/%s",
+                    transaction_id, vehicle_id, device_id)
 
         try:
             req_data = json.loads(payload.decode('utf-8'))
             start_time = req_data.get("start")
             stop_time = req_data.get("stop")
 
-            logger.info(
-                f"InfluxReader: Query {transaction_id} - Start: {start_time}, Stop: {stop_time}"
-            )
+            logger.info("InfluxReader: Query %s - Start: %s, Stop: %s",
+                        transaction_id, start_time, stop_time)
 
             if not start_time or not stop_time:
                 raise ValueError(
@@ -72,8 +74,8 @@ class InfluxReader(InfluxManager):
             stop_ns = int(stop_time) * 1_000
 
             logger.info(
-                f"InfluxReader: Query {transaction_id} - Converted Start: {start_ns}, Stop: {stop_ns}"
-            )
+                "InfluxReader: Query %s - Converted Start: %s, Stop: %s",
+                transaction_id, start_ns, stop_ns)
 
             flux_query = f'''
                 from(bucket: "{self.log_bucket}")
@@ -85,23 +87,20 @@ class InfluxReader(InfluxManager):
                 |> group(columns: ["network", "_measurement"])
             '''
 
-            logger.info(
-                f"InfluxReader: Query {transaction_id} - Executing Flux query:\n{flux_query}"
-            )
+            logger.info("InfluxReader: Query %s - Executing Flux query:\n%s",
+                        transaction_id, flux_query)
 
             tables = self.query_api.query(flux_query, org=self.client.org)
-            logger.info(
-                f"InfluxReader: Query {transaction_id} returned {len(tables)} tables."
-            )
+            logger.info("InfluxReader: Query %s returned %d tables.",
+                        transaction_id, len(tables))
             for table in tables:
-                logger.info(
-                    f"InfluxReader: Processing table with {len(table.records)} records."
-                )
+                logger.info("InfluxReader: Processing table with %d records.",
+                            len(table.records))
                 records = table.records
                 if not records:
                     logger.warning(
-                        f"InfluxReader: Table with no records found for query {transaction_id}."
-                    )
+                        "InfluxReader: Table with no records found for query %s.",
+                        transaction_id)
                     continue
 
                 network_name = records[0].values.get("network", "unknown")
@@ -159,24 +158,26 @@ class InfluxReader(InfluxManager):
                 csv_content = csv_buffer.getvalue()
                 compressed_content = gzip.compress(csv_content.encode('utf-8'))
 
-                topic_out = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{network_name}--{measurement_name.lower()}"
+                topic_out = (
+                    f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/"
+                    f"{network_name}--{measurement_name.lower()}")
 
                 self.mqtt.connection.publish(topic_out,
                                              compressed_content,
                                              qos=0)
                 logger.info(
-                    f"InfluxReader: Sent compressed CSV for '{network_name}--{measurement_name.lower()}' ({len(records)} rows)."
-                )
+                    "InfluxReader: Sent compressed CSV for '%s--%s' (%d rows).",
+                    network_name, measurement_name.lower(), len(records))
 
             eof_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/eof"
             self.mqtt.connection.publish(eof_topic, b"",
                                          qos=0)  # <-- Added .connection
-            logger.info(
-                f"InfluxReader: Query {transaction_id} completed (EOF sent).")
+            logger.info("InfluxReader: Query %s completed (EOF sent).",
+                        transaction_id)
 
         except Exception as e:
-            logger.error(
-                f"InfluxReader: Error during query {transaction_id}: {e}")
+            logger.error("InfluxReader: Error during query %s: %s",
+                         transaction_id, e)
             error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/error"
             self.mqtt.connection.publish(error_topic,
                                          json.dumps({
