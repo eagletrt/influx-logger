@@ -1,2 +1,4 @@
 FROM python:3.11-slim
 RUN pip install --no-cache-dir yapf pylint
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
