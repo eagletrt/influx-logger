@@ -430,7 +430,7 @@ class _DecoderWrapper:
         descriptor_set_file = _DecoderWrapper.compile_proto_files(
             version, network, cache)
         # protobuf descriptor set that will be populated with the compiled descriptor data
-        file_set: descriptor_pb2.FileDescriptorSet = descriptor_pb2.FileDescriptorSet(
+        file_set: descriptor_pb2.FileDescriptorSet = descriptor_pb2.FileDescriptorSet(  # pylint: disable=no-member
         )
         # Read the compiled descriptor set from the file and
         # parse it into a FileDescriptorSet object
@@ -501,8 +501,10 @@ class _DecoderWrapper:
             message_class = GetMessageClass(message_descriptor)
         except AttributeError:
             # If GetMessageClass is not available, use MessageFactory to get the message class
-            message_class = MessageFactory(pool).GetPrototype(
-                message_descriptor)
+            #message_class = MessageFactory(pool).GetPrototype(
+            #    message_descriptor)
+            get_prototype = getattr(MessageFactory(pool), "GetPrototype")
+            message_class = get_prototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
 
     @staticmethod
