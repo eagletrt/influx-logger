@@ -1,3 +1,11 @@
+"""
+This module provides a logger instance that can be used throughout
+the application.
+The logger is configured to log messages to the standard
+output (stdout) and supports a custom TRACE log level for
+detailed debugging information.
+"""
+
 import logging
 import os
 import sys
@@ -17,8 +25,8 @@ def _trace(self, message, *args, **kws):
 
 logging.Logger.trace = _trace
 
-level_name = "TRACE" if os.getenv("NODE_ENV") == "development" else "INFO"
-level = logging.getLevelName(level_name)
+LEVEL_NAME = "TRACE" if os.getenv("NODE_ENV") == "development" else "INFO"
+level = logging.getLevelName(LEVEL_NAME)
 
 logger = logging.getLogger("influx_logger")
 logger.setLevel(level)
