@@ -1,0 +1,47 @@
+name: Quality & Formatting Checks
+
+on:
+  push:
+    branches: [ "master", "dev" ]
+  pull_request:
+    branches: [ "master", "dev" ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yapf pylint
+
+      - name: Check yapf formatting
+        run: |
+          yapf --in-place --parallel --recursive src/*
+          git diff --exit-code || (echo "❌ Code is not formatted according to yapf. Please run yapf locally." && exit 1)
+
+      - name: Check pylint score
+        run: |
+          PYLINT_OUTPUT=$(pylint -r y src) || true
+          echo "$PYLINT_OUTPUT"
+          
+          SCORE=$(echo "$PYLINT_OUTPUT" | awk -F'rated at ' '/rated at/ {split($2, a, "/"); print a[1]}')
+          
+          if [ -z "$SCORE" ]; then
+            echo "❌ Could not parse pylint score."
+            exit 1
+          fi
+          
+          echo "Pylint score: $SCORE"
+          
+          python3 -c "import sys; score=float(sys.argv[1]); sys.exit(0 if score >= 9.5 else 1)" "$SCORE" || \
+          (echo "❌ Pylint score ($SCORE) is below 9.5 threshold." && exit 1)
