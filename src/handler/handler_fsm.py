@@ -100,18 +100,21 @@ class HandlerFSM(Thread, StateMachine):
         """
         Draws the FSM structure and saves it to a file.
         Args:
-            filename (str): The name of the file to save the FSM diagram. Defaults to 'handler_fsm.png'.
+            filename (str): The name of the file to save the FSM diagram.
         """
         DotGraphMachine(HandlerFSM).get_graph().write_png(filename)
 
     def log_on_mqtt(self) -> None:
         """
-        Logs the current state of the FSM to the configured MQTT topic if the MQTT connection is established
-        and the log_on_mqtt configuration is set. It publishes a message containing the current state of the FSM to the specified MQTT topic.
+        Logs the current state of the FSM to the configured MQTT topic
+        if the MQTT connection is established
+        and the log_on_mqtt configuration is set.
+        It publishes a message containing the current state of
+        the FSM to the specified MQTT topic.
         """
         msg = f"{self.current_state}"
-        if self.config and self.config.log_on_mqtt and self.handler and self.handler.mqtt and self.handler.mqtt.is_connected(
-        ):
+        if (self.config and self.config.log_on_mqtt and self.handler
+                and self.handler.mqtt and self.handler.mqtt.is_connected()):
             try:
                 result = self.handler.mqtt.connection.publish(
                     topic=self.config.log_on_mqtt,
@@ -119,12 +122,11 @@ class HandlerFSM(Thread, StateMachine):
                 )
                 if result.rc != 0:
                     logger.error(
-                        f"{self.get_log_header()} - Failed to publish log message to MQTT, return code: {result.rc}"
-                    )
+                        "%s - Failed to publish log message to MQTT, return code: %d",
+                        self.get_log_header(), result.rc)
             except Exception as e:
-                logger.error(
-                    f"{self.get_log_header()} - Failed to publish log message to MQTT: {e}"
-                )
+                logger.error("%s - Failed to publish log message to MQTT: %s",
+                             self.get_log_header(), str(e))
 
     def log_status(self, message: str):
         """
@@ -132,12 +134,13 @@ class HandlerFSM(Thread, StateMachine):
         Args:
             message (str): The message to log.
         """
-        logger.info(f"{self.get_log_header()} - {message}")
+        logger.info("%s - %s", self.get_log_header(), message)
         self.log_on_mqtt()
 
     def get_log_header(self) -> str:
         """
-        Returns a string containing the name of the FSM and its current state for logging purposes.
+        Returns a string containing the name of the FSM
+        and its current state for logging purposes.
         Returns:
             str: A string containing the name of the FSM and its current state.
         """
@@ -154,44 +157,65 @@ class HandlerFSM(Thread, StateMachine):
 
     def on_connection(self):
         """
-        Event triggered when a connection is established. It checks if both connections are established and transitions to the appropriate state.
-        If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
-        If neither connection is established, it remains in the idle state and continues to check for both connections.
+        Event triggered when a connection is established.
+        It checks if both connections are established and transitions
+        to the appropriate state.
+        If both connections are established, it transitions to the running
+        state. If only one connection is established, it remains in the
+        idle state and continues to check for both connections.
+        If neither connection is established, it remains in the idle state
+        and continues to check for both connections.
         """
         self.log_status("on_connection event triggered")
 
     def on_disconnection(self):
         """
-        Event triggered when a disconnection occurs. It checks if both connections are still established and transitions to the appropriate state.
-        If both connections are still established, it remains in the running state. If one or both connections are lost, it transitions to the idle state and continues to check for both connections.
+        Event triggered when a disconnection occurs. It checks if both
+        connections are still established and transitions to the
+        appropriate state.
+        If both connections are still established, it remains in the
+        running state.
+        If one or both connections are lost, it transitions to the
+        idle state and continues to check for both connections.
         """
         self.log_status("on_disconnection event triggered")
         self.msg_dispatcher.stop()
 
     def on_finish(self):
         """
-        Event triggered when the finish event is called. It transitions to the final state and performs any necessary cleanup operations.
+        Event triggered when the finish event is called.
+        It transitions to the final state and performs any necessary
+        cleanup operations.
         """
         self.log_status("on_finish event triggered")
 
     def on_enter_starting(self):
         """
-        Method called when entering the start state. It initializes the connections and prepares the handler for operation.
+        Method called when entering the start state.
+        It initializes the connections and prepares the handler for
+        operation.
         """
         self.log_status("Entering start state")
 
     def on_enter_idling(self):
         """
-        Method called when entering the idle state. It starts the connections and waits for both connections to be established before transitioning to the running state.
-        If both connections are not established, it remains in the idle state and continues to check for both connections.
+        Method called when entering the idle state.
+        It starts the connections and waits for both connections to be
+        established before transitioning to the running state.
+        If both connections are not established, it remains in the idle
+        state and continues to check for both connections.
         """
         self.log_status("Entering idle state")
         self.do_idle()
 
     def on_enter_running(self):
         """
-        Method called when entering the running state. It starts the handler's main operation, which involves processing incoming data and logging it to InfluxDB.
-        If either connection is lost while in the running state, it transitions back to the idle state and continues to check for both connections.
+        Method called when entering the running state.
+        It starts the handler's main operation, which involves processing
+        incoming data and logging it to InfluxDB.
+        If either connection is lost while in the running state, it
+        transitions back to the idle state and continues to check for
+        both connections.
         """
         self.log_status("Entering running state")
         # Set the InfluxWriter and MQTT connection in the MsgDispatcher
@@ -207,20 +231,25 @@ class HandlerFSM(Thread, StateMachine):
                 log_bucket=self.config.influx.buckets["adr"]),
             mqtt=self.handler.mqtt,
         )
-        # Check if there are already messages on the MQTT broker and handle them before starting the main operation
+        # Check if there are already messages on the MQTT broker and
+        # handle them before starting the main operation
         self.msg_dispatcher.handle_existing_messages()
         self.do_run()
 
     def on_enter_final(self):
         """
-        Method called when entering the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
+        Method called when entering the stop state.
+        It performs any necessary cleanup operations, such as stopping
+        the connections and releasing resources.
         """
         self.log_status("Entering stop state")
         self.do_stop()
 
     def do_start(self):
         """
-        Method to start the FSM. It triggers the init event to transition from the start state to the idle state and begins the FSM operation.
+        Method to start the FSM.
+        It triggers the init event to transition from the start state
+        to the idle state and begins the FSM operation.
         """
         if self.config.github_token and self.config.github_token != "":
             LibcanManager.TOKEN = self.config.github_token
@@ -233,9 +262,15 @@ class HandlerFSM(Thread, StateMachine):
 
     def do_idle(self):
         """
-        Method to handle the idle state. It triggers the connection event to check for both connections and transition to the appropriate state based on the connection status.
-        If both connections are established, it transitions to the running state. If only one connection is established, it remains in the idle state and continues to check for both connections.
-        If neither connection is established, it remains in the idle state and continues to check for both connections.
+        Method to handle the idle state.
+        It triggers the connection event to check for both connections and
+        transition to the appropriate state based on the connection status.
+        If both connections are established, it transitions to the running
+        state.
+        If only one connection is established, it remains in the idle state
+        and continues to check for both connections.
+        If neither connection is established, it remains in the idle state
+        and continues to check for both connections.
         """
         self.__event = False
         self.handler.start_connections()
@@ -251,8 +286,12 @@ class HandlerFSM(Thread, StateMachine):
 
     def do_run(self):
         """
-        Method to handle the running state. It performs the main operation of the handler, which involves processing incoming data and logging it to InfluxDB.
-        If either connection is lost while in the running state, it triggers the disconnection event to transition back to the idle state and continues to check for both connections.
+        Method to handle the running state.
+        It performs the main operation of the handler, which involves
+        processing incoming data and logging it to InfluxDB.
+        If either connection is lost while in the running state, it
+        triggers the disconnection event to transition back to the idle
+        state and continues to check for both connections.
         """
         self.__event = False
         while not self.__event and self.are_both_connected():
@@ -265,7 +304,9 @@ class HandlerFSM(Thread, StateMachine):
 
     def do_stop(self):
         """
-        Method to handle the stop state. It performs any necessary cleanup operations, such as stopping the connections and releasing resources.
+        Method to handle the stop state.
+        It performs any necessary cleanup operations, such as stopping
+        the connections and releasing resources.
         """
         self.msg_dispatcher.graceful_stop()
         self.handler.stop_connections()
@@ -273,8 +314,11 @@ class HandlerFSM(Thread, StateMachine):
 
     def do_state(self):
         """
-        Method to handle the current state of the FSM. It checks the current state and calls the appropriate method to handle that state.
-        This method is called in the run method to continuously check and handle the current state of the FSM.
+        Method to handle the current state of the FSM.
+        It checks the current state and calls the appropriate
+        method tohandle that state.
+        This method is called in the run method to continuously
+        check andhandle the current state of the FSM.
         """
         if self.current_state == self.starting:
             self.do_start()
@@ -287,7 +331,9 @@ class HandlerFSM(Thread, StateMachine):
 
     def stop_machine(self):
         """
-        Method to stop the FSM. It triggers the finish event to transition to the final state and perform any necessary cleanup operations.
+        Method to stop the FSM.
+        It triggers the finish event to transition to the final state
+        and perform any necessary cleanup operations.
         """
         self.__event = True
         self.send('finish')
@@ -305,13 +351,14 @@ class HandlerFSM(Thread, StateMachine):
 
     def on_message(self, topic: str, payload: bytes):
         '''
-        Callback method to handle incoming MQTT messages. It is called by the MQTT connection when a message is received.
+        Callback method to handle incoming MQTT messages.
+        It is called by the MQTT connection when a message is received.
         Args:
             topic (str): The topic of the incoming MQTT message.
             payload (bytes): The payload of the incoming MQTT message.
         '''
         # Handle message only if the FSM is in the running state
-        logger.debug(
-            f"{self.get_log_header()} - Received message on topic: {topic}")
+        logger.debug("%s - Received message on topic: %s",
+                     self.get_log_header(), topic)
         if self.current_state == self.running:
             self.msg_dispatcher.handle_incoming_message(topic, payload)
