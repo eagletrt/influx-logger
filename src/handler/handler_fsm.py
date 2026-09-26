@@ -102,7 +102,7 @@ class HandlerFSM(Thread, StateMachine):
         Args:
             filename (str): The name of the file to save the FSM diagram.
         """
-        DotGraphMachine(HandlerFSM).get_graph().write_png(filename)
+        DotGraphMachine(HandlerFSM).get_graph().write(filename, format='png')
 
     def log_on_mqtt(self) -> None:
         """

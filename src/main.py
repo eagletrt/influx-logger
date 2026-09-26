@@ -37,11 +37,11 @@ def main(argv=None):
         conf: str = "config.json"
     else:
         conf: str = argv[1]
-    #try:
-    configuration: Configuration = Configuration.load_from_file(conf)
-    #except Exception as e:
-    #    logger.error(f"Failed to load configuration from %s: %s", conf, e)
-    #    sys.exit(1)
+    try:
+        configuration: Configuration = Configuration.load_from_file(conf)
+    except Exception as e:
+        logger.error(f"Failed to load configuration from %s: %s", conf, e)
+        sys.exit(1)
     logger.info("Configuration loaded from %s: %s", conf, configuration)
     stop: bool = False
     while not stop:
@@ -54,7 +54,7 @@ def main(argv=None):
             logger.info("Ctrl+C received, stopping handler")
             safe_stop(handler)
         except Exception as e:
-            logger.error("HandlerFSM encountered an error: %s", e)
+            logger.error("HandlerFSM encountered an error: %s", str(e))
             try:
                 handler.stop_machine()
                 handler.join()
