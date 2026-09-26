@@ -8,7 +8,9 @@ on:
 
 jobs:
   code-quality:
-    runs-on: ubuntu-latest
+    runs-on: 
+      group: ci-runners
+      labels: Linux
 
     steps:
       - name: Checkout code
