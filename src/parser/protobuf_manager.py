@@ -68,7 +68,7 @@ class ProtobufManager:
                 # Instance of _DecoderWrapper that can decode messages for the given network
                 decoder = _DecoderWrapper.build_decoder(
                     version=version, network=network, lib_manager=lib_manager)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "protobuf_manager: Failed to build decoder for network '%s' (version %s): %s",
                     network, version, e)
@@ -87,7 +87,7 @@ class ProtobufManager:
             logger.info(
                 "protobuf_manager: Descriptor %s (version %s) is now ready for deserialize data",
                 network, version)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             logger.error(
                 "protobuf_manager: " \
                 "Downloaded proto descriptor for network '%s' "
@@ -147,7 +147,7 @@ class LibManager(ABC):
                 logger.warning(
                     "protobuf_manager: Request to %s failed with status code %s: %s",
                     check_url, resp.status_code, resp.text)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "protobuf_manager: " \
                     "Failed to check commit existence for hash '%s' at URL '%s'",
@@ -210,7 +210,7 @@ class LibManager(ABC):
                 resp = get(url, headers=headers, timeout=10)
                 if resp and resp.ok:
                     break
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "protobuf_manager: "
                     "Error while downloading proto for network '%s' (version %s)",
@@ -236,7 +236,7 @@ class LibManager(ABC):
                       encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             logger.error(
                 "protobuf_manager: "
                 "Failed to save downloaded proto for network '%s' (version %s)",
@@ -421,7 +421,7 @@ class _DecoderWrapper:
             # descriptor sets for the specified library
             cache: str = lib_manager.CACHE_DIR
             logger.info("protobuf_manager: Using cache directory '%s'", cache)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             logger.error(
                 "protobuf_manager: Invalid lib_manager provided." \
                 "It must have a CACHE_DIR attribute."
@@ -548,7 +548,7 @@ class _DecoderWrapper:
                 f"--descriptor_set_out={descriptor_set_file}",
                 "--include_imports", proto_file
             ])
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             logger.error(
                 "protobuf_manager: " \
                     "Failed to compile downloaded .proto descriptor for network '%s'",

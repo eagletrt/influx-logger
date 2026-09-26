@@ -183,7 +183,7 @@ class Parser(Thread):
                 if not self.protobuf_manager.download_proto_descriptor(
                         version, network):
                     return
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "parser: Error while getting proto, skipping message")
                 return
@@ -195,7 +195,7 @@ class Parser(Thread):
                 network]
             # Expect decoder to provide a `decode` method returning a dict-like object
             message_content = decoder.decode(payload)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 "parser: Cannot deserialize payload with saved descriptor: %s",
                 str(e))
@@ -282,7 +282,7 @@ class Parser(Thread):
                     try:
                         if additional_signals and isinstance(record, dict):
                             record.update(additional_signals)
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-exception-caught
                         #logger.warning(
                         #    "parser: Failed to update record with additional" \
                         #        "signals for measurement" \
@@ -358,7 +358,7 @@ class Parser(Thread):
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
                     measurement, str(e))
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
                     measurement, str(e))
