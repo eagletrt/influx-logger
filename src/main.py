@@ -39,8 +39,8 @@ def main(argv=None):
         conf: str = argv[1]
     try:
         configuration: Configuration = Configuration.load_from_file(conf)
-    except Exception as e:
-        logger.error(f"Failed to load configuration from %s: %s", conf, e)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to load configuration from %s: %s", conf, e)
         sys.exit(1)
     logger.info("Configuration loaded from %s: %s", conf, configuration)
     stop: bool = False
@@ -53,12 +53,12 @@ def main(argv=None):
         except KeyboardInterrupt:
             logger.info("Ctrl+C received, stopping handler")
             safe_stop(handler)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("HandlerFSM encountered an error: %s", str(e))
             try:
                 handler.stop_machine()
                 handler.join()
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
             stop = False
 
