@@ -5,7 +5,8 @@ handlers based on the topic.
 """
 
 from collections.abc import Callable
-from re import Pattern, compile as re_compile
+from re import Pattern
+from re import compile as re_compile
 
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_reader import InfluxReader
