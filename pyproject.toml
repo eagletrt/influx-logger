@@ -42,5 +42,9 @@ packages = [
     {include = "src"}
 ]
 
+[tool.ruff]
+line-length = 100
+extend-exclude = ["test"]
+
 [tool.ruff.lint]
 select = ["E", "F", "UP", "I", "N"]

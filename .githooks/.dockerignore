@@ -1,0 +1,14 @@
+node_modules
+bun.lockb
+configuration.json
+config.json
+.git/
+.venv/
+.generated/
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+*.service
