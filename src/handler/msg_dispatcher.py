@@ -5,7 +5,7 @@ handlers based on the topic.
 """
 
 from collections.abc import Callable
-from re import Pattern, compile
+from re import Pattern, compile as re_compile
 
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_reader import InfluxReader
@@ -102,16 +102,16 @@ class MsgDispatcher:
             )
             return
         # Subscribe to the relevant topics to receive existing messages
-        for topic in self.topic_callbacks.keys():
+        for topic in self.topic_callbacks:
             try:
                 self.mqtt.connection.subscribe(topic)
                 logger.info(
-                    f"msg_dispatcher: Subscribed to topic '{topic}' for existing messages"
-                )
+                    "msg_dispatcher: Subscribed to topic '%s' for existing messages",
+                    topic)
             except Exception as e:
                 logger.error(
-                    f"msg_dispatcher: Failed to subscribe to topic '{topic}': {e}"
-                )
+                    "msg_dispatcher: Failed to subscribe to topic '%s': %s",
+                    topic, str(e))
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -121,8 +121,8 @@ class MsgDispatcher:
             topic (str): The topic of the incoming MQTT message.
             payload (bytes): The payload of the incoming MQTT message.
         '''
-        logger.debug(
-            f"MQTT Connection: Handling incoming message on topic: {topic}")
+        logger.debug("MQTT Connection: Handling incoming message on topic: %s",
+                     topic)
         # Iterate through the registered topic handlers and invoke
         # the appropriate handler for the incoming message
         for handler_topic, handler_function in self.topic_callbacks.items():
@@ -147,11 +147,19 @@ class MsgDispatcher:
         pattern = topic.replace("/",
                                 "\\/").replace("+",
                                                "([^\\/]+)").replace("#", ".*")
-        return compile(pattern)
+        return re_compile(pattern)
 
     def handle_version_message(self, library: type[LibcanManager]
                                | type[LibgpsManager], version: str,
                                ids: list[str]) -> None:
+        """
+        Handles incoming version messages by checking the existence of
+        the commit and subscribing to data topics if the commit exists.
+        Args:
+            library (type): The library manager class (LibcanManager or LibgpsManager).
+            version (str): The version string received in the message.
+            ids (list[str]): A list containing the vehicle ID and device ID.
+        """
         if not self.mqtt:
             logger.warning(
                 "msg_dispatcher: MQTTConnection is not set. Cannot handle version message."
@@ -162,18 +170,20 @@ class MsgDispatcher:
                 "msg_dispatcher: InfluxWriter is not set. Cannot handle version message."
             )
             return
+        sanitized_version: str = None
         # Regex pattern to sanitize the version string by extracting
         # the commit hash from the version string.
-        VERSION_SANITIZE_REGEX = compile(r"^(\w+)", )
+        version_sanitize_regex = re_compile(r"^(\w+)", )
         try:
-            match = VERSION_SANITIZE_REGEX.search(version)
+            match = version_sanitize_regex.search(version)
             if match:
-                sanitized_version: str = match.group(1)
+                sanitized_version = match.group(1)
         except Exception:
             pass
         if sanitized_version:
             version = sanitized_version
-        logger.info(f"msg_dispatcher: Received version message from {ids}'")
+        logger.info("msg_dispatcher: Received version message from %s",
+                    str(ids))
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
         device_id: str = ids[1] if len(ids) > 1 else "unknown_id"
         if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
@@ -182,19 +192,19 @@ class MsgDispatcher:
             #    vehicle_id, device_id)
             return
         logger.info(
-            f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'"
-        )
+            "msg_dispatcher: Checking existance of commit %s, requested by device '%s/%s'",
+            version, vehicle_id, device_id)
         check = library.check_commit_existence(version)
         if check:
             logger.info(
-                f"msg_dispatcher: Subscribing to data topics for the new device ({vehicle_id}/{device_id})"
-            )
+                "msg_dispatcher: Subscribing to data topics for the new device (%s/%s)",
+                vehicle_id, device_id)
             if self.mqtt.connection:
                 self.mqtt.connection.subscribe(
                     f"{vehicle_id}/{device_id}/data/+")
                 logger.info(
-                    f"msg_dispatcher: Commit {version} exists, device '{vehicle_id}/{device_id}' will be considered"
-                )
+                    "msg_dispatcher: Commit %s exists, device '%s/%s' will be considered",
+                    version, vehicle_id, device_id)
             try:
                 if f"{vehicle_id}/{device_id}" not in self.influx_writer.parser.device_versions:
                     self.influx_writer.parser.device_versions[
@@ -204,36 +214,45 @@ class MsgDispatcher:
                 self.influx_writer.parser.protobuf_manager.version_descriptors[
                     version] = {}
                 logger.info(
-                    f"msg_dispatcher: Device '{vehicle_id}/{device_id}' is now subscribed to data topics, version_descriptors: {self.influx_writer.parser.protobuf_manager.version_descriptors}"
-                )
+                    "msg_dispatcher: Device '%s/%s' is now subscribed to data topics, " \
+                    "version_descriptors: %s",
+                    vehicle_id, device_id, self.influx_writer.parser.
+                    protobuf_manager.version_descriptors)
             except Exception as e:
                 logger.error(
-                    f"msg_dispatcher: Error while subscribing device '{vehicle_id}/{device_id}' to data topics: {e}"
-                )
+                    "msg_dispatcher: Error while subscribing device '%s/%s' to data topics: %s",
+                    vehicle_id, device_id, e)
         else:
             logger.error(
-                f"msg_dispatcher: Device '{vehicle_id}/{device_id}' uses a libcan commit that apparently doesn't exists. This device will not be considered"
+                "msg_dispatcher: Device '%s/%s' uses a libcan commit that " \
+                "apparently doesn't exists. " \
+                "This device will not be considered",
+                vehicle_id,
+                device_id
             )
 
     def handle_libcan_version_message(self, _topic: str, payload: bytes,
                                       ids: list[str]) -> None:
         '''
-        Handles incoming libcan version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Handles incoming libcan version messages by checking the existence of
+        the commit and subscribing to data topics if the commit exists.
         Args:
             _topic (str): The topic of the incoming libcan version message.
             payload (bytes): The payload of the incoming libcan version message.
-            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+            ids (list[str]): A list containing the vehicle ID and device ID.
         '''
         self.handle_version_message(LibcanManager, payload.decode(), ids)
 
     def handle_canlib_version_message(self, _topic: str, payload: bytes,
                                       ids: list[str]) -> None:
         '''
-        Handles incoming CAN library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Handles incoming CAN library version messages by checking
+        the existence of the commit and subscribing to data topics
+        if the commit exists.
         Args:
             _topic (str): The topic of the incoming CAN library version message.
             payload (bytes): The payload of the incoming CAN library version message.
-            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+            ids (list[str]): A list containing the vehicle ID and device ID.
         '''
         # We could think about moving this to a dedicated class
         self.handle_version_message(LibcanManager, payload.decode(), ids)
@@ -241,22 +260,24 @@ class MsgDispatcher:
     def handle_libgps_version_message(self, _topic: str, payload: bytes,
                                       ids: list[str]) -> None:
         '''
-        Handles incoming GPS library version messages by checking the existence of the commit and subscribing to data topics if the commit exists.
+        Handles incoming GPS library version messages by checking the existence
+        of the commit and subscribing to data topics if the commit exists.
         Args:
             _topic (str): The topic of the incoming GPS library version message.
             payload (bytes): The payload of the incoming GPS library version message.
-            ids (list[str]): A list containing the vehicle ID and device ID extracted from the topic.
+            ids (list[str]): A list containing the vehicle ID and device ID.
         '''
         self.handle_version_message(LibgpsManager, payload.decode(), ids)
 
     def handle_data_message(self, _topic: str, payload: bytes,
                             ids: list[str]) -> None:
         '''
-        Handles incoming data messages by deserializing the payload and pushing the records to the line repository.
+        Handles incoming data messages by deserializing the payload and
+        pushing the records to the line repository.
         Args:
             _topic (str): The topic of the incoming data message.
             payload (bytes): The payload of the incoming data message.
-            ids (list[str]): A list containing the vehicle ID, device ID, and network extracted from the topic.
+            ids (list[str]): A list containing the vehicle ID, device ID, and network.
         '''
         if not self.influx_writer:
             logger.warning(
@@ -266,7 +287,9 @@ class MsgDispatcher:
         row_msg: tuple[list[str], bytes] = (ids, payload)
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
         if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
-            #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}' is not in the whitelist.")
+            #logger.debug(
+            #    "msg_dispatcher: Vehicle '%s' is not in the whitelist.",
+            #    vehicle_id)
             return
         self.influx_writer.parser.add_to_queue(row_msg)
 
@@ -278,13 +301,14 @@ class MsgDispatcher:
         """
         if not self.influx_reader:
             logger.warning(
-                "msg_dispatcher: InfluxReader is not set. Cannot handle query request."
+                "msg_dispatcher: InfluxReader is not set. " \
+                "Cannot handle query request."
             )
             return
 
         if len(ids) < 3:
             logger.error(
-                f"msg_dispatcher: Query topic malformed. ids found: {ids}")
+                "msg_dispatcher: Query topic malformed. ids found: %s", ids)
             return
 
         vehicle_id = ids[0]
@@ -297,7 +321,8 @@ class MsgDispatcher:
 
     def stop(self) -> None:
         '''
-        Stops the MsgDispatcher by stopping the InfluxWriter and InfluxReader if they are set.
+        Stops the MsgDispatcher by stopping the InfluxWriter
+        and InfluxReader if they are set.
         '''
         if self.influx_writer:
             self.influx_writer.stop()
@@ -310,14 +335,16 @@ class MsgDispatcher:
 
     def graceful_stop(self) -> None:
         '''
-        Gracefully stops the MsgDispatcher by stopping the InfluxWriter and InfluxReader if they are set, and waiting for their threads to finish.
+        Gracefully stops the MsgDispatcher by stopping the
+        InfluxWriter and InfluxReader if they are set, and waiting
+        for their threads to finish.
         '''
         if self.influx_writer:
             self.influx_writer.graceful_stop()
             self.influx_writer.join()
         if self.influx_reader:
-            self.influx_reader.stop(
-            )  # TODO: Implement graceful stop for InfluxReader if needed
+            # Implement graceful stop for InfluxReader if needed here
+            self.influx_reader.stop()
             self.influx_reader.join()
 
 
