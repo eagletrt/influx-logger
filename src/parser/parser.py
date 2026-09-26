@@ -12,7 +12,7 @@ from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
 
 
-class Parser(Thread):
+class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     '''
     A parser for processing incoming messages and converting them into InfluxDB points.
 

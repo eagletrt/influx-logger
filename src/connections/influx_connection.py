@@ -21,13 +21,14 @@ class InfluxConnection(Connection):
         org: The organization name for the InfluxDB service.
     """
 
-    def __init__(self,
-                 url: str,
-                 token: str,
-                 org: str,
-                 port: int = 8086,
-                 on_state_change=None,
-                 buckets: list = None):
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+            self,
+            url: str,
+            token: str,
+            org: str,
+            port: int = 8086,
+            on_state_change=None,
+            buckets: list = None):
         """
         Initializes the InfluxConnection instance with the provided URL,
         token, organization, and port.

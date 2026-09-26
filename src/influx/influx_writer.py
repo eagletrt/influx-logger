@@ -27,7 +27,7 @@ class InfluxWriter(InfluxManager):
         ready_to_flush_list (list[str]): A list of identifiers for points which are ready.
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         client: InfluxConnection,
         adr_bucket: str = None,

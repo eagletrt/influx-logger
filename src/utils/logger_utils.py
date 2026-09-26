@@ -11,7 +11,7 @@ import os
 import sys
 
 
-class _TraceLevel:
+class _TraceLevel:  # pylint: disable=too-few-public-methods
     TRACE = 5
 
 
@@ -20,7 +20,8 @@ logging.addLevelName(_TraceLevel.TRACE, "TRACE")
 
 def _trace(self, message, *args, **kws):
     if self.isEnabledFor(_TraceLevel.TRACE):
-        self._log(_TraceLevel.TRACE, message, args, **kws)
+        self._log(  # pylint: disable=protected-access
+            _TraceLevel.TRACE, message, args, **kws)
 
 
 logging.Logger.trace = _trace

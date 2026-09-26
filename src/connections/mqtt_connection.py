@@ -11,7 +11,7 @@ from src.connections.connection import Connection
 from src.utils.logger_utils import logger
 
 
-class MQTTConnection(Connection):
+class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attributes
     """
     This class manages the connection to an MQTT broker.
     It extends the abstract Connection class and implements 
@@ -22,13 +22,14 @@ class MQTTConnection(Connection):
         port: The port of the MQTT broker to connect to.
     """
 
-    def __init__(self,
-                 url: str,
-                 port: int = 1883,
-                 username: str = None,
-                 password: str = None,
-                 on_state_change=None,
-                 on_message=None):
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+            self,
+            url: str,
+            port: int = 1883,
+            username: str = None,
+            password: str = None,
+            on_state_change=None,
+            on_message=None):
         super().__init__(url=url, port=port)
         self.username = username
         self.password = password
@@ -48,7 +49,7 @@ class MQTTConnection(Connection):
                    _userdata,
                    _flags,
                    reason_code,
-                   properties=None) -> None:
+                   properties=None) -> None:  # pylint: disable=unused-argument
         """
         Callback function that is called when the
         client receives a CONNACK response from the server.
@@ -92,11 +93,12 @@ class MQTTConnection(Connection):
             self.__subscribe_topics()
         self.__notify_state_change()
 
-    def on_disconnect(self,
-                      client,
-                      _userdata,
-                      reason_code,
-                      properties=None) -> None:
+    def on_disconnect(
+            self,
+            client,
+            _userdata,
+            reason_code,
+            properties=None) -> None:  # pylint: disable=unused-argument
         """
         Callback function that is called when the client disconnects from the server.
         It logs the disconnection event and sets the _connected flag to False.
@@ -123,7 +125,7 @@ class MQTTConnection(Connection):
         self.connection.subscribe("+/+/info/version/libcan")
         self.connection.subscribe("+/+/info/version/gpslib")
 
-    def on_message(self, client, _userdata, msg) -> None:
+    def on_message(self, client, _userdata, msg) -> None:  # pylint: disable=unused-argument
         """
         Callback function that is called when a message is received from the server.
         It logs the received message and invokes the message callback if provided.

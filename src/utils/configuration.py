@@ -140,13 +140,14 @@ class Configuration:
         }
     """
 
-    def __init__(self,
-                 mqtt: MQTTConfig = None,
-                 influx: InfluxConfig = None,
-                 excluded_networks: list = None,
-                 vehicle_whitelist: list = None,
-                 github_token: str = None,
-                 log_on_mqtt: str = None):
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+            self,
+            mqtt: MQTTConfig = None,
+            influx: InfluxConfig = None,
+            excluded_networks: list = None,
+            vehicle_whitelist: list = None,
+            github_token: str = None,
+            log_on_mqtt: str = None):
         self.mqtt: MQTTConfig = mqtt
         self.influx: InfluxConfig = influx
         self.excluded_networks: list = excluded_networks or []

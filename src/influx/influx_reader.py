@@ -53,8 +53,9 @@ class InfluxReader(InfluxManager):
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("InfluxReader: Error in main loop: %s", e)
 
-    def _process_query(self, vehicle_id: str, device_id: str,
-                       transaction_id: str, payload: bytes) -> None:
+    def _process_query(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+            self, vehicle_id: str, device_id: str, transaction_id: str,
+            payload: bytes) -> None:
         logger.info("InfluxReader: Starting query %s for %s/%s",
                     transaction_id, vehicle_id, device_id)
 
