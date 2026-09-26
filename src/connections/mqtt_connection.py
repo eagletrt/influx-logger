@@ -68,7 +68,7 @@ class MQTTConnection(Connection):
                 return
             try:
                 success = int(reason_code) == 0
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 success = not reason_code
 
             if not success:
@@ -134,7 +134,7 @@ class MQTTConnection(Connection):
         try:
             if callable(self.message_callback):
                 self.message_callback(msg.topic, msg.payload)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "mqtt-connection: Error while handling incoming message on topic %s: %s",
                 msg.topic, e)
@@ -156,7 +156,7 @@ class MQTTConnection(Connection):
                 try:
                     self.connection.loop_stop()
                     self.connection.disconnect()
-                except Exception:
+                except Exception:  # pylint: disable=broad-except
                     pass
                 self.connection = None
             try:
@@ -179,7 +179,7 @@ class MQTTConnection(Connection):
                 logger.info(
                     "mqtt-connection: Connection attempt to MQTT broker at %s:%d initiated",
                     self.url, self.port)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.connection = None
                 self._connecting = False
                 self._connected = False
@@ -205,7 +205,7 @@ class MQTTConnection(Connection):
                     self.connection.disconnect()
                     self.connection = None
                 return True
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(
                     "mqtt-connection: Failed to disconnect from MQTT broker at %s:%d: %s",
                     self.url, self.port, e)
@@ -226,7 +226,7 @@ class MQTTConnection(Connection):
             # but we avoid holding our lock while calling into paho at all.
             try:
                 return bool(self.connection.is_connected())
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.warning(
                     "mqtt-connection: Connection to MQTT broker at %s:%d is not alive: %s",
                     self.url, self.port, str(e))

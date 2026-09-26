@@ -124,7 +124,7 @@ class HandlerFSM(Thread, StateMachine):
                     logger.error(
                         "%s - Failed to publish log message to MQTT, return code: %d",
                         self.get_log_header(), result.rc)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error("%s - Failed to publish log message to MQTT: %s",
                              self.get_log_header(), str(e))
 

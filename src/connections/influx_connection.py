@@ -94,7 +94,7 @@ class InfluxConnection(Connection):
                 "influx-connection: No active connection to disconnect from InfluxDB at %s:%d",
                 self.url, self.port)
             return False
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "influx-connection: Failed to disconnect from InfluxDB at %s:%d: %s",
                 self.url, self.port, str(e))
@@ -130,7 +130,7 @@ class InfluxConnection(Connection):
                 self.connection.url
             )
             return False
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "influx-connection: Failed to connect to InfluxDB at %s:%d: %s",
                 self.url, self.port, str(e))
@@ -192,7 +192,7 @@ class InfluxConnection(Connection):
             logger.info("influx-connection: Bucket created successfully: %s",
                         bucket_name)
             return True
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "influx-connection: Failed to create bucket named %s: %s",
                 bucket_name, str(e))
@@ -225,7 +225,7 @@ class InfluxConnection(Connection):
                     "Ping returned None, indicating a potential issue with the connection."
             )
             return False
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             # Check weather InfluxDB is up
             health_api = self.connection.health()
             if health_api.status == "pass":
@@ -277,5 +277,5 @@ class ConnectionChecker(Thread):
         self._stop_event.set()
         try:
             self.join()  # Wait for the thread to finish
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pass

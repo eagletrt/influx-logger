@@ -50,7 +50,7 @@ class InfluxReader(InfluxManager):
                                     payload)
             except Empty:
                 continue
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error("InfluxReader: Error in main loop: %s", e)
 
     def _process_query(self, vehicle_id: str, device_id: str,
@@ -175,7 +175,7 @@ class InfluxReader(InfluxManager):
             logger.info("InfluxReader: Query %s completed (EOF sent).",
                         transaction_id)
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("InfluxReader: Error during query %s: %s",
                          transaction_id, e)
             error_topic = f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/error"

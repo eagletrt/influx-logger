@@ -76,12 +76,12 @@ class MsgDispatcher:
         if self.influx_writer:
             try:
                 self.influx_writer.start()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
         if self.influx_reader:
             try:
                 self.influx_reader.start()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
 
     def handle_existing_messages(self) -> None:
@@ -108,7 +108,7 @@ class MsgDispatcher:
                 logger.info(
                     "msg_dispatcher: Subscribed to topic '%s' for existing messages",
                     topic)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(
                     "msg_dispatcher: Failed to subscribe to topic '%s': %s",
                     topic, str(e))
@@ -178,7 +178,7 @@ class MsgDispatcher:
             match = version_sanitize_regex.search(version)
             if match:
                 sanitized_version = match.group(1)
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pass
         if sanitized_version:
             version = sanitized_version
@@ -218,7 +218,7 @@ class MsgDispatcher:
                     "version_descriptors: %s",
                     vehicle_id, device_id, self.influx_writer.parser.
                     protobuf_manager.version_descriptors)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(
                     "msg_dispatcher: Error while subscribing device '%s/%s' to data topics: %s",
                     vehicle_id, device_id, e)

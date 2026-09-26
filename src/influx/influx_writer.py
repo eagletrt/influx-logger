@@ -174,7 +174,7 @@ class InfluxWriter(InfluxManager):
                     "influx_writer: Commit returned unexpected result: %s",
                     result)
             return result is None
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.info(
                 "influx_writer: Trying to commit with configuration " \
                 "bucket: %s, org: %s, write_precision: %s",
@@ -189,7 +189,7 @@ class InfluxWriter(InfluxManager):
                 pack: str = InfluxWriter.__pack_lines(points)
                 logger.debug("influx_writer: Lines that failed to commit: %s",
                              pack)
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
             return False
 
@@ -225,7 +225,7 @@ class InfluxWriter(InfluxManager):
                     if isinstance(p, Point):
                         points_str.append(p.to_line_protocol())
             lines_str: str = "\n".join(points_str)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error("influx_writer: Failed to pack lines: %s",
                          e,
                          exc_info=True)
@@ -252,7 +252,7 @@ class InfluxWriter(InfluxManager):
     def run(self) -> None:
         try:
             self.parser.start()
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             pass
         while self.stopped() is False:
             with self.parser.__new_points_event_lock__:
