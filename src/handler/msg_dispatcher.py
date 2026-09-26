@@ -1,3 +1,9 @@
+"""
+This module implements a message dispatcher that handles
+incoming MQTT messages and dispatches them to the appropriate
+handlers based on the topic.
+"""
+
 from collections.abc import Callable
 from re import Pattern, compile
 
@@ -9,6 +15,19 @@ from src.utils.logger_utils import logger
 
 
 class MsgDispatcher:
+    """
+    A class that dispatches incoming MQTT messages to the appropriate handlers
+    based on the topic. It supports handling version messages, data messages,
+    and query requests. It also manages the InfluxWriter and InfluxReader instances
+    for writing and reading data to/from InfluxDB.
+
+    Attributes:
+        topic_callbacks: A dictionary mapping MQTT topics to their corresponding callback.
+        influx_writer: An instance of the InfluxWriter class for writing data to InfluxDB.
+        influx_reader: An instance of the InfluxReader class for reading data from InfluxDB.
+        mqtt: An instance of the MQTTConnection class for handling MQTT connections.
+        vehicle_whitelist: A list of allowed vehicle IDs.
+    """
 
     def __init__(self,
                  influx_writer: InfluxWriter = None,
@@ -25,7 +44,9 @@ class MsgDispatcher:
         self.influx_writer: InfluxWriter = influx_writer
         self.influx_reader: InfluxReader = influx_reader
         self.mqtt: MQTTConnection = mqtt
-        self.vehicle_whitelist: list = vehicle_whitelist if vehicle_whitelist and vehicle_whitelist != [] else None
+        self.vehicle_whitelist: list = None
+        if vehicle_whitelist and vehicle_whitelist != []:
+            self.vehicle_whitelist: list = vehicle_whitelist
         self.__run_if_set()
 
     def set(self,
@@ -36,7 +57,7 @@ class MsgDispatcher:
         '''
         Sets the InfluxWriter instance for the MsgDispatcher.
         Args:
-            influx_writer (InfluxWriter): The InfluxWriter instance to be used for writing data to InfluxDB.
+            influx_writer (InfluxWriter): Instance to be used for writing data to InfluxDB.
         '''
         if influx_writer is not None:
             self.influx_writer = influx_writer
@@ -65,7 +86,8 @@ class MsgDispatcher:
 
     def handle_existing_messages(self) -> None:
         '''
-        Handles any existing messages on the MQTT broker by subscribing to the relevant topics and processing the messages.
+        Handles any existing messages on the MQTT broker by
+        subscribing to the relevant topics and processing the messages.
         '''
         if not self.mqtt:
             logger.warning(
@@ -93,18 +115,22 @@ class MsgDispatcher:
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
-        Handles incoming MQTT messages by dispatching them to the appropriate handler based on the topic.
+        Handles incoming MQTT messages by dispatching them to the
+        appropriate handler based on the topic.
         Args:
             topic (str): The topic of the incoming MQTT message.
             payload (bytes): The payload of the incoming MQTT message.
         '''
         logger.debug(
             f"MQTT Connection: Handling incoming message on topic: {topic}")
-        # Iterate through the registered topic handlers and invoke the appropriate handler for the incoming message
+        # Iterate through the registered topic handlers and invoke
+        # the appropriate handler for the incoming message
         for handler_topic, handler_function in self.topic_callbacks.items():
             # Check if the incoming topic matches the handler topic pattern
             match = self.build_topic_regex(handler_topic).fullmatch(topic)
-            # If a match is found, extract the groups and call the handler function with the topic, payload, and extracted groups
+            # If a match is found, extract the groups and call
+            # the handler function with the topic, payload,
+            # and extracted groups
             if match:
                 groups = list(match.groups())
                 handler_function(topic, payload, groups)
@@ -136,8 +162,9 @@ class MsgDispatcher:
                 "msg_dispatcher: InfluxWriter is not set. Cannot handle version message."
             )
             return
+        # Regex pattern to sanitize the version string by extracting
+        # the commit hash from the version string.
         VERSION_SANITIZE_REGEX = compile(r"^(\w+)", )
-        '''Regex pattern to sanitize the version string by extracting the commit hash from the version string.'''
         try:
             match = VERSION_SANITIZE_REGEX.search(version)
             if match:
@@ -150,7 +177,9 @@ class MsgDispatcher:
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
         device_id: str = ids[1] if len(ids) > 1 else "unknown_id"
         if self.vehicle_whitelist and vehicle_id not in self.vehicle_whitelist:
-            #logger.debug(f"msg_dispatcher: Vehicle '{vehicle_id}/{device_id}' is not in the whitelist.")
+            #logger.debug(
+            #    "msg_dispatcher: Vehicle '%s/%s' is not in the whitelist.",
+            #    vehicle_id, device_id)
             return
         logger.info(
             f"msg_dispatcher: Checking existance of commit {version}, requested by device '{vehicle_id}/{device_id}'"

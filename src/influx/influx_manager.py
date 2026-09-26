@@ -1,3 +1,8 @@
+"""
+This module defines the InfluxManager class,
+which serves as a base class for managing interactions with InfluxDB.
+"""
+
 from abc import ABC
 from threading import Lock, Thread
 
@@ -8,8 +13,11 @@ from src.utils.timestamp import TimestampPrecision
 class InfluxManager(Thread, ABC):
     """
     A base class for managing interactions with InfluxDB.
-    This class provides common functionality for both reading and writing to InfluxDB, such as managing
-    the connection and handling timestamp precision. It is intended to be extended by specific reader and writer classes that implement the actual reading and writing logic.
+    This class provides common functionality for both reading and
+    writing to InfluxDB, such as managing
+    the connection and handling timestamp precision.
+    It is intended to be extended by specific reader and writer
+    classes that implement the actual reading and writing logic.
     
     Attributes:
         client (InfluxConnection): The connection to the InfluxDB service.

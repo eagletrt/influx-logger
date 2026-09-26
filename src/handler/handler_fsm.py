@@ -1,3 +1,10 @@
+"""
+This module implements a finite state machine (FSM) to manage the
+states and transitions of the handler.
+It uses the statemachine library to define the states and events,
+and the threading library to run the FSM in a separate thread.
+"""
+
 from threading import Condition, Thread
 
 from statemachine import State, StateMachine
@@ -26,6 +33,7 @@ class HandlerFSM(Thread, StateMachine):
     Attributes:
         parser: An instance of the Parser class to parse incoming data.
         msg_dispatcher: An instance of the MsgDispatcher class to handle incoming messages.
+        handler: An instance of the ConnectionHandler class to manage connections.
         influx_logger: An instance of the InfluxLogger class to manage logging to InfluxDB
 
         start: The initial state of the FSM.
