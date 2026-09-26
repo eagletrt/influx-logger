@@ -32,7 +32,7 @@ jobs:
 
       - name: Check pylint score
         run: |
-          PYLINT_OUTPUT=$(pylint -r y src) || true
+          PYLINT_OUTPUT=$(PYTHONPATH=. pylint -r y src) || true
           echo "$PYLINT_OUTPUT"
           
           SCORE=$(echo "$PYLINT_OUTPUT" | awk -F'rated at ' '/rated at/ {split($2, a, "/"); print a[1]}')
