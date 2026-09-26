@@ -175,6 +175,13 @@ class InfluxWriter(InfluxManager):
                     result)
             return result is None
         except Exception as e:
+            logger.info(
+                "influx_writer: Trying to commit with configuration " \
+                "bucket: %s, org: %s, write_precision: %s",
+                bucket,
+                self.client.org,
+                self.timestamp_precision
+            )
             logger.error("influx_writer: Failed to commit lines: %s",
                          e,
                          exc_info=True)

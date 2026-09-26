@@ -215,9 +215,9 @@ class Parser(Thread):
             logger.info(
                 "parser: Unpacked valuesPack for network '%s' with version %s: %s",
                 network, version, message_content)
-        logger.info(
-            "parser: Committing message content for network '%s' with version %s: %s",
-            network, version, message_content)
+        #logger.info(
+        #    "parser: Committing message content for network '%s' with version %s: %s",
+        #    network, version, message_content)
         self.commit_to_destination_list(message_content, tags)
 
     def timer_touch(self) -> None:
@@ -349,6 +349,15 @@ class Parser(Thread):
             # Create a Line object from the record and add it to the destination list
             try:
                 line: Line = Line.from_object(record, measurement, tags)
+            except ValueError as e:
+                if str(e) == "Missing fields":
+                    logger.warning(
+                        "parser: Skipping record for measurement '%s' due to missing fields: %s",
+                        measurement, record)
+                    return
+                logger.error(
+                    "parser: Error creating Line from record for measurement '%s': %s",
+                    measurement, str(e))
             except Exception as e:
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
