@@ -207,3 +207,6 @@ repomix-output.xml
 *.bak
 *.old
 *.orig
+
+# Poetry
+poetry.lock

@@ -1,24 +1,27 @@
-from abc import ABC, abstractmethod
+'''
+    Manages the retrieval and caching of protobuf descriptors for different versions and networks.
+'''
+
 import json
 import os
-import sys
-
+from abc import ABC, abstractmethod
 from typing import Any
-from requests import get
-from types import ModuleType
-from grpc_tools import protoc
+
 from google.protobuf import json_format
-from importlib.util import spec_from_loader
+from google.protobuf.descriptor_pb2 import FileDescriptorSet  # pylint: disable=no-name-in-module
 from google.protobuf.descriptor_pool import DescriptorPool
-from google.protobuf.descriptor_pb2 import FileDescriptorSet
-from google.protobuf.message_factory import MessageFactory, GetMessageClass
+from google.protobuf.message_factory import GetMessageClass, MessageFactory
+from grpc_tools import protoc
+from requests import get
 
 from src.utils.logger_utils import logger
+
 
 class ProtobufManager:
     '''
     Manages the retrieval and caching of protobuf descriptors for different versions and networks.
     '''
+
     def __init__(self):
         self.version_descriptors: dict[str, dict[str, Any]] = {}
         ''' Version descriptors maps version -> network -> protobuf type/object'''
@@ -29,12 +32,15 @@ class ProtobufManager:
         Returns:
             bool: True if the protobuf descriptor is already downloaded, False otherwise.
         '''
+        # Directory in the cache where the .proto file for the specified version will be stored
         version_dir = os.path.join(LibcanManager.CACHE_DIR, version)
-        '''Directory in the cache where the .proto file for the specified version will be stored'''
-        proto_file_path = os.path.join(version_dir, "proto", f"{network}.proto")
-        '''Path to the .proto file for the specified version and network'''
+        # Path to the .proto file for the specified version and network
+        proto_file_path = os.path.join(version_dir, "proto",
+                                       f"{network}.proto")
         if os.path.exists(proto_file_path):
-            logger.info(f"protobuf_manager: Descriptor for network '{network}' (version {version}) already downloaded")
+            logger.info(
+                "protobuf_manager: Descriptor for network '%s' (version %s) already downloaded",
+                network, version)
             return True
         return False
 
@@ -46,130 +52,151 @@ class ProtobufManager:
             version (str): The version of the protobuf descriptor.
             network (str): The network for which the protobuf descriptor is needed.
         '''
+        # Library manager class to use based on the network type
         lib_manager = LibcanManager if network != "gps" else LibgpsManager
-        '''Library manager class to use based on the network type'''
         if not self.proto_version_downloaded(version, network):
-            download_result: bool = lib_manager.download_proto_version(version, network)
-            '''Descriptor raw is the raw content of the downloaded protobuf descriptor'''
+            # Descriptor raw is the raw content of the downloaded protobuf descriptor
+            download_result: bool = lib_manager.download_proto_version(
+                version, network)
             if not download_result:
                 return False
-            logger.info(f"protobuf_manager: Descriptor successfully downloaded: {network} (version {version})")
+            logger.info(
+                "protobuf_manager: Descriptor successfully downloaded: %s (version %s)",
+                network, version)
         try:
             try:
-                decoder = _DecoderWrapper.build_decoder(version=version, network=network, lib_manager=lib_manager)
-            except Exception as e:
-                logger.error(f"protobuf_manager: Failed to build decoder for network '{network}' (version {version}): {e}")
+                # Instance of _DecoderWrapper that can decode messages for the given network
+                decoder = _DecoderWrapper.build_decoder(
+                    version=version, network=network, lib_manager=lib_manager)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error(
+                    "protobuf_manager: Failed to build decoder for network '%s' (version %s): %s",
+                    network, version, e)
                 return False
-            '''Decoder is an instance of _DecoderWrapper that can decode messages for the given network'''
-            logger.info(f"protobuf_manager: Descriptor successfully parsed: {network} (version {version})")
+            logger.info(
+                "protobuf_manager: Descriptor successfully parsed: %s (version %s)",
+                network, version)
             # Ensure the version exists in the version_descriptors dictionary
             if version not in self.version_descriptors:
-                logger.info(f"protobuf_manager: Creating new entry for version {version} in version_descriptors")
+                logger.info(
+                    "protobuf_manager: Creating new entry for version %s in version_descriptors",
+                    version)
                 self.version_descriptors[version] = {}
-            # Store the decoder in the version_descriptors dictionary for the given version and network
+            # Store decoder in version_descriptors dictionary for the given version and network
             self.version_descriptors[version][network] = decoder
-            logger.info(f"protobuf_manager: Descriptor {network} (version {version}) is now ready for deserialize data")
-        except Exception:
-            logger.error(f"protobuf_manager: Downloaded proto descriptor for network '{network}' (version {version}) is not a valid proto file")
+            logger.info(
+                "protobuf_manager: Descriptor %s (version %s) is now ready for deserialize data",
+                network, version)
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "protobuf_manager: " \
+                "Downloaded proto descriptor for network '%s' "
+                "(version %s) is not a valid proto file",
+                network,
+                version
+            )
             return False
-        logger.info(f"protobuf_manager: Descriptor {network} (version {version}) successfully parsed and is now ready for deserialize data")
+        logger.info(
+            "protobuf_manager: " \
+            "Descriptor %s (version %s) successfully parsed and is now ready for deserialize data",
+            network,
+            version
+        )
         return True
 
-    @staticmethod
-    def register_generated_proto_package(package_name: str) -> None:
-        '''
-        Registers a generated protobuf package in sys.modules to allow for dynamic imports of generated modules.
-        Args:
-            package_name (str): The name of the generated protobuf package to register.
-        '''
-        protobuf_manager = ProtobufManager()
-        '''ProtobufManager instance used for managing protobuf descriptors and decoders'''
-        package_path = os.path.join(protobuf_manager.generated_proto_root, package_name)
-        '''Path to the generated protobuf package directory'''
-        if not os.path.isdir(package_path):
-            return
-        module = ModuleType(package_name)
-        module.__path__ = [package_path]
-        module.__package__ = package_name
-        module.__file__ = os.path.join(package_path, "__init__.py")
-        module.__spec__ = spec_from_loader(package_name, loader=None, is_package=True)
-        if module.__spec__ is not None:
-            module.__spec__.submodule_search_locations = [package_path]
-
-        sys.modules[package_name] = module
 
 class LibManager(ABC):
     '''
-    A utility class for interacting with the CAN and GPS repositories to check commit existence and download protobuf descriptors.
+    A utility class for interacting with the CAN and GPS repositories 
+    to check commit existence and download protobuf descriptors.
     '''
     CACHE_DIR: str = "cache"
     '''Base cache directory used for storing .proto files and descriptor sets.'''
+
     @staticmethod
-    def check(hash: str, url: str|list[str], token: str = None) -> bool:
+    def check(commit_hash: str,
+              urls: str | list[str],
+              token: str = None) -> bool:
         '''
         Checks if a given commit hash exists in the repository.
         Args:
-            hash (str): The commit hash to check.
-            url (str|list[str]): The URL or list of URLs to check.
+            commit_hash (str): The commit hash to check.
+            urls (str|list[str]): The URL or list of URLs to check.
             token (str): The GitHub personal access token for authentication.
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        headers:json = {}
+        headers: json = {}
         # If a GitHub token is provided, include it in the request headers for authentication
         if token and token != "":
-            headers:json = {
+            headers: json = {
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github+json",
-                }
-        # Check the existence of the commit hash in the CAN repository by sending a GET request to the commit URLs
-        for url in url if isinstance(url, list) else [url]:
-            check_url = url.replace("hash", hash)
+            }
+        # Check the existence of the commit hash in the CAN repository
+        # by sending a GET request to the commit URLs
+        for repo_url in urls if isinstance(urls, list) else [urls]:
+            check_url = repo_url.replace("hash", commit_hash)
             try:
-                resp = get(check_url, headers=headers)
-                logger.info(f"protobuf_manager: url: {check_url}, headers: {headers}")
+                resp = get(check_url, headers=headers, timeout=10)
+                logger.info("protobuf_manager: url: %s, headers: %s",
+                            check_url, headers)
                 if resp.ok:
                     return True
-                else:
-                    logger.warning(f"protobuf_manager: Request to {check_url} failed with status code {resp.status_code}: {resp.text}")
-            except Exception as e:
-                logger.error(f"protobuf_manager: Failed to check commit existence for hash '{hash}' at URL '{check_url}'")
-                logger.error(f"protobuf_manager: {e}")
+                # If the request fails, log a warning with the status code and response text
+                logger.warning(
+                    "protobuf_manager: Request to %s failed with status code %s: %s",
+                    check_url, resp.status_code, resp.text)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error(
+                    "protobuf_manager: " \
+                    "Failed to check commit existence for hash '%s' at URL '%s'",
+                    commit_hash,
+                    check_url
+                )
+                logger.error("protobuf_manager: %s", e)
         return False
+
     @staticmethod
     @abstractmethod
-    def check_commit_existence(hash: str) -> bool:
+    def check_commit_existence(commit_hash: str) -> bool:
         '''
         Checks if a given commit hash exists in the repository.
         Args:
-            hash (str): The commit hash to check.
+            commit_hash (str): The commit hash to check.
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        raise NotImplementedError("Subclasses must implement the check_commit_existence method.")
+        raise NotImplementedError(
+            "Subclasses must implement the check_commit_existence method.")
+
     @staticmethod
-    def download(hash: str, network: str, in_url: str|list[str], cache: str, token: str = None) -> bool:
+    def download(commit_hash: str,
+                 network: str,
+                 in_url: str | list[str],
+                 cache: str,
+                 token: str = None) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the repository.
         Args:
-            hash (str): The commit hash for which to download the protobuf descriptor.
-            network (str): The network for which to download the protobuf descriptor.
-            url (str|list[str]): The URL or list of URLs from which to download the protobuf descriptor.
-            cache (str): The path to the cache directory where the downloaded proto file will be stored.
-            token (str): The GitHub personal access token for authentication.
+            commit_hash (str): The commit hash for which to download the protobuf descriptor
+            network (str): The network for which to download the protobuf descriptor
+            url (str|list[str]): URL or list of URLs from which to download the protobuf descriptor
+            cache (str): Path to the cache directory where the downloaded proto file will be stored
+            token (str): The GitHub personal access token for authentication
         Returns:
-            bool: True if the download is successful, False otherwise.
+            bool: True if the download is successful, False otherwise
         '''
-        headers:json = {}
+        headers: json = {}
         # If a GitHub token is provided, include it in the request headers for authentication
         if token and token != "":
-            headers:json = {
+            headers: json = {
                 "Authorization": f"Bearer {token}",
-                }
-        version_dir: str = os.path.join(cache, hash)
-        '''Directory in the cache where the .proto file for the specified commit hash will be stored'''
+            }
+        # Directory in the cache where the .proto file for the specified commit hash will be stored
+        version_dir: str = os.path.join(cache, commit_hash)
+        # List of URLs to check for the protobuf descriptor
         urls: list[str] = []
-        '''List of URLs to check for the protobuf descriptor'''
         # If in_url is a list, use it directly; if it's a string, convert it to a list
         if isinstance(in_url, list):
             urls = in_url
@@ -177,15 +204,22 @@ class LibManager(ABC):
             urls.append(in_url)
         for url_sample in urls:
             try:
-                url:str = url_sample.replace("hash", hash).replace("network", network)
-                logger.info(f"protobuf_manager: URL: {url}")
-                resp = get(url, headers=headers)
+                url: str = url_sample.replace("hash", commit_hash).replace(
+                    "network", network)
+                logger.info("protobuf_manager: URL: %s", url)
+                resp = get(url, headers=headers, timeout=10)
                 if resp and resp.ok:
                     break
-            except Exception:
-                logger.error(f"protobuf_manager: Error while downloading proto for network '{network}' (version {hash})")
+            except Exception:  # pylint: disable=broad-exception-caught
+                logger.error(
+                    "protobuf_manager: "
+                    "Error while downloading proto for network '%s' (version %s)",
+                    network, commit_hash)
         if not resp or not resp.ok:
-            logger.warning(f"protobuf_manager: Proto for network '{network}' (version {hash}) not downloaded {resp.status_code if resp else 'No response'}")
+            logger.warning(
+                "protobuf_manager: Proto for network '%s' (version %s) not downloaded %s",
+                network, commit_hash,
+                resp.status_code if resp else 'No response')
             return False
         try:
             if not os.path.exists(LibManager.CACHE_DIR):
@@ -197,116 +231,148 @@ class LibManager(ABC):
             proto_dir = os.path.join(version_dir, "proto")
             if not os.path.exists(proto_dir):
                 os.makedirs(proto_dir)
-            with open(os.path.join(proto_dir, f"{network}.proto"), "w", encoding="utf-8") as fh:
+            with open(os.path.join(proto_dir, f"{network}.proto"),
+                      "w",
+                      encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
-        except Exception:
-            logger.error(f"protobuf_manager: Failed to save downloaded proto for network '{network}' (version {hash})")
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "protobuf_manager: "
+                "Failed to save downloaded proto for network '%s' (version %s)",
+                network, commit_hash)
             return False
         return False
+
     @staticmethod
     @abstractmethod
-    def download_proto_version(hash: str, network: str) -> bool:
+    def download_proto_version(commit_hash: str, network: str) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the repository.
         Args:
-            hash (str): The commit hash for which to download the protobuf descriptor.
+            commit_hash (str): The commit hash for which to download the protobuf descriptor.
             network (str): The network for which to download the protobuf descriptor.
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        raise NotImplementedError("Subclasses must implement the download_proto_version method.")
+        raise NotImplementedError(
+            "Subclasses must implement the download_proto_version method.")
+
 
 class LibcanManager(LibManager):
     '''
-    A utility class for interacting with the CAN repository to check commit existence and download protobuf descriptors.
+    A utility class for interacting with the CAN repository to 
+    check commit existence and download protobuf descriptors.
     '''
+
     TOKEN: str = None
     '''GitHub personal access token used for authentication when accessing the CAN repository.'''
-
-    CAN_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/can/commits/hash"
-    '''URL to the commit page in the can repository, where 'hash' is a placeholder for the commit hash.'''
-    LIBCAN_COMMIT_URL:str = CAN_COMMIT_URL.replace("can", "libcan-sw")
-    '''URL to the commit page in the libcan-sw repository, where 'hash' is a placeholder for the commit hash.'''
-    CAN_COMMIT_URLS:list[str] = [
+    CAN_COMMIT_URL: str = "https://api.github.com/repos/eagletrt/can/commits/hash"
+    '''URL to the commit page in the can repository'''
+    LIBCAN_COMMIT_URL: str = CAN_COMMIT_URL.replace("can", "libcan-sw")
+    '''URL to the commit page in the libcan-sw repository'''
+    CAN_COMMIT_URLS: list[str] = [
         CAN_COMMIT_URL,
         LIBCAN_COMMIT_URL,
     ]
-    '''URLs to the commit pages in the can and libcan-sw repositories, where 'hash' is a placeholder for the commit hash.'''
+    '''URLs to the commit pages in the can and libcan-sw repositories'''
 
-    CAN_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/can/hash/proto/network/network.proto"
-    '''URL to the raw .proto file in the can repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
-    LIBCAN_PROTO_URL:str = CAN_PROTO_URL.replace("can", "libcan-sw")
-    '''URL to the raw .proto file in the libcan-sw repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
-    CAN_PROTO_URLS:list[str] = [
+    CAN_PROTO_URL: str = "https://raw.githubusercontent.com" \
+    "/eagletrt/can/hash/proto/network/network.proto"
+    '''URL to the raw .proto file in the can repository'''
+    LIBCAN_PROTO_URL: str = CAN_PROTO_URL.replace("can", "libcan-sw")
+    '''URL to the raw .proto file in the libcan-sw repository'''
+    CAN_PROTO_URLS: list[str] = [
         CAN_PROTO_URL,
         LIBCAN_PROTO_URL,
     ]
-    '''URLs to the raw .proto files in the can and libcan-sw repositories, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
+    '''URLs to the raw .proto files in the can and libcan-sw repositories'''
 
-    CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "can")
+    CACHE_DIR: str = os.path.join(LibManager.CACHE_DIR, "can")
     '''Cache directory used for storing .proto files and descriptor sets for CAN.'''
 
     @staticmethod
-    def check_commit_existence(hash: str) -> bool:
+    def check_commit_existence(commit_hash: str) -> bool:
         '''
         Checks if a given commit hash exists in the CAN repository.
         Args:
-            hash (str): The commit hash to check.
+            commit_hash (str): The commit hash to check.
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        return LibManager.check(hash, LibcanManager.CAN_COMMIT_URLS, token=LibcanManager.TOKEN)
+        return LibManager.check(commit_hash,
+                                LibcanManager.CAN_COMMIT_URLS,
+                                token=LibcanManager.TOKEN)
+
     @staticmethod
-    def download_proto_version(hash: str, network: str) -> bool:
+    def download_proto_version(commit_hash: str, network: str) -> bool:
         '''
-        Downloads the protobuf descriptor for a given commit hash and network from the CAN repository.
+        Downloads the protobuf descriptor for a given 
+        commit hash and network from the CAN repository.
         Args:
-            hash (str): The commit hash for which to download the protobuf descriptor.
+            commit_hash (str): The commit hash for which to download the protobuf descriptor.
             network (str): The network for which to download the protobuf descriptor.
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        return LibManager.download(hash, network, LibcanManager.CAN_PROTO_URLS, cache=LibcanManager.CACHE_DIR, token=LibcanManager.TOKEN)
+        return LibManager.download(commit_hash,
+                                   network,
+                                   LibcanManager.CAN_PROTO_URLS,
+                                   cache=LibcanManager.CACHE_DIR,
+                                   token=LibcanManager.TOKEN)
+
+
 class LibgpsManager(LibManager):
     '''
     A utility class for interacting with the GPS repository to check commit existence.
     '''
-    GPS_COMMIT_URL:str = "https://api.github.com/repos/eagletrt/gpslib/commits/hash"
-    '''URL to the commit page in the gps repository, where 'hash' is a placeholder for the commit hash.'''
-    GPS_PROTO_URL:str = "https://raw.githubusercontent.com/eagletrt/gpslib/hash/network.proto"
-    '''URL to the raw .proto file in the gps repository, where 'hash' and 'network' are placeholders for the commit hash and network name, respectively.'''
+    GPS_COMMIT_URL: str = "https://api.github.com" \
+        "/repos/eagletrt/gpslib/commits/hash"
+    '''URL to the commit page in the gps repository'''
+    GPS_PROTO_URL: str = "https://raw.githubusercontent.com" \
+        "/eagletrt/gpslib/hash/network.proto"
+    '''URL to the raw .proto file in the gps repository'''
 
-    CACHE_DIR:str = os.path.join(LibManager.CACHE_DIR, "gps")
+    CACHE_DIR: str = os.path.join(LibManager.CACHE_DIR, "gps")
     '''Cache directory used for storing .proto files and descriptor sets for GPS.'''
 
     @staticmethod
-    def check_commit_existence(hash: str) -> bool:
+    def check_commit_existence(commit_hash: str) -> bool:
         '''
         Checks if a given commit hash exists in the GPS repository.
         Args:
-            hash (str): The commit hash to check.
+            commit_hash (str): The commit hash to check.
         Returns:
             bool: True if the commit exists, False otherwise.
         '''
-        return LibManager.check(hash, LibgpsManager.GPS_COMMIT_URL)
+        return LibManager.check(commit_hash, LibgpsManager.GPS_COMMIT_URL)
+
     @staticmethod
-    def download_proto_version(hash: str, network: str) -> bool:
+    def download_proto_version(commit_hash: str, network: str) -> bool:
         '''
-        Downloads the protobuf descriptor for a given commit hash and network from the GPS repository.
+        Downloads the protobuf descriptor for a given 
+        commit hash and network from the GPS repository.
         Args:
-            hash (str): The commit hash for which to download the protobuf descriptor.
+            commit_hash (str): The commit hash for which to download the protobuf descriptor.
             network (str): The network for which to download the protobuf descriptor.
         Returns:
             bool: True if the download is successful, False otherwise.
         '''
-        logger.info(f"protobuf_manager: Downloading GPS proto for network '{network}' (version {hash})")
-        return LibManager.download(hash, network, LibgpsManager.GPS_PROTO_URL, cache=LibgpsManager.CACHE_DIR)
+        logger.info(
+            "protobuf_manager: Downloading GPS proto for network '%s' (version %s),",
+            network, commit_hash)
+        return LibManager.download(commit_hash,
+                                   network,
+                                   LibgpsManager.GPS_PROTO_URL,
+                                   cache=LibgpsManager.CACHE_DIR)
+
 
 class _DecoderWrapper:
     '''
-    A wrapper class for decoding protobuf messages using a specific message class and JSON format module.
+    A wrapper class for decoding protobuf messages using 
+    a specific message class and JSON format module.
     '''
+
     def __init__(self, message_class, json_format_module):
         '''
         Initializes the _DecoderWrapper with the given message class and JSON format module.
@@ -319,14 +385,15 @@ class _DecoderWrapper:
 
     def decode(self, payload: bytes) -> dict:
         '''
-        Decodes a protobuf message from the given payload using the stored message class and converts it to a dictionary.
+        Decodes a protobuf message from the given payload using 
+        the stored message class and converts it to a dictionary.
         Args:
             payload (bytes): The raw bytes of the protobuf message to decode.
         Returns:
             dict: A dictionary representation of the decoded protobuf message.
         '''
+        # Creates an instance of the message class to hold the decoded data
         message = self._message_class()
-        '''Creates an instance of the message class to hold the decoded data'''
         # Parse the payload into the message instance
         message.ParseFromString(payload)
         return self._json_format.MessageToDict(
@@ -334,70 +401,58 @@ class _DecoderWrapper:
             preserving_proto_field_name=True,
             use_integers_for_enums=True,
         )
-    
+
     @staticmethod
-    def build_decoder(version: str, network: str, lib_manager: type = LibManager) -> '_DecoderWrapper':
+    def build_decoder(version: str,
+                      network: str,
+                      lib_manager: type = LibManager) -> '_DecoderWrapper':
         '''
         Builds a decoder for the given protobuf descriptor and network.
         Args:
             version (str): The version for which the decoder is being built.
             network (str): The network for which the decoder is being built.
         Returns:
-            _DecoderWrapper: An instance of _DecoderWrapper that can decode messages for the given network.
+            _DecoderWrapper: Message decoder for the given network.
         '''
         try:
-            logger.info(f"protobuf_manager: Lib_manager '{lib_manager.__name__}'")
+            logger.info("protobuf_manager: Lib_manager '%s'",
+                        lib_manager.__name__)
+            # Cache directory used for storing .proto files and
+            # descriptor sets for the specified library
             cache: str = lib_manager.CACHE_DIR
-            '''Cache directory used for storing .proto files and descriptor sets for the specified library'''
-            logger.info(f"protobuf_manager: Using cache directory '{cache}'")
-        except Exception:
-            logger.error(f"protobuf_manager: Invalid lib_manager provided. It must have a CACHE_DIR attribute.")
-            raise
-        version_dir = os.path.join(cache, version)
-        '''Directory in the cache where the .proto file for the specified version will be stored'''
-        # If cache directory does not exist, create it
-        if not os.path.exists(cache):
-            os.makedirs(cache)
-        if not os.path.exists(version_dir):
-            os.makedirs(version_dir)
-        if not os.path.exists(os.path.join(version_dir, "proto")):
-            os.makedirs(os.path.join(version_dir, "proto"))
-        pb_dir: str = os.path.join(version_dir, "pb")
-        '''Directory in the cache where the compiled descriptor set for the specified version will be stored'''
-        if not os.path.exists(pb_dir):
-            os.makedirs(pb_dir)
-        # Create files for the .proto descriptor and the compiled descriptor set
-        proto_file: str = os.path.join(version_dir, "proto", f"{network}.proto")
-        '''Path to the .proto file for the specified version and network'''
-        descriptor_set_file: str = os.path.join(version_dir, "pb", f"{network}.pb")
-        '''File that will store the compiled descriptor set'''
-        # Compile the .proto file into a descriptor set using protoc
-        logger.info(f"protobuf_manager: protoc -I{version_dir} --descriptor_set_out={descriptor_set_file} --include_imports {proto_file}")
-        try:
-            result = protoc.main(
-                [
-                    "protoc",
-                    f"-I{version_dir}",
-                    f"--descriptor_set_out={descriptor_set_file}",
-                    "--include_imports",
-                    proto_file
-                ]
+            logger.info("protobuf_manager: Using cache directory '%s'", cache)
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "protobuf_manager: Invalid lib_manager provided." \
+                "It must have a CACHE_DIR attribute."
             )
-        except Exception as e:
-            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}'")
-            result = 1
-        # Check if the compilation was successful
-        if result != 0:
-            logger.error(f"protobuf_manager: Failed to compile downloaded .proto descriptor for network '{network}' (version {version})")
-            raise RuntimeError("Failed to compile downloaded .proto descriptor")
+            raise
+        descriptor_set_file = _DecoderWrapper.compile_proto_files(
+            version, network, cache)
+        # protobuf descriptor set that will be populated with the compiled descriptor data
         file_set: FileDescriptorSet = FileDescriptorSet()
-        '''protobuf descriptor set that will be populated with the compiled descriptor data'''
-        # Read the compiled descriptor set from the file and parse it into a FileDescriptorSet object
+        # Read the compiled descriptor set from the file and
+        # parse it into a FileDescriptorSet object
         with open(descriptor_set_file, "rb") as fh:
             file_set.ParseFromString(fh.read())
+        return _DecoderWrapper.build_message_prototype(network, lib_manager,
+                                                       file_set)
+
+    @staticmethod
+    def build_message_prototype(network: str, lib_manager: type,
+                                file_set: FileDescriptorSet):
+        '''
+        Builds a message prototype for the given protobuf descriptor and network.
+        Args:
+            network (str): The network for which the message prototype is being built
+            lib_manager (type): The library manager type
+            file_set (FileDescriptorSet): file set containing the compiled protobuf descriptors
+        Returns:
+            _DecoderWrapper: Message decoder for the given network.
+        '''
         # Create a DescriptorPool to register the compiled file descriptors
+        # DescriptorPool that will be used to register the compiled file descriptors
         pool: DescriptorPool = DescriptorPool()
-        '''DescriptorPool that will be used to register the compiled file descriptors'''
         # Add the compiled file descriptors to the DescriptorPool
         for file_proto in file_set.file:
             pool.Add(file_proto)
@@ -406,39 +461,112 @@ class _DecoderWrapper:
         pack_name: str = "Pack"
         if lib_manager == LibgpsManager:
             pack_name = "GpsPack"
+        # Fully qualified name of the top-level message type expected in the DescriptorPool
         full_name = f"{network}.{pack_name}"
-        '''Fully qualified name of the top-level message type expected in the DescriptorPool'''
+        # Descriptor for the top-level message type in the DescriptorPool
         message_descriptor = None
-        '''Descriptor for the top-level message type in the DescriptorPool'''
         try:
             # Find the message descriptor for the top-level message type in the DescriptorPool
             message_descriptor = pool.FindMessageTypeByName(full_name)
         except KeyError:
             # If the message type is not found, search for candidates with the name "Pack"
+            # Fully qualified names of message types named "Pack" found in the descriptor set
             candidates = [
-                desc.full_name
-                for file_proto in file_set.file
-                for desc in file_proto.message_type
-                if desc.name == "Pack"
+                desc.full_name for file_proto in file_set.file
+                for desc in file_proto.message_type if desc.name == "Pack"
             ]
-            '''Fully qualified names of message types named "Pack" found in the descriptor set'''
-            # If no candidates are found, raise an error indicating that the protobuf message type cannot be found
+            # If no candidates are found,
+            # raise an error indicating that the protobuf message type cannot be found
             if not candidates:
-                logger.error(f"protobuf_manager: Cannot find protobuf message type '{full_name}'")
-                raise RuntimeError(f"Cannot find protobuf message type '{full_name}'")
-            # If candidates are found, log a warning and use the first candidate as the message type
+                logger.error(
+                    "protobuf_manager: Cannot find protobuf message type '%s'",
+                    full_name)
+                raise RuntimeError(
+                    "Cannot find protobuf message type '{full_name}'"
+                ) from KeyError(full_name)
+            # If candidates are found,
+            # log a warning and use the first candidate as the message type
+            # Log a warning indicating that the expected message
+            # type was not found and that a candidate will be used instead
             message_descriptor = pool.FindMessageTypeByName(candidates[0])
-            '''Log a warning indicating that the expected message type was not found and that a candidate will be used instead'''
-            logger.warning(f"protobuf_manager: Cannot find protobuf message type '{full_name}', using '{candidates[0]}' instead")
+            logger.warning(
+                "protobuf_manager: Cannot find protobuf message type '%s', using '%s' instead",
+                full_name, candidates[0])
+        # Class corresponding to the found message descriptor,
+        # used for decoding protobuf messages
         message_class = None
-        '''Class corresponding to the found message descriptor, used for decoding protobuf messages'''
         try:
             # Get the message class for the found message descriptor using GetMessageClass
             message_class = GetMessageClass(message_descriptor)
         except AttributeError:
             # If GetMessageClass is not available, use MessageFactory to get the message class
-            message_class = MessageFactory(pool).GetPrototype(message_descriptor)
+            #message_class = MessageFactory(pool).GetPrototype(
+            #    message_descriptor)
+            get_prototype = getattr(MessageFactory(pool), "GetPrototype")
+            message_class = get_prototype(message_descriptor)
         return _DecoderWrapper(message_class, json_format)
 
+    @staticmethod
+    def compile_proto_files(version: str, network: str, cache: str):
+        '''
+        Compiles the .proto files for the specified version and network into a descriptor set.
+        Args:
+            version (str): The version for which the .proto files are being compiled.
+            network (str): The network for which the .proto files are being compiled.
+            cache (str): The cache directory where the .proto files and descriptor sets are stored.
+        Returns:
+            str: The path to the compiled descriptor set file.
+        '''
+        # Directory in the cache where the .proto file for the specified version will be stored
+        version_dir: str = os.path.join(cache, version)
+        # If cache directory does not exist, create it
+        if not os.path.exists(cache):
+            os.makedirs(cache)
+        if not os.path.exists(version_dir):
+            os.makedirs(version_dir)
+        proto_dir = os.path.join(version_dir, "proto")
+        if not os.path.exists(proto_dir):
+            os.makedirs(proto_dir)
+        version_pb_dir = os.path.join(version_dir, "pb")
+        if not os.path.exists(version_pb_dir):
+            os.makedirs(version_pb_dir)
+        # Create files for the .proto descriptor and the compiled descriptor set
+        # Path to the .proto file for the specified version and network
+        proto_file: str = os.path.join(version_dir, "proto",
+                                       f"{network}.proto")
+        # File that will store the compiled descriptor set
+        descriptor_set_file: str = os.path.join(version_dir, "pb",
+                                                f"{network}.pb")
+        # Compile the .proto file into a descriptor set using protoc
+        logger.info(
+            "protobuf_manager: protoc -I%s --descriptor_set_out=%s --include_imports %s",
+            version_dir, descriptor_set_file, proto_file)
+        try:
+            result = protoc.main([
+                "protoc", f"-I{version_dir}",
+                f"--descriptor_set_out={descriptor_set_file}",
+                "--include_imports", proto_file
+            ])
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "protobuf_manager: " \
+                    "Failed to compile downloaded .proto descriptor for network '%s'",
+                network
+            )
+            result = 1
+        # Check if the compilation was successful
+        if result != 0:
+            logger.error(
+                "protobuf_manager: " \
+                    "Failed to compile downloaded .proto descriptor for network '%s' (version %s)",
+                network,
+                version
+            )
+            raise RuntimeError(
+                "Failed to compile downloaded .proto descriptor")
+        return descriptor_set_file
+
     def __str__(self):
-        return f"_DecoderWrapper(message_class={self._message_class}, json_format_module={self._json_format})"
+        return "_DecoderWrapper" \
+            f"(message_class={self._message_class}, " \
+            f"json_format_module={self._json_format})"
