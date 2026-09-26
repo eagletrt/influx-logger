@@ -16,11 +16,16 @@ from src.utils.logger_utils import logger
 
 class HandlerFSM(Thread, StateMachine):
     """
-    This class implements a finite state machine (FSM) to manage the states and transitions of the handler.
-    It extends the StateMachine class from the statemachine library and the Thread class from the threading library.
-    The FSM has four states: start, idle, run, and stop. It also defines events to transition between these states based on the connection status of InfluxDB and MQTT broker.
+    This class implements a finite state machine (FSM) to manage the
+    states and transitions of the handler.
+    It extends the StateMachine class from the statemachine library and
+    the Thread class from the threading library.
+    The FSM has four states: start, idle, run, and stop. It also defines
+    events to transition between these states based on the connection status
+    of InfluxDB and MQTT broker.
     Attributes:
         parser: An instance of the Parser class to parse incoming data.
+        msg_dispatcher: An instance of the MsgDispatcher class to handle incoming messages.
         influx_logger: An instance of the InfluxLogger class to manage logging to InfluxDB
 
         start: The initial state of the FSM.
@@ -47,18 +52,33 @@ class HandlerFSM(Thread, StateMachine):
                  name: str = "HandlerFSM") -> None:
         self.msg_dispatcher: MsgDispatcher = MsgDispatcher(
             vehicle_whitelist=config.vehicle_whitelist)
-        '''MsgDispatcher object responsible for handling incoming MQTT messages and dispatching them to the appropriate handlers.'''
+        '''
+        MsgDispatcher object responsible for handling incoming MQTT messages
+        and dispatching them to the appropriate handlers.
+        '''
         self.config: Configuration = config
-        '''Configuration object containing settings for MQTT and InfluxDB connections.'''
+        '''
+        Configuration object containing
+        settings for MQTT and InfluxDB connections.
+        '''
         self.__connection_condition: Condition = Condition()
-        '''Condition variable used to synchronize connection state changes between threads.'''
+        '''
+        Condition variable used to synchronize connection state
+        changes between threads.
+        '''
         self.handler: ConnectionHandler = ConnectionHandler(
             self.config,
             on_state_change=self.__notify_connection_change,
         )
-        '''ConnectionHandler object responsible for managing connections to InfluxDB and MQTT broker.'''
+        '''
+        ConnectionHandler object responsible for managing
+        connections to InfluxDB and MQTT broker.
+        '''
         self.__event: bool = False
-        '''Flag indicating whether an event has occurred that requires the FSM to transition to a different state.'''
+        '''
+        Flag indicating whether an event has occurred that
+        requires the FSM to transition to a different state.
+        '''
         Thread.__init__(self, name=name)
         StateMachine.__init__(self)
 
