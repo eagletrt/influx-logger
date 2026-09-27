@@ -8,7 +8,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from google.protobuf import json_format
-from google.protobuf.descriptor_pb2 import FileDescriptorSet  # pylint: disable=no-name-in-module
+
+# pylint: disable=no-name-in-module
+from google.protobuf.descriptor_pb2 import FileDescriptorSet
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.message_factory import GetMessageClass, MessageFactory
 from grpc_tools import protoc

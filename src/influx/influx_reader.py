@@ -26,7 +26,8 @@ class InfluxReader(InfluxManager):
         client: InfluxConnection,
         mqtt_client: MQTTConnection,
         log_bucket: str,
-        timestamp_precision: str = TimestampPrecision.MICROSECONDS.name
+        timestamp_precision: str = TimestampPrecision.get_name(
+            TimestampPrecision.MICROSECONDS.value)
     ) -> None:
         super().__init__(client, timestamp_precision, name="InfluxReader")
         self.query_api = self.client.connection.query_api()

@@ -24,11 +24,11 @@ class InfluxManager(Thread, ABC):
         timestamp_precision (str): The precision of timestamps used in interactions with InfluxDB.
     """
 
-    def __init__(
-            self,
-            client: InfluxConnection,
-            timestamp_precision: str = TimestampPrecision.MICROSECONDS.name,
-            name: str = "InfluxManager") -> None:
+    def __init__(self,
+                 client: InfluxConnection,
+                 timestamp_precision: str = TimestampPrecision.get_name(
+                     TimestampPrecision.MICROSECONDS.value),
+                 name: str = "InfluxManager") -> None:
         super().__init__(name=name)
         self.client: InfluxConnection = client
         self.timestamp_precision: str = timestamp_precision

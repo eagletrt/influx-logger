@@ -36,6 +36,25 @@ class TimestampPrecision(Enum):
             return TimestampPrecision.SECONDS.value
         return None
 
+    @staticmethod
+    def get_name(precision: int) -> str:
+        """
+        Returns the name of the timestamp precision corresponding to the specified factor.
+        Args:
+            precision (int): The factor of the timestamp precision.
+        Returns:
+            str: The name of the timestamp precision, which can be "ns", "us", "ms", or "s".
+        """
+        if precision == TimestampPrecision.NANOSECONDS.value:
+            return "ns"
+        if precision == TimestampPrecision.MICROSECONDS.value:
+            return "us"
+        if precision == TimestampPrecision.MILLISECONDS.value:
+            return "ms"
+        if precision == TimestampPrecision.SECONDS.value:
+            return "s"
+        return None
+
 
 INFLUX_INT64_MAX: int = 2**63 - 1
 '''
@@ -45,8 +64,13 @@ the maximum limit that InfluxDB can handle.
 '''
 
 TIMESTAMP_KEYS: list[str] = [
-    "inner_timestamp", "_inner_timestamp", "_timestamp", "timestamp",
-    "_innerTimestamp", "innerTimestamp"
+    "inner_timestamp",
+    "_inner_timestamp",
+    "time",
+    "timestamp",
+    "_timestamp",
+    "innerTimestamp",
+    "_innerTimestamp",
 ]
 '''
 List of keys that are commonly used to represent timestamps in data structures.

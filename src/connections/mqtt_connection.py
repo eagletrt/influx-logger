@@ -18,8 +18,11 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
     the connect method to establish a connection to the MQTT 
     broker using the provided URL and port.
     Attributes:
-        broker: The URL of the MQTT broker to connect to.
+        url: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
+        username: The username to use for authentication.
+        password: The password to use for authentication.
+        client_id: The client ID to use for the MQTT connection.
     """
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -28,17 +31,21 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             port: int = 1883,
             username: str = None,
             password: str = None,
+            client_id: str = None,
             on_state_change=None,
             on_message=None):
         super().__init__(url=url, port=port)
-        self.username = username
-        self.password = password
+        self.client_id: str = None
+        if client_id:
+            self.client_id = client_id
+        self.username: str = username
+        self.password: str = password
         self.on_state_change = on_state_change
         self.message_callback = on_message
-        self._connected = False
-        self._connecting = False
+        self._connected: bool = False
+        self._connecting: bool = False
         # Lock to synchronize access to the connection state and the underlying MQTT client.
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
@@ -67,17 +74,14 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     "mqtt-connection: Ignoring on_connect from stale client at %s:%d",
                     self.url, self.port)
                 return
-            try:
-                success = int(reason_code) == 0
-            except Exception:  # pylint: disable=broad-except
-                success = not reason_code
+            success = getattr(reason_code, "value", reason_code) == 0
 
             if not success:
                 self._connecting = False
                 self._connected = False
                 logger.error(
                     "mqtt-connection: MQTT broker at %s:%d rejected the " \
-                        "connection with reason code %d",
+                        "connection with reason code %s",
                     self.url,
                     self.port,
                     reason_code
@@ -97,6 +101,7 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             self,
             client,
             _userdata,
+            _disconnect_flags,
             reason_code,
             properties=None) -> None:  # pylint: disable=unused-argument
         """
@@ -111,7 +116,7 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     self.url, self.port)
                 return
             logger.info(
-                "mqtt-connection: Disconnected from MQTT broker at %s:%d with reason code %d",
+                "mqtt-connection: Disconnected from MQTT broker at %s:%d with reason code %s",
                 self.url, self.port, reason_code)
             self.connection = None
             self._connecting = False
@@ -162,17 +167,20 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     pass
                 self.connection = None
             try:
-                self.connection = mqtt.Client()
+                self.connection = mqtt.Client(
+                    client_id=self.client_id,
+                    callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
                 self._connecting = True
                 self.connection.enable_logger(logger)
+                self.connection.on_connect = self.on_connect
+                self.connection.on_disconnect = self.on_disconnect
+                self.connection.on_message = self.on_message
+                self.connection.reconnect_delay_set(min_delay=5, max_delay=90)
                 if self.username and self.password:
                     self.connection.username_pw_set(self.username,
                                                     self.password)
                     self.connection.tls_set(
                     )  # Enable TLS for secure connection
-                self.connection.on_connect = self.on_connect
-                self.connection.on_disconnect = self.on_disconnect
-                self.connection.on_message = self.on_message
                 logger.info(
                     "mqtt-connection: Attempting to connect to MQTT broker at %s:%d",
                     self.url, self.port)

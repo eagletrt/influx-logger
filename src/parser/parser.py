@@ -299,16 +299,16 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                         logger.error(
                             "parser: Skipping invalid record for measurement '%s': %s",
                             measurement, str(e))
-                continue
-            try:
-                #logger.info("parser: Non List Measurement '%s': %s",
-                #            measurement, records
-                #            )
-                self.push(measurement, record_list, tags)
-            except ValueError:
-                #logger.error("parser: Skipping invalid record for measurement '%s': %s",
-                #             measurement, e)
-                pass
+            else:
+                try:
+                    #logger.info("parser: Non List Measurement '%s': %s",
+                    #            measurement, records
+                    #            )
+                    self.push(measurement, record_list, tags)
+                except ValueError:
+                    #logger.error("parser: Skipping invalid record for measurement '%s': %s",
+                    #             measurement, e)
+                    pass
 
     def push(self, measurement: str, record: Any, tags: dict[str,
                                                              str]) -> None:
@@ -340,7 +340,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                                 row, measurement, tags)
                             #logger.info(f"parser: Line: {line}")
                             self.__append_to_destination_list(line)
-                        return
+                return
             #logger.info(
             #    "parser: Received row-wise record for measurement '%s': %s",
             #    measurement,
@@ -351,9 +351,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 line: Line = Line.from_object(record, measurement, tags)
             except ValueError as e:
                 if str(e) == "Missing fields":
-                    logger.warning(
-                        "parser: Skipping record for measurement '%s' due to missing fields: %s",
-                        measurement, record)
+                    #logger.warning(
+                    #    "parser: Skipping record for measurement '%s' due to missing fields: %s",
+                    #    measurement, record)
                     return
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
@@ -386,7 +386,12 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Returns:
             list[dict[str, Any]]: List with timestamps and corresponding field values
         '''
-        timestamps = Parser._unwrap_values(record.get("timestamp"))
+        timestamp_values = None
+        for timestamp_key in TIMESTAMP_KEYS:
+            if timestamp_key in record:
+                timestamp_values = record[timestamp_key]
+                break
+        timestamps = Parser._unwrap_values(timestamp_values)
         values_map = record.get("valuesMap", {})
         # Validate that the timestamps and values_map are of the expected types
         if not isinstance(timestamps, list):

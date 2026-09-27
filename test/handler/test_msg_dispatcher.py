@@ -264,3 +264,37 @@ class TestMsgDispatcher(TestCase):
             self.assertTrue(connection.is_connected())
         finally:
             mqtt_module.mqtt.Client = original_client
+
+    def test_mqtt_connection_accepts_paho_reason_code(self):
+        import src.connections.mqtt_connection as mqtt_module
+
+        original_client = mqtt_module.mqtt.Client
+
+        class PahoReasonCode:
+            value = 0
+
+            def __str__(self):
+                return "Success"
+
+        class Client:
+            def __init__(self, *args, **kwargs):
+                self.on_connect = None
+
+            def connect(self, *args, **kwargs):
+                return None
+
+            def subscribe(self, *args, **kwargs):
+                return None
+
+            def loop_start(self):
+                return None
+
+        mqtt_module.mqtt.Client = Client
+        try:
+            connection = MQTTConnection(url="broker", port=1883)
+            connection.connection = Client()
+            connection.on_connect(
+                connection.connection, None, None, PahoReasonCode())
+            self.assertTrue(connection._connected)
+        finally:
+            mqtt_module.mqtt.Client = original_client
