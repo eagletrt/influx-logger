@@ -33,6 +33,16 @@ from src.utils.line import Line
 
 
 class TestLine(TestCase):
+    def test_from_object_treats_time_as_timestamp(self):
+        line = Line.from_object(
+            {"time": 123, "lap_time": 42.5},
+            measurement="bestlap",
+            tags={},
+        )
+
+        self.assertEqual(line.timestamp, 123)
+        self.assertEqual(line.fields, {"lap_time": 42.5})
+
     def test_to_point_preserves_each_field_type(self):
         line = Line(
             measurement="sample",

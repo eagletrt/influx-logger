@@ -98,7 +98,8 @@ class Line:
     @staticmethod
     def _normalize_timestamp(
         timestamp: int,
-        timestamp_precision: str = TimestampPrecision.MICROSECONDS.name
+        timestamp_precision: str = TimestampPrecision.get_name(
+            TimestampPrecision.MICROSECONDS.value)
     ) -> int:
         '''
         Normalizes a timestamp based on the specified precision.
@@ -125,7 +126,8 @@ class Line:
 
     def to_point(
         self,
-        timestamp_precision: str = TimestampPrecision.MICROSECONDS.name
+        timestamp_precision: str = TimestampPrecision.get_name(
+            TimestampPrecision.MICROSECONDS.value)
     ) -> Point:
         '''
         Converts the Line object to an InfluxDB Point object.

@@ -4,6 +4,7 @@ all the modifiable settings required to run it.
 """
 import json
 import os
+import random
 
 
 class InfluxConfig:
@@ -82,17 +83,22 @@ class MQTTConfig:
         port (int): The port number of the MQTT broker.
         username (str): The username for MQTT authentication (optional).
         password (str): The password for MQTT authentication (optional).
+        client_id (str): The client ID for the MQTT connection (optional).
     """
 
     def __init__(self,
                  url: str,
                  port: int,
                  username: str = None,
-                 password: str = None):
+                 password: str = None,
+                 client_id: str = None):
         self.url: str = url
         self.port: int = int(port)
         self.username: str = username
         self.password: str = password
+        self.client_id: str = client_id
+        if not self.client_id:
+            self.client_id: str = f"influx-logger-{random.randint(0, 999_999):06d}"
 
     @staticmethod
     def from_dict(data: dict) -> "MQTTConfig":
@@ -106,7 +112,8 @@ class MQTTConfig:
         return MQTTConfig(url=data.get("url"),
                           port=data.get("port", 1883),
                           username=data.get("username", None),
-                          password=data.get("password", None))
+                          password=data.get("password", None),
+                          client_id=data.get("client_id", None))
 
     def to_dict(self) -> dict:
         '''
@@ -118,7 +125,8 @@ class MQTTConfig:
             "url": self.url,
             "port": self.port,
             "username": self.username,
-            "password": self.password
+            "password": self.password,
+            "client_id": self.client_id
         }
 
     def __str__(self):
@@ -215,7 +223,8 @@ class Configuration:
         mqtt = MQTTConfig(url=os.getenv("MQTT_URL", "localhost"),
                           port=port,
                           username=os.getenv("MQTT_USERNAME", None),
-                          password=os.getenv("MQTT_PASSWORD", None))
+                          password=os.getenv("MQTT_PASSWORD", None),
+                          client_id=os.getenv("MQTT_CLIENT_ID", None))
         vehicle_whitelist = json.loads(os.getenv("VEHICLE_WHITELIST", "[]"))
         excluded_networks = json.loads(os.getenv("EXCLUDED_NETWORKS", "[]"))
         github_token = os.getenv("GITHUB_TOKEN", "")
