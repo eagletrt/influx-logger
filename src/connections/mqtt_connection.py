@@ -101,6 +101,7 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             self,
             client,
             _userdata,
+            _disconnect_flags,
             reason_code,
             properties=None) -> None:  # pylint: disable=unused-argument
         """
