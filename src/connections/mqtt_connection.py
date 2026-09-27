@@ -3,7 +3,6 @@ This module defines the MQTTConnection class,
 which manages the connection to an MQTT broker.
 """
 
-import random
 import threading
 
 import paho.mqtt.client as mqtt
@@ -19,8 +18,11 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
     the connect method to establish a connection to the MQTT 
     broker using the provided URL and port.
     Attributes:
-        broker: The URL of the MQTT broker to connect to.
+        url: The URL of the MQTT broker to connect to.
         port: The port of the MQTT broker to connect to.
+        username: The username to use for authentication.
+        password: The password to use for authentication.
+        client_id: The client ID to use for the MQTT connection.
     """
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -29,10 +31,13 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             port: int = 1883,
             username: str = None,
             password: str = None,
+            client_id: str = None,
             on_state_change=None,
             on_message=None):
         super().__init__(url=url, port=port)
-        self.client_id: str = f"influx-logger-{random.randint(0, 999_999):06d}"
+        self.client_id: str = None
+        if client_id:
+            self.client_id = client_id
         self.username: str = username
         self.password: str = password
         self.on_state_change = on_state_change
