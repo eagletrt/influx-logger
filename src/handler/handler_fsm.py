@@ -119,7 +119,8 @@ class HandlerFSM(Thread, StateMachine):
                 result = self.handler.mqtt.connection.publish(
                     topic=self.config.log_on_mqtt,
                     payload=msg,
-                )
+                    qos=0,
+                    retain=False)
                 if result.rc != 0:
                     logger.error(
                         "%s - Failed to publish log message to MQTT, return code: %d",
@@ -256,7 +257,7 @@ class HandlerFSM(Thread, StateMachine):
         self.handler.set(
             self.config,
             on_state_change=self.__notify_connection_change,
-            on_message=self.on_message,
+            on_message=self.on_mqtt_message,
         )
         self.send('init')
 
@@ -349,7 +350,7 @@ class HandlerFSM(Thread, StateMachine):
             self.do_stop()
         self.log_status("Thread finished")
 
-    def on_message(self, topic: str, payload: bytes):
+    def on_mqtt_message(self, topic: str, payload: bytes):
         '''
         Callback method to handle incoming MQTT messages.
         It is called by the MQTT connection when a message is received.

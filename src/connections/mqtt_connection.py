@@ -3,6 +3,7 @@ This module defines the MQTTConnection class,
 which manages the connection to an MQTT broker.
 """
 
+import random
 import threading
 
 import paho.mqtt.client as mqtt
@@ -31,14 +32,15 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             on_state_change=None,
             on_message=None):
         super().__init__(url=url, port=port)
-        self.username = username
-        self.password = password
+        self.client_id: str = f"influx-logger-{random.randint(0, 999_999):06d}"
+        self.username: str = username
+        self.password: str = password
         self.on_state_change = on_state_change
         self.message_callback = on_message
-        self._connected = False
-        self._connecting = False
+        self._connected: bool = False
+        self._connecting: bool = False
         # Lock to synchronize access to the connection state and the underlying MQTT client.
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
 
     def __notify_state_change(self) -> None:
         if callable(self.on_state_change):
@@ -162,17 +164,20 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     pass
                 self.connection = None
             try:
-                self.connection = mqtt.Client()
+                self.connection = mqtt.Client(
+                    client_id=self.client_id,
+                    callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
                 self._connecting = True
                 self.connection.enable_logger(logger)
+                self.connection.on_connect = self.on_connect
+                self.connection.on_disconnect = self.on_disconnect
+                self.connection.on_message = self.on_message
+                self.connection.reconnect_delay_set(min_delay=5, max_delay=90)
                 if self.username and self.password:
                     self.connection.username_pw_set(self.username,
                                                     self.password)
                     self.connection.tls_set(
                     )  # Enable TLS for secure connection
-                self.connection.on_connect = self.on_connect
-                self.connection.on_disconnect = self.on_disconnect
-                self.connection.on_message = self.on_message
                 logger.info(
                     "mqtt-connection: Attempting to connect to MQTT broker at %s:%d",
                     self.url, self.port)
