@@ -277,7 +277,7 @@ class HandlerFSM(Thread, StateMachine):
         self.handler.start_connections()
         while not self.__event and not self.are_both_connected():
             with self.__connection_condition:
-                self.__connection_condition.wait(timeout=1.0)
+                self.__connection_condition.wait(timeout=2.0)
             self.log_status("trying connection")
             self.handler.start_connections()
         if self.are_both_connected():
