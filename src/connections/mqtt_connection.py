@@ -69,17 +69,14 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     "mqtt-connection: Ignoring on_connect from stale client at %s:%d",
                     self.url, self.port)
                 return
-            try:
-                success = int(reason_code) == 0
-            except Exception:  # pylint: disable=broad-except
-                success = not reason_code
+            success = getattr(reason_code, "value", reason_code) == 0
 
             if not success:
                 self._connecting = False
                 self._connected = False
                 logger.error(
                     "mqtt-connection: MQTT broker at %s:%d rejected the " \
-                        "connection with reason code %d",
+                        "connection with reason code %s",
                     self.url,
                     self.port,
                     reason_code
@@ -113,7 +110,7 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                     self.url, self.port)
                 return
             logger.info(
-                "mqtt-connection: Disconnected from MQTT broker at %s:%d with reason code %d",
+                "mqtt-connection: Disconnected from MQTT broker at %s:%d with reason code %s",
                 self.url, self.port, reason_code)
             self.connection = None
             self._connecting = False
