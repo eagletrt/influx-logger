@@ -121,6 +121,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             return
         with self.__row_message_lock:
             message: tuple[list[str], bytes] = self.row_messages.pop(0)
+            self.row_queue_not_empty.notify_all()
             self.parse_msg(message)
 
     def parse_msg(self, msg: tuple[list[str], bytes]) -> None:
@@ -434,9 +435,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         It sets the stop flag to True,
         which will signal the run method to exit its loop and stop the thread.
         """
-        cond: Condition = Condition(lock=self.__row_message_lock)
-        while len(self.row_messages) > 0:
-            cond.wait()
+        with self.row_queue_not_empty:
+            while len(self.row_messages) > 0:
+                self.row_queue_not_empty.wait()
         self.stop_parser()
 
     def stop_parser(self) -> None:

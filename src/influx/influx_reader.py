@@ -48,9 +48,9 @@ class InfluxReader(InfluxManager):
         logger.info("InfluxReader: Thread started for query processing.")
         while not self.stopped():
             try:
-                # 1 second timeout to avoid blocking the check of self.stopped()
+                # 2.0 second timeout to avoid blocking the check of self.stopped()
                 vehicle_id, device_id, transaction_id, payload = self.query_queue.get(
-                    timeout=1.0)
+                    timeout=2.0)
                 self._process_query(vehicle_id, device_id, transaction_id,
                                     payload)
             except Empty:
