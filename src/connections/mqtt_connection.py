@@ -108,6 +108,12 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
         Callback function that is called when the client disconnects from the server.
         It logs the disconnection event and sets the _connected flag to False.
         """
+        try:
+            if self.connection:
+                self.connection.loop_stop()
+                self.connection.disconnect()
+        except Exception:  # pylint: disable=broad-except
+            pass
         with self._lock:
             # Ignore callbacks from a client instance we've already replaced/torn down.
             if client is not self.connection:
