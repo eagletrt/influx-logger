@@ -5,6 +5,7 @@ from src.handler.handler_fsm import HandlerFSM
 
 
 class _DummyCondition:
+
     def __init__(self):
         self.wait_calls = []
 
@@ -19,6 +20,7 @@ class _DummyCondition:
 
 
 class TestHandlerFSM(unittest.TestCase):
+
     def test_do_run_transitions_to_disconnection_when_connection_drops(self):
         fsm = object.__new__(HandlerFSM)
         dummy_condition = _DummyCondition()

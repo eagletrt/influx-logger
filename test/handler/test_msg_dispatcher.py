@@ -6,6 +6,7 @@ if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
 
     class InfluxDBClient:
+
         def __init__(self, *args, **kwargs):
             self.connection = self
 
@@ -24,6 +25,7 @@ if "influxdb_client" not in sys.modules:
     write_api_module = ModuleType("influxdb_client.client.write_api")
 
     class WriteOptions:
+
         def __init__(self, *args, **kwargs):
             self.batch_size = kwargs.get("batch_size", 0)
 
@@ -52,6 +54,7 @@ if "paho.mqtt.client" not in sys.modules:
     mqtt_client_module = ModuleType("paho.mqtt.client")
 
     class Client:
+
         def __init__(self, *args, **kwargs):
             self.on_connect = None
             self.on_disconnect = None
@@ -104,6 +107,7 @@ if "google.protobuf" not in sys.modules:
     descriptor_pool_module = ModuleType("google.protobuf.descriptor_pool")
 
     class DescriptorPool:
+
         def Add(self, file_proto):
             return None
 
@@ -115,6 +119,7 @@ if "google.protobuf" not in sys.modules:
     descriptor_pb2_module = ModuleType("google.protobuf.descriptor_pb2")
 
     class FileDescriptorSet:
+
         def __init__(self) -> None:
             self.file = []
 
@@ -126,6 +131,7 @@ if "google.protobuf" not in sys.modules:
     message_factory_module = ModuleType("google.protobuf.message_factory")
 
     class MessageFactory:
+
         def __init__(self, pool):
             self.pool = pool
 
@@ -156,6 +162,7 @@ from src.handler.msg_dispatcher import MsgDispatcher
 
 
 class TestMsgDispatcher(TestCase):
+
     def test_version_topics_keep_legacy_and_new_paths(self):
         dispatcher = MsgDispatcher()
 
@@ -185,7 +192,8 @@ class TestMsgDispatcher(TestCase):
         dispatcher = MsgDispatcher()
         regex = dispatcher.build_topic_regex("+/+/version")
 
-        self.assertIsNone(regex.fullmatch("vehicle/onboard/info/version/libcan"))
+        self.assertIsNone(
+            regex.fullmatch("vehicle/onboard/info/version/libcan"))
 
     def test_mqtt_connection_subscribes_to_legacy_and_new_version_topics(self):
         import src.connections.mqtt_connection as mqtt_module
@@ -194,6 +202,7 @@ class TestMsgDispatcher(TestCase):
         original_client = mqtt_module.mqtt.Client
 
         class Client:
+
             def __init__(self, *args, **kwargs):
                 self.on_connect = None
                 self.on_disconnect = None
@@ -232,6 +241,7 @@ class TestMsgDispatcher(TestCase):
         original_client = mqtt_module.mqtt.Client
 
         class Client:
+
             def __init__(self, *args, **kwargs):
                 self.on_connect = None
                 self.on_disconnect = None
@@ -277,6 +287,7 @@ class TestMsgDispatcher(TestCase):
                 return "Success"
 
         class Client:
+
             def __init__(self, *args, **kwargs):
                 self.on_connect = None
 
@@ -293,8 +304,8 @@ class TestMsgDispatcher(TestCase):
         try:
             connection = MQTTConnection(url="broker", port=1883)
             connection.connection = Client()
-            connection.on_connect(
-                connection.connection, None, None, PahoReasonCode())
+            connection.on_connect(connection.connection, None, None,
+                                  PahoReasonCode())
             self.assertTrue(connection._connected)
         finally:
             mqtt_module.mqtt.Client = original_client
