@@ -236,6 +236,25 @@ class InfluxConnection(Connection):
                 )
             return False
 
+    def reset_ping(self) -> bool:
+        """
+        Resets the ping timer for the InfluxDB connection.
+        This method can be used to reset the connection check interval.
+        Returns:
+            bool: True if the ping timer was reset successfully, False otherwise.
+        """
+        try:
+            self.connection_checker.reset_timer()
+            logger.info(
+                "influx-connection: Ping timer reset successfully for InfluxDB at %s:%d",
+                self.url, self.port)
+            return True
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "influx-connection: Failed to reset ping timer for InfluxDB at %s:%d: %s",
+                self.url, self.port, str(e))
+            return False
+
 
 class ConnectionChecker(Thread):
     """
@@ -256,6 +275,15 @@ class ConnectionChecker(Thread):
         self.influx_connection: InfluxConnection = influx_connection
         self.check_interval: int = check_interval
         self._stop_event: Event = Event()
+        self.is_stopping: bool = False
+
+    def reset_timer(self):
+        """
+        Resets the timer for the connection check interval.
+        This method can be called to restart the waiting period before the next connection check.
+        """
+        self._stop_event.set()
+        self._stop_event.clear()
 
     def run(self):
         """
@@ -265,7 +293,7 @@ class ConnectionChecker(Thread):
         self._stop_event.clear()
         if self.influx_connection.is_connected():
             self.influx_connection.on_connect()
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and not self.is_stopping:
             if not self.influx_connection.is_connected():
                 self._stop_event.set()
             self._stop_event.wait(self.check_interval)
@@ -275,6 +303,7 @@ class ConnectionChecker(Thread):
         """
         Stops the ConnectionChecker thread gracefully.
         """
+        self.is_stopping = True
         self._stop_event.set()
         try:
             self.join()  # Wait for the thread to finish

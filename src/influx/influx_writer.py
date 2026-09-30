@@ -169,6 +169,7 @@ class InfluxWriter(InfluxManager):
                 #    "influx_writer: Lines committed: %s",
                 #    self.__pack_lines(points, self.timestamp_precision)
                 #)
+                self.client.reset_ping()
             else:
                 logger.warning(
                     "influx_writer: Commit returned unexpected result: %s",
