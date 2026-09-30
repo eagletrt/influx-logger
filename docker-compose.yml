@@ -3,6 +3,8 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.influx-logger.yml
+        container_name: influx-logger
+        hostname: influx-logger
         volumes:
             - ./config.json:/app/config.json:ro
             - ./cache:/app/cache:rw
