@@ -238,11 +238,12 @@ class LibManager(ABC):
                       encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 "protobuf_manager: "
                 "Failed to save downloaded proto for network '%s' (version %s)",
                 network, commit_hash)
+            logger.error("Exception %s: %s", type(e).__name__, e)
             return False
         return False
 
