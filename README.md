@@ -109,6 +109,8 @@ docker build --secret id=logger-config,src=$(pwd)/configuration.json -f Dockerfi
 ```sh
 docker run --mount=type=bind,src=$(pwd)/configuration.json,target=/app/config.json,readonly --mount=type=bind,src=./cache,target=/app/cache influx-logger:latest
 ```
+#### Compose
+A production-ready Compose file is available as [`compose.production.yaml`](compose.production.yaml).
 #### Tests
 For tests purpose can be useful to run Influx and Mosquitto on Docker with Influx Logger, to do so this repository provide a *docker-compose.yml* file which creates such system.
 You must first execute it once and retrives the Influxdb token from https://localhost:8086, than place the token in a configuration file named *configuration.json*, than you can properly 
