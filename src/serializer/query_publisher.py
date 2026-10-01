@@ -1,6 +1,9 @@
+"""
+A class for publishing query-related messages over MQTT.
+"""
+
 import json
 
-from src.utils.logger_utils import logger
 from src.serializer.query_protocol import (
     QueryChunkInfo,
     QueryError,
@@ -12,23 +15,37 @@ from src.serializer.query_protocol import (
     legacy_error_topic,
     status_topic,
 )
+from src.utils.logger_utils import logger
 
 STATUS_QOS: int = 1
-'''Statuses are published at QoS 1: losing the message that reports a failure would leave
-the requester waiting forever, which is exactly what the protocol exists to prevent.'''
+'''
+Statuses are published at QoS 1: losing the message that
+reports a failure would leave
+the requester waiting forever, which is exactly what the
+protocol exists to prevent.
+'''
 
 CONTENT_QOS: int = 0
-'''Chunks are published at QoS 0, as before: the manifest sent on completion lets the
-requester detect a missing chunk without paying for QoS 1 on the whole payload.'''
+'''
+Chunks are published at QoS 0, as before: the manifest sent
+on completion lets the
+requester detect a missing chunk without paying for QoS 1 on
+the whole payload.
+'''
+
 
 class QueryPublisher:
     '''
-    Single place where the query protocol reaches MQTT: builds the topics of a transaction
+    Single place where the query protocol reaches MQTT:
+    builds the topics of a transaction
     and publishes on them without ever raising.
 
-    Every publish is guarded because the MQTT connection is dropped, and set to None, as
-    soon as the broker disconnects: an unguarded publish inside a failure handler would
-    raise a second exception and the failure would never be reported.
+    Every publish is guarded because the MQTT
+    connection is dropped, andset to None, as
+    soon as the broker disconnects: an
+    unguarded publish inside a failurehandler would
+    raise a second exception and the failure would
+    never be reported.
 
     Attributes:
         mqtt (MQTTConnection): The connection used to publish, may be disconnected.
@@ -37,6 +54,7 @@ class QueryPublisher:
         transaction_id (str): The transaction being answered.
         legacy_topics (bool): Whether to also publish the pre-protocol eof and error topics.
     '''
+
     def __init__(
         self,
         mqtt,
@@ -53,7 +71,8 @@ class QueryPublisher:
 
     def _safe_publish(self, topic: str, payload: bytes, qos: int) -> bool:
         '''
-        Publishes a payload, reporting failures through the return value instead of exceptions.
+        Publishes a payload, reporting failures through
+        the return value instead of exceptions.
 
         Args:
             topic (str): The topic to publish on.
@@ -64,16 +83,21 @@ class QueryPublisher:
         '''
         connection = getattr(self.mqtt, "connection", None)
         if connection is None:
-            logger.error(f"query_publisher: No MQTT connection available, cannot publish on '{topic}'")
+            logger.error(
+                "query_publisher: No MQTT connection available, cannot publish on '%s'",
+                topic)
             return False
         try:
             result = connection.publish(topic, payload, qos=qos)
-        except Exception as error:
-            logger.error(f"query_publisher: Failed to publish on '{topic}': {error}")
+        except Exception as error:  # pylint: disable=broad-except
+            logger.error("query_publisher: Failed to publish on '%s': %s",
+                         topic, error)
             return False
         return_code = getattr(result, "rc", 0)
         if return_code != 0:
-            logger.error(f"query_publisher: Broker refused the message on '{topic}', return code: {return_code}")
+            logger.error(
+                "query_publisher: Broker refused the message on '%s', return code: %d",
+                topic, return_code)
             return False
         return True
 
@@ -86,21 +110,26 @@ class QueryPublisher:
         Returns:
             bool: True if the broker accepted the message, False otherwise.
         '''
-        topic = status_topic(self.vehicle_id, self.device_id, self.transaction_id)
+        topic = status_topic(self.vehicle_id, self.device_id,
+                             self.transaction_id)
         try:
             payload = status.serializeAsProtobufString()
-        except Exception as error:
-            logger.error(f"query_publisher: Failed to serialize the status of query {self.transaction_id}: {error}")
+        except Exception as error:  # pylint: disable=broad-except
+            logger.error(
+                "query_publisher: Failed to serialize the status of query %s: %s",
+                self.transaction_id, error)
             return False
         return self._safe_publish(topic, payload, STATUS_QOS)
 
     def publish_accepted(self) -> bool:
         '''Tells the requester the query has been received and queued.'''
-        return self.publish_status(build_status(self.transaction_id, QueryState.QUERY_STATE_ACCEPTED))
+        return self.publish_status(
+            build_status(self.transaction_id, QueryState.QUERY_STATE_ACCEPTED))
 
     def publish_running(self) -> bool:
         '''Tells the requester the query is being executed.'''
-        return self.publish_status(build_status(self.transaction_id, QueryState.QUERY_STATE_RUNNING))
+        return self.publish_status(
+            build_status(self.transaction_id, QueryState.QUERY_STATE_RUNNING))
 
     def publish_completed(
         self,
@@ -126,12 +155,11 @@ class QueryPublisher:
                 total_rows=total_rows,
                 chunks=chunks,
                 details=details,
-            )
-        )
+            ))
         if self.legacy_topics:
             self._safe_publish(
-                legacy_eof_topic(self.vehicle_id, self.device_id, self.transaction_id), b"", CONTENT_QOS
-            )
+                legacy_eof_topic(self.vehicle_id, self.device_id,
+                                 self.transaction_id), b"", CONTENT_QOS)
         return published
 
     def publish_failure(
@@ -153,8 +181,8 @@ class QueryPublisher:
             bool: True if the broker accepted the message, False otherwise.
         '''
         logger.error(
-            f"query_publisher: Query {self.transaction_id} failed at stage '{stage}' with {code.name}: {description}"
-        )
+            "query_publisher: Query %s failed at stage '%s' with %s: %s",
+            self.transaction_id, stage, code.name, description)
         published = self.publish_status(
             build_status(
                 self.transaction_id,
@@ -163,12 +191,16 @@ class QueryPublisher:
                 stage=stage,
                 description=description,
                 details=details,
-            )
-        )
+            ))
         if self.legacy_topics:
             self._safe_publish(
-                legacy_error_topic(self.vehicle_id, self.device_id, self.transaction_id),
-                json.dumps({"error": description, "code": code.name, "stage": stage}).encode("utf-8"),
+                legacy_error_topic(self.vehicle_id, self.device_id,
+                                   self.transaction_id),
+                json.dumps({
+                    "error": description,
+                    "code": code.name,
+                    "stage": stage
+                }).encode("utf-8"),
                 CONTENT_QOS,
             )
         return published
@@ -184,8 +216,8 @@ class QueryPublisher:
             bool: True if the broker accepted the message, False otherwise.
         '''
         return self._safe_publish(
-            content_topic(self.vehicle_id, self.device_id, self.transaction_id, name), payload, CONTENT_QOS
-        )
+            content_topic(self.vehicle_id, self.device_id, self.transaction_id,
+                          name), payload, CONTENT_QOS)
 
     def chunk_topic(self, name: str) -> str:
         '''
@@ -194,6 +226,8 @@ class QueryPublisher:
         Returns:
             str: The topic the chunk is published on, as reported in the manifest.
         '''
-        return content_topic(self.vehicle_id, self.device_id, self.transaction_id, name)
+        return content_topic(self.vehicle_id, self.device_id,
+                             self.transaction_id, name)
+
 
 __all__ = ["QueryPublisher", "STATUS_QOS", "CONTENT_QOS"]

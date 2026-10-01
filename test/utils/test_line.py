@@ -2,7 +2,6 @@ import sys
 from types import ModuleType
 from unittest import TestCase
 
-
 if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
 
@@ -34,6 +33,16 @@ from src.utils.line import Line
 
 
 class TestLine(TestCase):
+    def test_from_object_treats_time_as_timestamp(self):
+        line = Line.from_object(
+            {"time": 123, "lap_time": 42.5},
+            measurement="bestlap",
+            tags={},
+        )
+
+        self.assertEqual(line.timestamp, 123)
+        self.assertEqual(line.fields, {"lap_time": 42.5})
+
     def test_to_point_preserves_each_field_type(self):
         line = Line(
             measurement="sample",
@@ -50,3 +59,15 @@ class TestLine(TestCase):
         self.assertIsInstance(point.fields["float_field"], float)
         self.assertTrue(point.fields["bool_field"])
         self.assertIsInstance(point.fields["bool_field"], bool)
+
+    def test_to_point_serializes_nested_field_values(self):
+        line = Line(
+            measurement="sample",
+            tags={},
+            fields={"group_mux1": {"channel": 2, "enabled": True}},
+            timestamp=123,
+        )
+
+        point = line.to_point()
+
+        self.assertEqual(point.fields["group_mux1"], '{"channel":2,"enabled":true}')

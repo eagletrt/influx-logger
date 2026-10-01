@@ -62,7 +62,8 @@ It should be written like this:
         "url" : "mosquitto",
         "port" : 1883,
         "username" : "optional_username",
-        "password" : "optional_password"
+        "password" : "optional_password",
+        "client_id" : "influx-logger-optional123"
     },
     "influx" : {
         "url" : "influxdb",

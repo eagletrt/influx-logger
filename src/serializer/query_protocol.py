@@ -1,7 +1,8 @@
+"""
+Query protocol for InfluxDB queries.
+"""
 import json
 import time
-
-import src.serializer  # noqa: F401  (registers the generated code on sys.path)
 
 try:
     from influxlogger.query import (
@@ -17,8 +18,7 @@ except ImportError as error:  # pragma: no cover - depends on the build step
     raise ImportError(
         "Generated query protocol not found. Initialize the submodule with "
         "'git submodule update --init --recursive' and generate the protobuf "
-        "modules with 'make proto'."
-    ) from error
+        "modules with 'make proto'.") from error
 
 PROTOCOL_VERSION: int = 1
 '''Version of the query protocol implemented by this module. Published in every message.'''
@@ -32,6 +32,7 @@ STAGE_SERIALIZATION: str = "serialization"
 STAGE_PUBLISH: str = "publish"
 '''The failure happened while publishing a message on MQTT.'''
 
+
 class QueryRequestError(Exception):
     '''
     Raised when a query request cannot be accepted. Carries the protocol error code
@@ -41,10 +42,12 @@ class QueryRequestError(Exception):
         code (QueryError): The protocol error code to publish.
         stage (str): The stage of the pipeline the failure belongs to.
     '''
+
     def __init__(self, code: QueryError, stage: str, description: str) -> None:
         super().__init__(description)
         self.code: QueryError = code
         self.stage: str = stage
+
 
 def now_us() -> int:
     '''
@@ -53,23 +56,31 @@ def now_us() -> int:
     '''
     return int(time.time() * 1_000_000)
 
+
 def status_topic(vehicle_id: str, device_id: str, transaction_id: str) -> str:
     '''Topic carrying the QueryStatus messages of a transaction.'''
     return f"{vehicle_id}/{device_id}/query/{transaction_id}/status"
 
-def content_topic(vehicle_id: str, device_id: str, transaction_id: str, name: str) -> str:
+
+def content_topic(vehicle_id: str, device_id: str, transaction_id: str,
+                  name: str) -> str:
     '''Topic carrying the payload of a single chunk.'''
     return f"{vehicle_id}/{device_id}/query/{transaction_id}/data/content/{name}"
 
-def legacy_eof_topic(vehicle_id: str, device_id: str, transaction_id: str) -> str:
+
+def legacy_eof_topic(vehicle_id: str, device_id: str,
+                     transaction_id: str) -> str:
     '''Topic used before the protocol existed to signal the end of a transaction.'''
     return content_topic(vehicle_id, device_id, transaction_id, "eof")
 
-def legacy_error_topic(vehicle_id: str, device_id: str, transaction_id: str) -> str:
+
+def legacy_error_topic(vehicle_id: str, device_id: str,
+                       transaction_id: str) -> str:
     '''Topic used before the protocol existed to signal a failure.'''
     return content_topic(vehicle_id, device_id, transaction_id, "error")
 
-def build_status(
+
+def build_status(  # pylint: disable=too-many-arguments disable=too-many-positional-arguments
     transaction_id: str,
     state: QueryState,
     error: QueryError = QueryError.QUERY_ERROR_NONE,
@@ -113,6 +124,7 @@ def build_status(
         details=details if details else {},
     )
 
+
 def classify_influx_error(error: Exception) -> QueryError:
     '''
     Maps an exception raised by the InfluxDB client to a protocol error code, so the
@@ -132,15 +144,16 @@ def classify_influx_error(error: Exception) -> QueryError:
     if isinstance(status, int) and status >= 500:
         return QueryError.QUERY_ERROR_DB_UNAVAILABLE
     if type(error).__name__ in (
-        "NewConnectionError",
-        "MaxRetryError",
-        "ConnectTimeoutError",
-        "ReadTimeoutError",
-        "ProtocolError",
-        "ServiceException",
+            "NewConnectionError",
+            "MaxRetryError",
+            "ConnectTimeoutError",
+            "ReadTimeoutError",
+            "ProtocolError",
+            "ServiceException",
     ):
         return QueryError.QUERY_ERROR_DB_UNAVAILABLE
     return QueryError.QUERY_ERROR_QUERY_FAILED
+
 
 def escape_flux_string(value: str) -> str:
     '''
@@ -153,6 +166,7 @@ def escape_flux_string(value: str) -> str:
         str: The value with backslashes and double quotes escaped.
     '''
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
 
 def _request_from_json(payload: bytes) -> QueryRequest:
     '''
@@ -168,45 +182,50 @@ def _request_from_json(payload: bytes) -> QueryRequest:
     try:
         data = json.loads(payload.decode("utf-8"))
     except Exception as error:
-        raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, f"invalid JSON payload: {error}"
-        ) from error
+        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST,
+                                STAGE_REQUEST,
+                                f"invalid JSON payload: {error}") from error
     if not isinstance(data, dict):
-        raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, "invalid JSON payload: expected an object"
-        )
+        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST,
+                                STAGE_REQUEST,
+                                "invalid JSON payload: expected an object")
     if data.get("start") is None or data.get("stop") is None:
         raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, "invalid JSON payload: 'start' and 'stop' are mandatory"
-        )
+            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST,
+            "invalid JSON payload: 'start' and 'stop' are mandatory")
     try:
         start = int(data["start"])
         stop = int(data["stop"])
         max_rows = int(data.get("maxRows", 0))
     except (TypeError, ValueError) as error:
-        raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, f"invalid JSON payload: {error}"
-        ) from error
+        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST,
+                                STAGE_REQUEST,
+                                f"invalid JSON payload: {error}") from error
     return QueryRequest(
         start=start,
         stop=stop,
         transactionId=str(data.get("transactionId", "")),
         networks=[str(network) for network in data.get("networks", [])],
-        measurements=[str(measurement) for measurement in data.get("measurements", [])],
+        measurements=[
+            str(measurement) for measurement in data.get("measurements", [])
+        ],
         format=QueryFormat.QUERY_FORMAT_CSV,
         compression=QueryCompression.QUERY_COMPRESSION_GZIP,
         maxRows=max_rows,
         protocolVersion=0,
     )
 
-def parse_query_request(payload: bytes, transaction_id: str = "", max_range_us: int = 0) -> QueryRequest:
+
+def parse_query_request(payload: bytes,
+                        transaction_id: str = "",
+                        max_range_us: int = 0) -> QueryRequest:
     '''
     Decodes and validates a query request. Accepts both a serialized QueryRequest and the
     legacy JSON payload, so clients can migrate without a flag day.
 
     Args:
         payload (bytes): The raw MQTT payload.
-        transaction_id (str): The transaction id taken from the topic, used when the payload omits it.
+        transaction_id (str): The transaction id taken from the topic.
         max_range_us (int): Maximum accepted time range in microseconds, 0 to disable the check.
     Returns:
         QueryRequest: The validated request, with the optional fields defaulted.
@@ -214,7 +233,8 @@ def parse_query_request(payload: bytes, transaction_id: str = "", max_range_us: 
         QueryRequestError: If the payload cannot be decoded or the time range is not usable.
     '''
     if not payload:
-        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, "empty payload")
+        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST,
+                                STAGE_REQUEST, "empty payload")
     if payload.lstrip().startswith(b"{"):
         request = _request_from_json(payload)
     else:
@@ -230,33 +250,35 @@ def parse_query_request(payload: bytes, transaction_id: str = "", max_range_us: 
         request.transactionId = transaction_id
     if request.start <= 0 or request.stop <= 0:
         raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, "'start' and 'stop' are mandatory and must be positive"
-        )
+            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST,
+            "'start' and 'stop' are mandatory and must be positive")
     if request.stop <= request.start:
         raise QueryRequestError(
             QueryError.QUERY_ERROR_INVALID_RANGE,
             STAGE_REQUEST,
             f"'stop' ({request.stop}) must be greater than 'start' ({request.start})",
         )
-    if max_range_us > 0 and (request.stop - request.start) > max_range_us:
+    if 0 < max_range_us < (request.stop - request.start):
         raise QueryRequestError(
             QueryError.QUERY_ERROR_INVALID_RANGE,
             STAGE_REQUEST,
-            f"requested range of {request.stop - request.start} us exceeds the maximum of {max_range_us} us",
+            f"requested range of {request.stop - request.start} us " \
+                f"exceeds the maximum of {max_range_us} us",
         )
     if request.format is None:
         request.format = QueryFormat.QUERY_FORMAT_CSV
     if request.compression is None:
         request.compression = QueryCompression.QUERY_COMPRESSION_GZIP
     if request.format != QueryFormat.QUERY_FORMAT_CSV:
-        raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, f"unsupported format: {request.format}"
-        )
+        raise QueryRequestError(QueryError.QUERY_ERROR_BAD_REQUEST,
+                                STAGE_REQUEST,
+                                f"unsupported format: {request.format}")
     if request.compression != QueryCompression.QUERY_COMPRESSION_GZIP:
         raise QueryRequestError(
-            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST, f"unsupported compression: {request.compression}"
-        )
+            QueryError.QUERY_ERROR_BAD_REQUEST, STAGE_REQUEST,
+            f"unsupported compression: {request.compression}")
     return request
+
 
 __all__ = [
     "PROTOCOL_VERSION",

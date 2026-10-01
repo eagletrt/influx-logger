@@ -1,3 +1,7 @@
+"""
+This module implements a CSV serializer for Flux tables.
+"""
+
 import csv
 import gzip
 import hashlib
@@ -20,7 +24,8 @@ EXCLUDED_COLUMNS: tuple[str, ...] = (
 TIMESTAMP_COLUMN: str = "_timestamp"
 '''Name of the timestamp column written as the first field of every CSV.'''
 
-class SerializedChunk:
+
+class SerializedChunk:  # pylint: disable=too-few-public-methods
     '''
     The outcome of serializing one Flux table.
 
@@ -29,10 +34,12 @@ class SerializedChunk:
         rows (int): Number of data rows, the header excluded.
         digest (str): Hexadecimal sha256 of the payload, published in the chunk manifest.
     '''
+
     def __init__(self, payload: bytes, rows: int) -> None:
         self.payload: bytes = payload
         self.rows: int = rows
         self.digest: str = hashlib.sha256(payload).hexdigest()
+
 
 class CsvSerializer:
     '''
@@ -80,7 +87,8 @@ class CsvSerializer:
         for record in records:
             for key in record.values.keys():
                 clean_key = key.strip().lower()
-                if not clean_key.startswith("_") and clean_key not in EXCLUDED_COLUMNS:
+                if not clean_key.startswith(
+                        "_") and clean_key not in EXCLUDED_COLUMNS:
                     columns.add(clean_key)
         columns.discard("timestamp")
         return [TIMESTAMP_COLUMN] + sorted(columns)
@@ -116,7 +124,9 @@ class CsvSerializer:
         columns = self._columns(records)
         data_columns = set(columns[1:])
         buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=columns, lineterminator="\n")
+        writer = csv.DictWriter(buffer,
+                                fieldnames=columns,
+                                lineterminator="\n")
         writer.writeheader()
         rows = 0
         for record in records:
@@ -135,4 +145,7 @@ class CsvSerializer:
         payload = gzip.compress(buffer.getvalue().encode("utf-8"), mtime=0)
         return SerializedChunk(payload=payload, rows=rows)
 
-__all__ = ["CsvSerializer", "SerializedChunk", "EXCLUDED_COLUMNS", "TIMESTAMP_COLUMN"]
+
+__all__ = [
+    "CsvSerializer", "SerializedChunk", "EXCLUDED_COLUMNS", "TIMESTAMP_COLUMN"
+]

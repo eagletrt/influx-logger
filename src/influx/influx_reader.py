@@ -1,12 +1,27 @@
-from queue import Queue, Empty, Full
+"""
+This module implements a reader for InfluxDB queries,
+handling incoming requests, fetching data, formatting it
+as CSV, and publishing it back over MQTT.
+The InfluxReader class extends the InfluxManager base
+class, providing specific functionality for
+query processing, serialization, and publishing.
+The reader operates in a separate thread, continuously checking
+for new query requests and processing them.
+The reader also provides mechanisms for graceful shutdown,
+ensuring that in-flight queries are completed
+before stopping, and that any queued requests are explicitly
+refused.
+The reader uses a CsvSerializer to convert Flux tables into
+gzip-compressed CSV chunks, which are
+then published to the appropriate MQTT topics.
+"""
 
-from src.utils.logger_utils import logger
-from src.utils.timestamp import TimestampPrecision
-from src.influx.influx_manager import InfluxManager
+from queue import Empty, Full, Queue
+
 from src.connections.influx_connection import InfluxConnection
 from src.connections.mqtt_connection import MQTTConnection
+from src.influx.influx_manager import InfluxManager
 from src.serializer.csv_serializer import CsvSerializer
-from src.serializer.query_publisher import QueryPublisher
 from src.serializer.query_protocol import (
     STAGE_PUBLISH,
     STAGE_QUERY,
@@ -20,8 +35,12 @@ from src.serializer.query_protocol import (
     escape_flux_string,
     parse_query_request,
 )
+from src.serializer.query_publisher import QueryPublisher
+from src.utils.logger_utils import logger
+from src.utils.timestamp import TimestampPrecision
 
-class InfluxReader(InfluxManager):
+
+class InfluxReader(InfluxManager):  # pylint: disable=too-many-instance-attributes
     """
     A reader for interacting with InfluxDB. Handles incoming query requests,
     fetches data, formats it as CSV, and publishes it back over MQTT.
@@ -41,12 +60,14 @@ class InfluxReader(InfluxManager):
         max_rows (int): Maximum rows returned per measurement, 0 to disable the limit.
         legacy_topics (bool): Whether to also publish the pre-protocol eof and error topics.
     """
-    def __init__(
+
+    def __init__(  # pylint: disable=too-many-arguments disable=too-many-positional-arguments
         self,
         client: InfluxConnection,
         mqtt_client: MQTTConnection,
         log_bucket: str,
-        timestamp_precision: str = TimestampPrecision.us.name,
+        timestamp_precision: str = TimestampPrecision.get_name(
+            TimestampPrecision.MICROSECONDS),
         max_queue_size: int = 32,
         max_range_us: int = 0,
         max_rows: int = 0,
@@ -62,7 +83,8 @@ class InfluxReader(InfluxManager):
         self.max_rows: int = max_rows
         self.legacy_topics: bool = legacy_topics
 
-    def publisher(self, vehicle_id: str, device_id: str, transaction_id: str) -> QueryPublisher:
+    def publisher(self, vehicle_id: str, device_id: str,
+                  transaction_id: str) -> QueryPublisher:
         '''
         Builds the publisher answering a given transaction.
 
@@ -73,11 +95,14 @@ class InfluxReader(InfluxManager):
         Returns:
             QueryPublisher: The publisher bound to that transaction.
         '''
-        return QueryPublisher(
-            self.mqtt, vehicle_id, device_id, transaction_id, legacy_topics=self.legacy_topics
-        )
+        return QueryPublisher(self.mqtt,
+                              vehicle_id,
+                              device_id,
+                              transaction_id,
+                              legacy_topics=self.legacy_topics)
 
-    def add_query_to_queue(self, vehicle_id: str, device_id: str, transaction_id: str, payload: bytes) -> bool:
+    def add_query_to_queue(self, vehicle_id: str, device_id: str,
+                           transaction_id: str, payload: bytes) -> bool:
         '''
         Enqueues a query request for asynchronous processing, telling the requester whether
         it was taken in charge.
@@ -92,12 +117,13 @@ class InfluxReader(InfluxManager):
         '''
         publisher = self.publisher(vehicle_id, device_id, transaction_id)
         if self.stopped():
-            publisher.publish_failure(
-                QueryError.QUERY_ERROR_UNAVAILABLE, STAGE_REQUEST, "InfluxReader is shutting down"
-            )
+            publisher.publish_failure(QueryError.QUERY_ERROR_UNAVAILABLE,
+                                      STAGE_REQUEST,
+                                      "InfluxReader is shutting down")
             return False
         try:
-            self.query_queue.put_nowait((vehicle_id, device_id, transaction_id, payload))
+            self.query_queue.put_nowait(
+                (vehicle_id, device_id, transaction_id, payload))
         except Full:
             publisher.publish_failure(
                 QueryError.QUERY_ERROR_UNAVAILABLE,
@@ -109,19 +135,27 @@ class InfluxReader(InfluxManager):
         return True
 
     def run(self) -> None:
+        """
+        Main loop for processing incoming query requests.
+        Continuously checks the query queue for new requests and processes them.
+        """
         logger.info("InfluxReader: Thread started for query processing.")
         while not self.stopped():
             try:
                 # Timeout di 1 secondo per non bloccare il controllo di self.stopped()
-                vehicle_id, device_id, transaction_id, payload = self.query_queue.get(timeout=1.0)
+                vehicle_id, device_id, transaction_id, payload = self.query_queue.get(
+                    timeout=1.0)
             except Empty:
                 continue
             try:
-                self._process_query(vehicle_id, device_id, transaction_id, payload)
-            except Exception as e:
+                self._process_query(vehicle_id, device_id, transaction_id,
+                                    payload)
+            except Exception as e:  # pylint: disable=broad-except
                 # _process_query reports its own failures: reaching this point means the
                 # reporting itself failed, so there is nothing left to publish.
-                logger.error(f"InfluxReader: Error in main loop: {e}", exc_info=True)
+                logger.error("InfluxReader: Error in main loop: %s",
+                             str(e),
+                             exc_info=True)
         self._drain_queue()
 
     def graceful_stop(self) -> None:
@@ -135,13 +169,18 @@ class InfluxReader(InfluxManager):
         '''Refuses every request still queued when the reader stops.'''
         while True:
             try:
-                vehicle_id, device_id, transaction_id, _payload = self.query_queue.get_nowait()
+                vehicle_id, device_id, transaction_id, _payload = self.query_queue.get_nowait(
+                )
             except Empty:
                 return
-            logger.warning(f"InfluxReader: Query {transaction_id} dropped, the reader is stopping.")
-            self.publisher(vehicle_id, device_id, transaction_id).publish_failure(
-                QueryError.QUERY_ERROR_UNAVAILABLE, STAGE_REQUEST, "InfluxReader stopped before running the query"
-            )
+            logger.warning(
+                "InfluxReader: Query %s dropped, the reader is stopping.",
+                transaction_id)
+            self.publisher(vehicle_id, device_id,
+                           transaction_id).publish_failure(
+                               QueryError.QUERY_ERROR_UNAVAILABLE,
+                               STAGE_REQUEST,
+                               "InfluxReader stopped before running the query")
 
     def _effective_max_rows(self, request: QueryRequest) -> int:
         '''
@@ -153,10 +192,13 @@ class InfluxReader(InfluxManager):
         Returns:
             int: The strictest cap between the request and the reader, 0 when neither caps.
         '''
-        limits = [limit for limit in (request.maxRows, self.max_rows) if limit > 0]
+        limits = [
+            limit for limit in (request.maxRows, self.max_rows) if limit > 0
+        ]
         return min(limits) if limits else 0
 
-    def _build_flux_query(self, vehicle_id: str, device_id: str, request: QueryRequest) -> str:
+    def _build_flux_query(self, vehicle_id: str, device_id: str,
+                          request: QueryRequest) -> str:
         '''
         Builds the Flux query for a request. Every interpolated value is escaped: vehicle and
         device ids come straight from the MQTT topic and are not trusted input.
@@ -172,12 +214,14 @@ class InfluxReader(InfluxManager):
         stop_ns = request.stop * 1000
         filters = ""
         if request.networks:
-            networks = " or ".join(f'r["network"] == "{escape_flux_string(network)}"' for network in request.networks)
+            networks = " or ".join(
+                f'r["network"] == "{escape_flux_string(network)}"'
+                for network in request.networks)
             filters += f"\n                |> filter(fn: (r) => {networks})"
         if request.measurements:
             measurements = " or ".join(
-                f'r["_measurement"] == "{escape_flux_string(measurement)}"' for measurement in request.measurements
-            )
+                f'r["_measurement"] == "{escape_flux_string(measurement)}"'
+                for measurement in request.measurements)
             filters += f"\n                |> filter(fn: (r) => {measurements})"
         max_rows = self._effective_max_rows(request)
         limit = f"\n                |> limit(n: {max_rows})" if max_rows > 0 else ""
@@ -191,7 +235,9 @@ class InfluxReader(InfluxManager):
                 |> group(columns: ["network", "_measurement"]){limit}
         '''
 
-    def _process_query(self, vehicle_id: str, device_id: str, transaction_id: str, payload: bytes) -> None:
+    def _process_query(  # pylint: disable=too-many-locals
+            self, vehicle_id: str, device_id: str, transaction_id: str,
+            payload: bytes) -> None:
         '''
         Runs a query and publishes its result, reporting on the status topic at every stage.
 
@@ -201,24 +247,31 @@ class InfluxReader(InfluxManager):
             transaction_id (str): The transaction the request belongs to.
             payload (bytes): The raw request payload.
         '''
-        logger.info(f"InfluxReader: Inizio elaborazione query {transaction_id} per {vehicle_id}/{device_id}")
+        logger.info("InfluxReader: Inizio elaborazione query %s per %s/%s",
+                    transaction_id, vehicle_id, device_id)
         publisher = self.publisher(vehicle_id, device_id, transaction_id)
 
         try:
-            request = parse_query_request(payload, transaction_id=transaction_id, max_range_us=self.max_range_us)
+            request = parse_query_request(payload,
+                                          transaction_id=transaction_id,
+                                          max_range_us=self.max_range_us)
         except QueryRequestError as error:
             publisher.publish_failure(error.code, error.stage, str(error))
             return
-        except Exception as error:
-            publisher.publish_failure(QueryError.QUERY_ERROR_INTERNAL, STAGE_REQUEST, str(error))
+        except Exception as error:  # pylint: disable=broad-except
+            publisher.publish_failure(QueryError.QUERY_ERROR_INTERNAL,
+                                      STAGE_REQUEST, str(error))
             return
 
         publisher.publish_running()
 
         try:
-            tables = self.query_api.query(self._build_flux_query(vehicle_id, device_id, request), org=self.client.org)
-        except Exception as error:
-            publisher.publish_failure(classify_influx_error(error), STAGE_QUERY, str(error))
+            tables = self.query_api.query(self._build_flux_query(
+                vehicle_id, device_id, request),
+                                          org=self.client.org)
+        except Exception as error:  # pylint: disable=broad-except
+            publisher.publish_failure(classify_influx_error(error),
+                                      STAGE_QUERY, str(error))
             return
 
         chunks: list[QueryChunkInfo] = []
@@ -232,10 +285,13 @@ class InfluxReader(InfluxManager):
                 continue
 
             try:
-                network_name, measurement_name = self.serializer.describe(records)
+                network_name, measurement_name = self.serializer.describe(
+                    records)
                 chunk = self.serializer.serialize(records)
-            except Exception as error:
-                publisher.publish_failure(QueryError.QUERY_ERROR_SERIALIZATION_FAILED, STAGE_SERIALIZATION, str(error))
+            except Exception as error:  # pylint: disable=broad-except
+                publisher.publish_failure(
+                    QueryError.QUERY_ERROR_SERIALIZATION_FAILED,
+                    STAGE_SERIALIZATION, str(error))
                 return
 
             name = f"{network_name}--{measurement_name.lower()}"
@@ -248,7 +304,7 @@ class InfluxReader(InfluxManager):
                 return
 
             total_rows += chunk.rows
-            if max_rows > 0 and chunk.rows >= max_rows:
+            if 0 < max_rows <= chunk.rows:
                 truncated = True
             chunks.append(
                 QueryChunkInfo(
@@ -262,14 +318,16 @@ class InfluxReader(InfluxManager):
                     hash=chunk.digest,
                     format=self.serializer.format,
                     compression=self.serializer.compression,
-                )
-            )
-            logger.info(f"InfluxReader: Inviato CSV compresso per '{name}' ({chunk.rows} righe).")
+                ))
+            logger.info(
+                "InfluxReader: Inviato CSV compresso per '%s' ({%d righe).",
+                name, chunk.rows)
 
         details = {"truncated": "true"} if truncated else None
         publisher.publish_completed(chunks, total_rows, details=details)
         logger.info(
-            f"InfluxReader: Query {transaction_id} completata ({len(chunks)} chunk, {total_rows} righe)."
-        )
+            "InfluxReader: Query %s completata ({%d} chunk, {%d} righe).",
+            transaction_id, len(chunks), total_rows)
+
 
 __all__ = ["InfluxReader"]

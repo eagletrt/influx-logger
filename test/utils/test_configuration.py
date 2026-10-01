@@ -2,6 +2,7 @@ from unittest import TestCase
 
 from src.utils.configuration import Configuration
 
+
 class TestConfiguration(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

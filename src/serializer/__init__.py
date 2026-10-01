@@ -13,7 +13,6 @@ Both directories contribute to the same 'influxlogger' namespace package, so
 even though they live in different trees.
 '''
 import sys
-
 from pathlib import Path
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]

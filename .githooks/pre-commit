@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -e
+
+# Option A: Local Python tools exist (including ruff)
+if command -v ruff &> /dev/null && command -v yapf &> /dev/null && command -v pylint &> /dev/null; then
+    echo "⚡ Running checks using local Python tools..."
+    .githooks/check.sh
+    git add src/
+    exit 0
+fi
+
+# Option B: Local tools missing -> Fallback to Docker
+if command -v docker &> /dev/null; then
+    echo "🐳 Local tools not found. Running checks inside Docker..."
+
+    # If it isn't already built, build the Docker image for linting
+    if ! docker image inspect repo-linter &> /dev/null; then
+        echo "📦 Building Docker image for linting..."
+        docker build -t repo-linter -f .githooks/Dockerfile.lint .
+    fi
+    # Mount repo root, install dependencies, and execute check.sh
+    docker run --rm -v "$(pwd)":/workspace -w /workspace repo-linter bash .githooks/check.sh
+
+    # Re-stage files formatted by yapf inside Docker
+    git add src/
+    exit 0
+fi
+
+# Option C: Neither environment is available
+echo "❌ Error: Missing required tools (ruff, yapf, pylint) and Docker is not running."
+echo "💡 Please install either:"
+echo "   1. Python packages: pip install ruff yapf pylint"
+echo "   2. Docker Desktop: https://www.docker.com/products/docker-desktop/"
+exit 1
