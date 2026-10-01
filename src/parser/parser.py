@@ -65,6 +65,24 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''A timer to track the last time a message was parsed'''
         self.timer_expired: bool = False
         '''Flag to indicate whether the last_parse_timer has expired'''
+        self.network_blacklisting: dict[tuple[str, str], int] = {}
+        '''
+        Counter to track the number of times a network has
+        failed to download its .proto descriptor.
+        If a network fails to download its .proto descriptor
+        blacklist_threshold times,
+        it will be blacklisted and skipped in future parsing attempts.
+        '''
+        self.network_blacklist: set[tuple[str, str]] = set()
+        '''
+        Set of blacklisted networks that have failed to 
+        download their .proto descriptor.
+        '''
+        self.blacklist_threshold: int = 3
+        '''
+        Threshold for blacklisting a network after consecutive
+        failures to download its .proto descriptor.
+        '''
 
     def _handle_inactivity(self) -> None:
         """
@@ -124,7 +142,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             self.row_queue_not_empty.notify_all()
             self.parse_msg(message)
 
-    def parse_msg(self, msg: tuple[list[str], bytes]) -> None:
+    def parse_msg(self, msg: tuple[list[str], bytes]) -> None:  # pylint: disable=too-many-return-statements
         """
         Parses a message and appends it to the destination list.
         Args:
@@ -157,7 +175,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 network)
             return
         try:
-            version = self.device_versions[key][library]
+            version: str = self.device_versions[key][library]
         except KeyError:
             logger.error(
                 "parser:" \
@@ -165,6 +183,15 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                     "Skipping.",
                     key,
                     library.__name__
+            )
+            return
+        if (network, version) in self.network_blacklist:
+            logger.debug(
+                "parser: Network '%s' with version %s is blacklisted due " \
+                "to repeated failures to download its .proto descriptor. " \
+                "Skipping message.",
+                network,
+                version
             )
             return
         # Check if the network is already registered for the given version, if not,
@@ -183,6 +210,19 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             try:
                 if not self.protobuf_manager.download_proto_descriptor(
                         version, network):
+                    self.network_blacklisting[(
+                        network, version)] = self.network_blacklisting.get(
+                            (network, version), 0) + 1
+                    if self.network_blacklisting[(
+                            network, version)] >= self.blacklist_threshold:
+                        logger.warning(
+                            "parser: Network '%s' with version %s has failed to " \
+                            "download its .proto descriptor %d times. Blacklisting.",
+                            network,
+                            version,
+                            self.blacklist_threshold
+                        )
+                        self.network_blacklist.add((network, version))
                     return
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.error(
