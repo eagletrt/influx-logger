@@ -1,0 +1,33 @@
+services:
+  cache-init:
+    container_name: "cache-initializer"
+    image: "busybox:1.36"
+    user: "0:0"
+    volumes:
+      - ./cache:/cache:rw
+    command: ["sh", "-c", "chown -R 1000:1000 /cache"]
+    restart: "no"
+
+  influx-logger:
+    container_name: "influx-logger"
+    hostname: influx-logger
+    image: "ghcr.io/eagletrt/influx-logger:latest"
+    user: "1000:1000"
+    depends_on:
+      cache-init:
+        condition: service_completed_successfully
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./cache:/app/cache:rw
+    restart: unless-stopped
+    networks:
+      - default
+
+networks:
+    default:
+        driver: bridge
