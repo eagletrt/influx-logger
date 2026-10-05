@@ -23,6 +23,7 @@ def _install_import_stubs() -> None:
     descriptor_pool_module = ModuleType("google.protobuf.descriptor_pool")
 
     class DescriptorPool:
+
         def Add(self, file_proto):
             return None
 
@@ -34,6 +35,7 @@ def _install_import_stubs() -> None:
     descriptor_pb2_module = ModuleType("google.protobuf.descriptor_pb2")
 
     class FileDescriptorSet:
+
         def __init__(self) -> None:
             self.file = []
 
@@ -45,6 +47,7 @@ def _install_import_stubs() -> None:
     message_factory_module = ModuleType("google.protobuf.message_factory")
 
     class MessageFactory:
+
         def __init__(self, pool):
             self.pool = pool
 
@@ -66,9 +69,12 @@ def _install_import_stubs() -> None:
     sys.modules.setdefault("google", google_module)
     sys.modules.setdefault("google.protobuf", protobuf_module)
     sys.modules.setdefault("google.protobuf.json_format", json_format_module)
-    sys.modules.setdefault("google.protobuf.descriptor_pool", descriptor_pool_module)
-    sys.modules.setdefault("google.protobuf.descriptor_pb2", descriptor_pb2_module)
-    sys.modules.setdefault("google.protobuf.message_factory", message_factory_module)
+    sys.modules.setdefault("google.protobuf.descriptor_pool",
+                           descriptor_pool_module)
+    sys.modules.setdefault("google.protobuf.descriptor_pb2",
+                           descriptor_pb2_module)
+    sys.modules.setdefault("google.protobuf.message_factory",
+                           message_factory_module)
 
 
 _install_import_stubs()
@@ -77,6 +83,7 @@ from src.parser.protobuf_manager import _DecoderWrapper
 
 
 class DummyMessage:
+
     def __init__(self) -> None:
         self.payload = None
 
@@ -85,6 +92,7 @@ class DummyMessage:
 
 
 class FakeJsonFormat:
+
     def __init__(self) -> None:
         self.calls = []
 
@@ -94,6 +102,7 @@ class FakeJsonFormat:
 
 
 class TestDecoderWrapper(TestCase):
+
     def test_decode_forces_integer_enums(self):
         fake_json_format = FakeJsonFormat()
         wrapper = _DecoderWrapper(DummyMessage, fake_json_format)

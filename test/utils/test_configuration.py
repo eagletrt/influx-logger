@@ -4,20 +4,19 @@ from src.utils.configuration import Configuration
 
 
 class TestConfiguration(TestCase):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        self.config = Configuration(
-            mqtt_url="mqtt://localhost",
-            mqtt_port=1883,
-            influx_url="http://localhost",
-            influx_port=8086,
-            influx_token="token",
-            influx_org="org",
-            influx_bucket="bucket",
-            excluded_networks=["192.168.1.0/24"]
-        )
+        self.config = Configuration(mqtt_url="mqtt://localhost",
+                                    mqtt_port=1883,
+                                    influx_url="http://localhost",
+                                    influx_port=8086,
+                                    influx_token="token",
+                                    influx_org="org",
+                                    influx_bucket="bucket",
+                                    excluded_networks=["192.168.1.0/24"])
 
     def test_configuration_initialization(self):
         self.assertEqual(self.config.mqtt_url, "mqtt://localhost")

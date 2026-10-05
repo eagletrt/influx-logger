@@ -219,9 +219,10 @@ class LibManager(ABC):
                     network, commit_hash)
         if not resp or not resp.ok:
             logger.warning(
-                "protobuf_manager: Proto for network '%s' (version %s) not downloaded %s",
+                "protobuf_manager: Proto for network '%s' (version %s) not downloaded: %s.",
                 network, commit_hash,
-                resp.status_code if resp else 'No response')
+                str(resp.status_code) if resp else 'No response')
+
             return False
         try:
             if not os.path.exists(LibManager.CACHE_DIR):

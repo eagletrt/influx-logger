@@ -6,6 +6,7 @@ if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
 
     class Point:
+
         def __init__(self, measurement):
             self.measurement = measurement
             self.tags = {}
@@ -33,9 +34,13 @@ from src.utils.line import Line
 
 
 class TestLine(TestCase):
+
     def test_from_object_treats_time_as_timestamp(self):
         line = Line.from_object(
-            {"time": 123, "lap_time": 42.5},
+            {
+                "time": 123,
+                "lap_time": 42.5
+            },
             measurement="bestlap",
             tags={},
         )
@@ -47,7 +52,11 @@ class TestLine(TestCase):
         line = Line(
             measurement="sample",
             tags={"vehicle-id": "vehicle-1"},
-            fields={"int_field": 3, "float_field": 3.5, "bool_field": True},
+            fields={
+                "int_field": 3,
+                "float_field": 3.5,
+                "bool_field": True
+            },
             timestamp=123,
         )
 
@@ -64,10 +73,14 @@ class TestLine(TestCase):
         line = Line(
             measurement="sample",
             tags={},
-            fields={"group_mux1": {"channel": 2, "enabled": True}},
+            fields={"group_mux1": {
+                "channel": 2,
+                "enabled": True
+            }},
             timestamp=123,
         )
 
         point = line.to_point()
 
-        self.assertEqual(point.fields["group_mux1"], '{"channel":2,"enabled":true}')
+        self.assertEqual(point.fields["group_mux1"],
+                         '{"channel":2,"enabled":true}')

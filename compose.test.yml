@@ -1,5 +1,41 @@
 name: influx-test-env
 services:
+    cache-init:
+        container_name: cache-initializer-test
+        hostname: cache-initializer-test
+        image: busybox:1.36
+        user: "0:0"
+        volumes:
+            - ./cache:/cache:rw
+        command: ["sh", "-c", "chown -R 1000:1000 /cache"]
+        restart: "no"
+
+    influx-logger:
+        container_name: influx-logger-test
+        hostname: influx-logger-test
+        build:
+            context: .
+            dockerfile: Dockerfile.influx-logger.yml
+        user: "1000:1000"
+        depends_on:
+            influxdb2:
+                condition: service_healthy
+            mosquitto:
+                condition: service_healthy
+            cache-init:
+                condition: service_completed_successfully
+        init: true
+        cap_drop:
+            - ALL
+        security_opt:
+            - no-new-privileges:true
+        volumes:
+            - ./configuration.json:/app/config.json:ro
+            - ./cache:/app/cache:rw
+        networks:
+            - default
+        restart: unless-stopped
+
     influxdb2:
         image: influxdb:2
         container_name: influxdb2-test
@@ -17,8 +53,9 @@ services:
               target: /etc/influxdb2
         networks:
             - default
+
     mosquitto:
-        hostname: mosquitto
+        hostname: mosquitto-test
         build:
             context: .
             dockerfile: Dockerfile.mosquitto.yml
@@ -27,20 +64,7 @@ services:
             - "1884:1884"
         networks:
             - default
-    influx-logger:
-        hostname: influx-logger
-        build:
-            context: .
-            dockerfile: Dockerfile.influx-logger.yml
-        container_name: influx-logger-test
-        volumes:
-            - ./configuration.json:/app/config.json:ro
-            - ./cache:/app/cache:rw
-        depends_on:
-            - influxdb2
-            - mosquitto
-        networks:
-            - default
+
 secrets:
     influxdb2-admin-username:
         file: ./.env.influxdb2-admin-username
@@ -50,11 +74,13 @@ secrets:
         file: ./.env.influxdb2-admin-token
     logger-config:
         file: ./config.json
+
 volumes:
     influxdb2-data:
         driver: local
     influxdb2-config:
         driver: local
+
 networks:
     default:
         driver: bridge
