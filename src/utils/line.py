@@ -3,9 +3,12 @@ Represents a single measurement line for InfluxDB.
 """
 
 import json
+import time
 from typing import Any
 
 from influxdb_client import Point
+
+from src.utils.logger_utils import logger
 
 #from src.utils.logger_utils import logger
 from src.utils.timestamp import INFLUX_INT64_MAX, TIMESTAMP_KEYS, TimestampPrecision
@@ -71,8 +74,12 @@ class Line:
             timestamp = obj.get(key)
         # If no valid timestamp is found, raise an error
         if timestamp is None:
-            #logger.error(f"Handler: Missing timestamp in object: {Line.obj_to_str(obj)}")
-            raise ValueError("Missing timestamp")
+            logger.warning("line: Missing timestamp in object: %s",
+                           Line.obj_to_str(obj))
+            # Adding timestamp to the object with the current time in microseconds
+            timestamp: int = int(time.time_ns() //
+                                 1_000)  # Current time in microseconds
+            #raise ValueError("Missing timestamp")
         # Convert the timestamp to an integer if it's a string or float
         if isinstance(timestamp, (str, float, int)):
             timestamp_value: int = int(timestamp)
