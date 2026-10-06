@@ -230,7 +230,8 @@ class InfluxWriter(InfluxManager):
             logger.error("influx_writer: Failed to pack lines: %s",
                          e,
                          exc_info=True)
-            # logger.error(f"influx_writer: Lines that failed to pack: {lines}")
+            #logger.error("influx_writer: Lines that failed to pack: {%s}",
+            #             lines)
             lines_str = ""
         record: str = ""
         for line in lines_str.splitlines():
