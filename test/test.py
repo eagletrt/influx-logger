@@ -29,7 +29,7 @@ def main():
         except Exception as exc:
 
             def _raise_import_error(err=exc, path=file_path):
-                raise RuntimeError(f"Failed to import {path}: {err}") from err
+                raise ImportError(f"Failed to import {path}: {err}")
 
             suite.addTest(FunctionTestCase(_raise_import_error))
             continue

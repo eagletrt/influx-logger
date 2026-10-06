@@ -294,7 +294,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             line (Line): The Line object to be appended to the destination list.
         """
         with self.__destination_list_lock:
-            #logger.info(f"parser: Appending line to destination list: {line}")
+            #logger.info("parser: Appending line to destination list: %s", line)
             self.destination_list.append(line)
             self.timer_touch()
         with self.__new_points_event_lock__:
@@ -361,10 +361,12 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             record (Any): The record to be pushed, which can be a dictionary or any other type.
             tags (dict[str, str]): A dictionary of tags associated with the record.
         '''
-        #logger.info(f"parser: Pushing record for measurement '{measurement}': {record}")
+        #logger.info("parser: Pushing record for measurement '%s': %s",
+        #            measurement, record)
         # Check if the record is a dictionary; if not, log a warning and return early
         if isinstance(record, dict):
-            #logger.info(f"parser: Received record for measurement '{measurement}': {record}")
+            #logger.info("parser: Received record for measurement '%s': %s",
+            #            measurement, record)
             # Check if the record contains a "valuesMap" key, indicating a columnar format.
             if "valuesMap" in record:
                 #logger.info(
@@ -379,7 +381,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                             # Push each row-wise record to the line repository
                             line: Line = Line.from_object(
                                 row, measurement, tags)
-                            #logger.info(f"parser: Line: {line}")
+                            #logger.info("parser: Line: %s", line)
                             self.__append_to_destination_list(line)
                 return
             #logger.info(
@@ -404,7 +406,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                     "parser: Error creating Line from record for measurement '%s': %s",
                     measurement, str(e))
                 return
-            #logger.info(f"parser: Line: {line}")
+            #logger.info("parser: Line: %s", line)
             self.__append_to_destination_list(line)
         elif isinstance(record, str):
             #logger.warning(
