@@ -33,7 +33,7 @@ class InfluxWriter(InfluxManager):
         adr_bucket: str = None,
         log_bucket: str = None,
         excluded_networks: list = None,
-        batch_size: int = 2_500,
+        batch_size: int = 800,
         timestamp_precision: str = TimestampPrecision.get_name(
             TimestampPrecision.MICROSECONDS.value)) -> None:
         super().__init__(client, timestamp_precision, name="InfluxWriter")
