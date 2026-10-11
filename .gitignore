@@ -211,3 +211,8 @@ repomix-output.xml
 
 # Poetry
 poetry.lock
+
+# CSV
+*.csv
+*.csv#
+
