@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from google.protobuf import json_format
+from google.protobuf.descriptor import FieldDescriptor
 
 # pylint: disable=no-name-in-module
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
@@ -400,11 +401,80 @@ class _DecoderWrapper:
         message = self._message_class()
         # Parse the payload into the message instance
         message.ParseFromString(payload)
-        return self._json_format.MessageToDict(
+        decoded = self._json_format.MessageToDict(
             message,
             preserving_proto_field_name=True,
             use_integers_for_enums=True,
         )
+        return self._restore_descriptor_types(
+            decoded, getattr(message, "DESCRIPTOR", None))
+
+    @staticmethod
+    def _restore_descriptor_types(value: Any, descriptor: Any) -> Any:
+        """Restore protobuf scalar types after converting a message to a dict.
+
+        The JSON representation is intentionally generic, while InfluxDB
+        distinguishes integer and floating-point field types. Use the
+        descriptor as the source of truth before creating ``Line`` objects.
+        """
+        if not isinstance(value, dict) or descriptor is None:
+            return value
+
+        fields_by_name = {
+            field.json_name: field
+            for field in descriptor.fields
+        }
+        fields_by_name.update(
+            {field.name: field
+             for field in descriptor.fields})
+
+        restored: dict[str, Any] = {}
+        for key, field_value in value.items():
+            field = fields_by_name.get(key)
+            if field is None:
+                restored[key] = field_value
+                continue
+            restored[key] = _DecoderWrapper._restore_field_type(
+                field_value, field)
+        return restored
+
+    @staticmethod
+    def _restore_field_type(value: Any, field: Any) -> Any:
+        """Restore a decoded field according to its protobuf descriptor."""
+        if field.is_repeated:
+            if field.message_type is not None and field.message_type.GetOptions(
+            ).map_entry:
+                value_field = field.message_type.fields_by_name["value"]
+                return {
+                    key:
+                    _DecoderWrapper._restore_scalar_or_message(
+                        item, value_field)
+                    for key, item in value.items()
+                }
+            return [
+                _DecoderWrapper._restore_scalar_or_message(item, field)
+                for item in value
+            ]
+        return _DecoderWrapper._restore_scalar_or_message(value, field)
+
+    @staticmethod
+    def _restore_scalar_or_message(value: Any, field: Any) -> Any:
+        """Restore a scalar or recursively restore a nested message."""
+        if field.message_type is not None:
+            return _DecoderWrapper._restore_descriptor_types(
+                value, field.message_type)
+        if field.type in (FieldDescriptor.TYPE_FLOAT,
+                          FieldDescriptor.TYPE_DOUBLE):
+            return float(value)
+        if field.type in (
+                FieldDescriptor.TYPE_INT32, FieldDescriptor.TYPE_SINT32,
+                FieldDescriptor.TYPE_SFIXED32, FieldDescriptor.TYPE_INT64,
+                FieldDescriptor.TYPE_SINT64, FieldDescriptor.TYPE_SFIXED64,
+                FieldDescriptor.TYPE_UINT32, FieldDescriptor.TYPE_FIXED32,
+                FieldDescriptor.TYPE_UINT64, FieldDescriptor.TYPE_FIXED64,
+                FieldDescriptor.TYPE_ENUM):
+            return int(value)
+        return value
 
     @staticmethod
     def build_decoder(version: str,

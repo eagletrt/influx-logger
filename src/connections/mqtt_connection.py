@@ -141,9 +141,9 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
         Callback function that is called when a message is received from the server.
         It logs the received message and invokes the message callback if provided.
         """
-        logger.debug(
-            "mqtt-connection: Received message on topic %s with payload %s",
-            msg.topic, msg.payload)
+        #logger.debug(
+        #    "mqtt-connection: Received message on topic %s with payload %s",
+        #    msg.topic, msg.payload)
         try:
             if callable(self.message_callback):
                 self.message_callback(msg.topic, msg.payload)

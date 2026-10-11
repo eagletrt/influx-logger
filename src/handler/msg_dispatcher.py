@@ -135,6 +135,10 @@ class MsgDispatcher:
             if match:
                 groups = list(match.groups())
                 handler_function(topic, payload, groups)
+            else:
+                logger.debug(
+                    "MQTT Connection: No match for topic '%s' with handler topic '%s'",
+                    topic, handler_topic)
 
     @staticmethod
     def build_topic_regex(topic: str) -> Pattern:
