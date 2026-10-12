@@ -135,6 +135,7 @@ class InfluxWriter(InfluxManager):
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
+        #log_lines(points)
         # Record to send to InfluxDB
         record: str = InfluxWriter.__pack_lines(points)
         # Target bucket for committing points to InfluxDB
