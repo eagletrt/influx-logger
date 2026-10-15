@@ -5,6 +5,7 @@ config.json
 .git/
 .venv/
 .generated/
+
 # Python
 .venv/
 __pycache__/
@@ -12,3 +13,7 @@ __pycache__/
 *.pyc
 **/*.pyc
 *.service
+.pytest_cache/
+.ruff_cache/
+
+debug/

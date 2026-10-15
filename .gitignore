@@ -186,6 +186,11 @@ dist
 __pycache__/
 *.pyc
 **/*.pyc
+
+# Python caches
+.ruff_cache/
+.pytest_cache/
+
 # Generated files
 .generated/
 **/__pycache__/
@@ -211,3 +216,8 @@ repomix-output.xml
 
 # Poetry
 poetry.lock
+
+# CSV
+*.csv
+*.csv#
+
