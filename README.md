@@ -1,6 +1,6 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Quality & Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml/badge.svg?event=check_suite)](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml)
-[![Influx-Logger Docker Image](https://github.com/eagletrt/influx-logger/actions/workflows/influx-logger.yml/badge.svg?event=registry_package)](https://github.com/eagletrt/influx-logger/actions/workflows/influx-logger.yml)
+[![Quality & Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml)
+[![Latest Release](https://img.shields.io/github/v/release/eagletrt/influx-logger)](https://github.com/eagletrt/influx-logger/releases/latest)
 
 # Influx Logger
 
