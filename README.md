@@ -1,3 +1,7 @@
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Quality & Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml)
+[![Latest Release](https://img.shields.io/github/v/release/eagletrt/influx-logger)](https://github.com/eagletrt/influx-logger/releases/latest)
+
 # Influx Logger
 
 Influx Logger is the telemetry middleware used by E-Agle Trento Racing Team. It
