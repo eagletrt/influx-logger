@@ -7,12 +7,13 @@ from threading import Condition, Lock
 
 from influxdb_client.client.write_api import SYNCHRONOUS, Point, WriteApi, WriteOptions
 
-#from debug.log_lines import log_lines
 from src.connections.influx_connection import InfluxConnection
 from src.influx.influx_manager import InfluxManager
 from src.parser.parser import Line, Parser
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
+
+#from tools.log_lines import log_lines
 
 
 class InfluxWriter(InfluxManager):
@@ -199,49 +200,42 @@ class InfluxWriter(InfluxManager):
     @staticmethod
     def __pack_lines(lines: list) -> str:
         """
-        Packs a list of InfluxDB points into a single string representation.
+        Packs a list of InfluxDB points into a single line protocol string.
 
         Args:
             lines (list[Point]): A list of InfluxDB Point objects to be packed.
 
         Returns:
-            str: A string representation of the packed points.
+            str: Newline-terminated line protocol, one line per point.
         """
-        valid_lines: list = [line for line in lines if line is not None]
         try:
             points_str: list = []
-            for point in valid_lines:
-                if point is not None:
-                    if isinstance(point, Point):
-                        p: Point = point
-                    elif isinstance(point, dict):
-                        p: Point = Point.from_dict(point)
-                    elif isinstance(point, Line):
-                        p: Point = point.to_point()
-                    else:
-                        logger.warning(
-                            "influx_writer: Invalid line type: %s. " \
-                                "Expected Point or dict. Skipping line: %s",
-                            type(point),
-                            point
-                        )
-                    if isinstance(p, Point):
-                        points_str.append(p.to_line_protocol())
-            lines_str: str = "\n".join(points_str)
+            for point in lines:
+                if point is None:
+                    continue
+                if isinstance(point, Point):
+                    p: Point = point
+                elif isinstance(point, dict):
+                    p = Point.from_dict(point)
+                elif isinstance(point, Line):
+                    p = point.to_point()
+                else:
+                    logger.warning(
+                        "influx_writer: Invalid line type: %s. " \
+                            "Expected Point, dict or Line. Skipping line: %s",
+                        type(point),
+                        point
+                    )
+                    continue
+                points_str.append(p.to_line_protocol())
+            # The timestamp is already the last token of each line and its
+            # unit is declared via write_precision, so lines are sent as-is.
+            return "\n".join(points_str) + "\n" if points_str else ""
         except Exception as e:  # pylint: disable=broad-except
             logger.error("influx_writer: Failed to pack lines: %s",
                          e,
                          exc_info=True)
-            #logger.error("influx_writer: Lines that failed to pack: {%s}",
-            #             lines)
-            lines_str = ""
-        record: str = ""
-        for line in lines_str.splitlines():
-            line_segments: list = line.split(" ")
-            time: str = "_time=" + line_segments[-1]
-            final_line: str = " ".join(line_segments[:-1]) + "," + time
-            record += final_line + "\n"
-        return record
+            return ""
 
     def check_to_commit(self) -> bool:
         '''
