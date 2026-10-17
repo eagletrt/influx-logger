@@ -78,7 +78,8 @@ class Line:
                            Line.obj_to_str(obj))
             # Adding timestamp to the object with the current time in microseconds
             timestamp: int = int(time.time_ns() //
-                                 1_000)  # Current time in microseconds
+                                 TimestampPrecision.MICROSECONDS.value
+                                 )  # Current time in microseconds
             #raise ValueError("Missing timestamp")
         # Convert the timestamp to an integer if it's a string or float
         if isinstance(timestamp, (str, float, int)):
@@ -124,7 +125,8 @@ class Line:
         # Line.timestamp is expressed in microseconds, while ``factor`` is
         # the number of nanoseconds per unit of the target precision.
         # Convert microseconds -> nanoseconds first, then to the target unit.
-        normalized: int = (timestamp * 1_000) // factor
+        normalized: int = (timestamp *
+                           TimestampPrecision.MICROSECONDS.value) // factor
         # Check if the normalized timestamp exceeds InfluxDB's
         # maximum value for a 64-bit signed integer
         if normalized > INFLUX_INT64_MAX:
