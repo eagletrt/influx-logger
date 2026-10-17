@@ -7,12 +7,13 @@ from threading import Condition, Lock
 
 from influxdb_client.client.write_api import SYNCHRONOUS, Point, WriteApi, WriteOptions
 
-#from debug.log_lines import log_lines
 from src.connections.influx_connection import InfluxConnection
 from src.influx.influx_manager import InfluxManager
 from src.parser.parser import Line, Parser
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
+
+#from tools.log_lines import log_lines
 
 
 class InfluxWriter(InfluxManager):

@@ -46,7 +46,7 @@ def extract_lines(measurement: str, field: str) -> None:
         field (str): The field to filter lines by.
     """
     output: str = ""
-    with open(debug_logs_file, "r", encoding="utf-8") as log_file:
+    with open(debug_logs_file, encoding="utf-8") as log_file:
         lines = log_file.readlines()
         for line in lines:
             if measurement in line and field in line:

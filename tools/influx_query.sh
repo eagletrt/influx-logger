@@ -1,8 +1,8 @@
 TOKEN=token
 URL=http://localhost:8086
-MEASUREMENT=measurement
-FIELD=motortemperature
-TIME=-20m
+MEASUREMENT=ephorusinverter2telemetryb
+FIELD=speedActual
+TIME=-1h
 DIR=debug_logs
 
 mkdir -p $DIR
