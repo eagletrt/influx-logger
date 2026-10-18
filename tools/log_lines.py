@@ -12,6 +12,7 @@ from src.utils.logger_utils import logger
 debug_logs_dir = "debug_logs"
 debug_logs_file = os.path.join(debug_logs_dir, "lines.log")
 
+
 @staticmethod
 def log_lines(list_of_lines: list[Point | Line]) -> None:
     """
@@ -36,6 +37,7 @@ def log_lines(list_of_lines: list[Point | Line]) -> None:
             log: str = f"influx_writer: _time={readable_time}, {record}"
             logger.debug(log)
             log_file.write(log + "\n")
+
 
 def extract_lines(measurement: str, field: str) -> None:
     """
