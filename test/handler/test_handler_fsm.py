@@ -37,7 +37,7 @@ class TestHandlerFSM(unittest.TestCase):
         fsm._HandlerFSM__connection_condition = dummy_condition  # pylint: disable=protected-access
         fsm.are_both_connected = MagicMock(side_effect=[True, False, False])
         fsm.send = MagicMock()
-        fsm.log_status = MagicMock()
+        fsm.log_state = MagicMock()
 
         HandlerFSM.do_run(fsm)
 
