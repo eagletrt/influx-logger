@@ -1,4 +1,4 @@
-name: Influx-Logger Docker Image
+name: Influx Logger Docker Image
 
 on:
   release:
@@ -10,13 +10,15 @@ jobs:
     runs-on:
       group: ci-runners
       labels: Linux
+
     permissions:
       packages: write
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
