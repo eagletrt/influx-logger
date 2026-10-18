@@ -2,32 +2,31 @@
 set -e
 
 THRESHOLD=9.95
+SRC="src"
 
-# 1. Run ruff linter
-echo "🐶 Running ruff check..."
-ruff check src/
+echo "Running ruff check..."
+ruff check
 
-# 2. Run yapf code formatting
-echo "🧹 Running yapf auto-formatter..."
-yapf --in-place --parallel --recursive src/*
+echo "Running yapf..."
+yapf --in-place --parallel --recursive $(find . -type f -name "*.py" ! -path "./.venv/*")
 
-# 3. Run pylint and verify score >= THRESHOLD
-echo "🔍 Running pylint..."
-
+echo "Running pylint..."
 set +e
-PYLINT_OUTPUT=$(PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" pylint -r y src)
+PYLINT_OUTPUT=$(PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" pylint -r y $SRC)
 set -e
-
 echo "$PYLINT_OUTPUT"
-
 # Extract score from output
 SCORE=$(echo "$PYLINT_OUTPUT" | awk -F'rated at ' '/rated at/ {split($2, a, "/"); print a[1]}')
-
 if [ -z "$SCORE" ]; then
-    echo "❌ Error: Could not determine pylint score."
+    echo "Error: Could not determine pylint score."
     exit 1
 fi
-
+# Compare score against THRESHOLD using Python
+PASSED=$(python3 -c "import sys; print(1 if float(sys.argv[1]) >= float(sys.argv[2]) else 0)" "$SCORE" "$THRESHOLD")
+if [ "$PASSED" -ne 1 ]; then
+    echo "Commit rejected: Pylint score ($SCORE) is below $THRESHOLD threshold."
+    exit 1
+fi
 # Compare score against THRESHOLD using Python
 PASSED=$(python3 -c "import sys; print(1 if float(sys.argv[1]) >= float(sys.argv[2]) else 0)" "$SCORE" "$THRESHOLD")
 
