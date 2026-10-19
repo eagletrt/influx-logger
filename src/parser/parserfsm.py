@@ -38,23 +38,33 @@ class ParserFSM(StateMachine):
     restore_from_error: TransitionList = erroring.to(idling)
     finish: TransitionList = idling.to(final)
 
-    def __init__(self, name: str = "ParserFSM", signal: bool = False) -> None:
+    def __init__(self,
+                 name: str = "ParserFSM",
+                 log_callback: callable = None) -> None:
         """
         Initialize the parser.
         Args:
             name (str): The name of the FSM.
-            signal (bool): Whether to signal the current state.
+            log_callback (callable): The callback function to be set for logging.
         """
         self.name = name
         '''
         Name of the FSM, used for logging purposes.
         '''
-        self.signal = signal
+        self.log_callback = log_callback
         '''
-        Whether to signal the current state.
-        If True, the FSM will signal its current state via MQTT.
+        The callback function to be set for logging.
         '''
         StateMachine.__init__(self)
+
+    def set_log_callback(self, callback: callable) -> None:
+        """
+        Sets the log callback function for the parser's finite state machine.
+        Args:
+            callback (callable): The callback function to be set for logging.
+        """
+        self.log_callback = callback
+        self.log_state(f"Log callback set to {callback}")
 
     @staticmethod
     def draw(filename: str = 'parser_fsm.png'):
@@ -74,13 +84,16 @@ class ParserFSM(StateMachine):
         """
         return f"{self.name} {self.current_state}"
 
-    def log_state(self, message: str = ""):
+    def log_state(self, message: str = "", signal: bool = True):
         """
         Logs a message with the FSM name and current state.
         Args:
             message (str): The message to log.
+            signal (bool): Whether to signal the current state after logging.
         """
         logger.info("%s - %s", self.get_log_header(), message)
+        if signal:
+            self.signal_state()
 
     def on_initialization(self):
         """
@@ -89,16 +102,20 @@ class ParserFSM(StateMachine):
         """
         self.log_state("Initialization")
 
-    def signal_state(self):
+    def signal_state(self) -> bool:
         """
         Signals the current state of the FSM.
         This method is intended to be called to signal
         the current state of the FSM.
         It sends the current state via MQTT.
         """
-        # TODO: Send via MQTT the current FSM state
-        if self.signal:
-            self.log_state()
+        if self.log_callback:
+            try:
+                self.log_callback(self.current_state)
+                return True
+            except Exception as e:  # pylint: disable=broad-except
+                self.log_state(f"Error signaling state: {e}", signal=False)
+        return False
 
     def restore(self):
         """

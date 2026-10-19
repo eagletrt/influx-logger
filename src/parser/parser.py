@@ -7,6 +7,7 @@ from typing import Any
 from influxdb_client import Point
 
 from src.parser.libmanager import LibcanManager, LibgpsManager
+from src.parser.parserfsm import ParserFSM
 from src.parser.protobuf_manager import ProtobufManager
 from src.utils.line import Line
 from src.utils.logger_utils import logger
@@ -34,7 +35,14 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     TIMER_TIMEOUT: int = 5
     '''Timeout in seconds indicating how long to wait before the system is considered inactive.'''
 
-    def __init__(self, excluded_networks: list[str] = None) -> None:
+    def __init__(self,
+                 excluded_networks: list[str] = None,
+                 log_callback: callable = None) -> None:
+        '''Initialize the parser.'''
+        self.parserfsm: ParserFSM = ParserFSM()
+        if log_callback:
+            self.parserfsm.set_log_callback(log_callback)
+        '''Finite State Machine for the parser.'''
         super().__init__(name="Parser")
         self.excluded_networks: list[
             str] = excluded_networks if excluded_networks is not None else []
@@ -84,6 +92,15 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Threshold for blacklisting a network after consecutive
         failures to download its .proto descriptor.
         '''
+        self.parserfsm.send('initialization')
+
+    def set_log_callback(self, callback: callable) -> None:
+        """
+        Sets the log callback function for the parser's finite state machine.
+        Args:
+            callback (callable): The callback function to be set for logging.
+        """
+        self.parserfsm.set_log_callback(callback)
 
     def _handle_inactivity(self) -> None:
         """
@@ -120,6 +137,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             message (tuple[list[str], bytes]): The message to be added
         '''
         with self.__row_message_lock:
+            #self.parserfsm.send('message_received')
             self.row_messages.append(message)
             # Notify the parser thread that a new message has been added to the queue
             self.row_queue_not_empty.notify_all()
