@@ -326,13 +326,7 @@ class _DecoderWrapper:
         # Directory in the cache where the .proto file for the specified version will be stored
         version_dir: str = os.path.join(cache, version)
         # If cache directory does not exist, create it
-        if not os.path.exists(cache):
-            os.makedirs(cache)
-        if not os.path.exists(version_dir):
-            os.makedirs(version_dir)
-        proto_dir = os.path.join(version_dir, "proto")
-        if not os.path.exists(proto_dir):
-            os.makedirs(proto_dir)
+        LibManager.create_cache_directories(cache, version_dir)
         version_pb_dir = os.path.join(version_dir, "pb")
         if not os.path.exists(version_pb_dir):
             os.makedirs(version_pb_dir)

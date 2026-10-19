@@ -131,15 +131,8 @@ class LibManager(ABC):
 
             return False
         try:
-            if not os.path.exists(LibManager.CACHE_DIR):
-                os.makedirs(LibManager.CACHE_DIR)
-            if not os.path.exists(cache):
-                os.makedirs(cache)
-            if not os.path.exists(version_dir):
-                os.makedirs(version_dir)
-            proto_dir = os.path.join(version_dir, "proto")
-            if not os.path.exists(proto_dir):
-                os.makedirs(proto_dir)
+            proto_dir: str = LibManager.create_cache_directories(
+                cache, version_dir)
             with open(os.path.join(proto_dir, f"{network}.proto"),
                       "w",
                       encoding="utf-8") as fh:
@@ -153,6 +146,28 @@ class LibManager(ABC):
             logger.error("Exception %s: %s", type(e).__name__, e)
             return False
         return False
+
+    @staticmethod
+    def create_cache_directories(cache, version_dir) -> str:
+        """
+        Creates the necessary cache directories for
+        storing .proto files and descriptor sets.
+        Args:
+            cache (str): Path to the cache directory.
+            version_dir (str): Path to the version-specific directory within the cache.
+        Returns:
+            str: Path to the proto directory where .proto files will be stored.
+        """
+        if not os.path.exists(LibManager.CACHE_DIR):
+            os.makedirs(LibManager.CACHE_DIR)
+        if not os.path.exists(cache):
+            os.makedirs(cache)
+        if not os.path.exists(version_dir):
+            os.makedirs(version_dir)
+        proto_dir = os.path.join(version_dir, "proto")
+        if not os.path.exists(proto_dir):
+            os.makedirs(proto_dir)
+        return proto_dir
 
     @staticmethod
     @abstractmethod
