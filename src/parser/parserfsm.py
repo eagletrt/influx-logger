@@ -36,7 +36,7 @@ class ParserFSM(StateMachine):
     error_occurred: TransitionList = (running.to(erroring)
                                       | logging.to(erroring))
     restore_from_error: TransitionList = erroring.to(idling)
-    finish: TransitionList = (idling.to(final))
+    finish: TransitionList = idling.to(final)
 
     def __init__(self, name: str = "ParserFSM", signal: bool = False) -> None:
         """

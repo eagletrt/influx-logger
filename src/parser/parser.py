@@ -6,7 +6,8 @@ from typing import Any
 
 from influxdb_client import Point
 
-from src.parser.protobuf_manager import LibcanManager, LibgpsManager, ProtobufManager
+from src.parser.libmanager import LibcanManager, LibgpsManager
+from src.parser.protobuf_manager import ProtobufManager
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
