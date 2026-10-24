@@ -168,16 +168,17 @@ class MsgDispatcher:
                     topic)
                 return
             if session_topic == self.SESSION_START:
-                logger.info("MQTT Connection: Session started for topic '%s'",
-                            topic)
-                MsgDispatcher.extract_timestamp(
-                    MsgDispatcher.payload_to_json(payload),
-                    session_type="start")
+                self.process_session(topic=topic,
+                                     payload=payload,
+                                     session_type="start",
+                                     log_session_fun=self.influx_writer.parser.
+                                     log_session_start)
             elif session_topic == self.SESSION_STOP:
-                logger.info("MQTT Connection: Session stopped for topic '%s'",
-                            topic)
-                MsgDispatcher.extract_timestamp(
-                    MsgDispatcher.payload_to_json(payload), session_type="end")
+                self.process_session(
+                    topic=topic,
+                    payload=payload,
+                    session_type="end",
+                    log_session_fun=self.influx_writer.parser.log_session_end)
             else:
                 logger.warning(
                     "MQTT Connection: Unknown session topic '%s' in topic '%s'",
@@ -186,6 +187,23 @@ class MsgDispatcher:
             logger.error(
                 "Error while handling session message on topic '%s': %s",
                 topic, str(e))
+
+    def process_session(self, topic, payload, session_type: str,
+                        log_session_fun: Callable) -> None:
+        """
+        Processes the session message by extracting the timestamp and logging the session status.
+        Args:
+            topic (str): The topic of the incoming session message.
+            payload (bytes): The payload of the incoming session message.
+            session_type (str): The type of session message ("start" or "end").
+            log_session_fun (Callable): The function to call for handling the session status.
+        """
+        logger.info("MQTT Connection: Session %s for topic '%s'", session_type,
+                    topic)
+        json_payload: json = MsgDispatcher.payload_to_json(payload)
+        timestamp: int = MsgDispatcher.extract_timestamp(
+            json_payload, session_type=session_type)
+        log_session_fun(timestamp)
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''

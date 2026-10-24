@@ -561,5 +561,24 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 ]
         return points
 
+    def log_session_start(self, timestamp: int) -> None:
+        """
+        Logs the start of a session with the provided timestamp.
+        Args:
+            timestamp (int): The timestamp indicating when the session started.
+        """
+        logger.info("parser: Session started at timestamp %d", timestamp)
+        raise NotImplementedError(
+            "log_session_start method is not implemented.")
+
+    def log_session_end(self, timestamp: int) -> None:
+        """
+        Logs the end of a session with the provided timestamp.
+        Args:
+            timestamp (int): The timestamp indicating when the session ended.
+        """
+        logger.info("parser: Session ended at timestamp %d", timestamp)
+        raise NotImplementedError("log_session_end method is not implemented.")
+
 
 __all__ = ["Parser"]
