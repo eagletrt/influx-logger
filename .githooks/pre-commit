@@ -15,10 +15,8 @@ fi
 if command -v docker &> /dev/null; then
     echo "Local tools not found."
     echo "Running checks inside Docker..."
-    # If it isn't already built, build the Docker image for linting
-    if ! docker image inspect repo-linter &> /dev/null; then
-        docker build -t repo-linter -f .githooks/Dockerfile.lint .
-    fi
+    # Build with Docker's cache so changes to the Dockerfile are picked up.
+    docker build -t repo-linter -f .githooks/Dockerfile.lint .
     # Mount repo root, install dependencies, and execute check.sh
     docker run --rm -v "$(pwd)":/workspace -w /workspace repo-linter bash .githooks/check.sh
     # Re-stage files formatted by yapf inside Docker

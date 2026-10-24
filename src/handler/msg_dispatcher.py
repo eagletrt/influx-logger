@@ -4,6 +4,7 @@ incoming MQTT messages and dispatches them to the appropriate
 handlers based on the topic.
 """
 
+import json
 from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
@@ -30,15 +31,21 @@ class MsgDispatcher:
         vehicle_whitelist: A list of allowed vehicle IDs.
     """
 
+    SESSION_START: str = "started"
+    """Topic indicating when a session has started."""
+    SESSION_STOP: str = "stopped"
+    """Topic indicating when a session has stopped."""
+
     def __init__(self,
                  influx_writer: InfluxWriter = None,
                  influx_reader: InfluxReader = None,
                  mqtt: MQTTConnection = None,
                  vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
+            #"+/+/version":              self.handle_canlib_version_message,
             "+/+/info/version/libcan": self.handle_libcan_version_message,
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
-            #"+/+/version":              self.handle_canlib_version_message,
+            "+/+/info/session/+": self.handle_session_message,
             "+/+/data/+": self.handle_data_message,
             "+/+/query/+/data/get": self.handle_query_request,
         }
@@ -113,6 +120,72 @@ class MsgDispatcher:
                 logger.error(
                     "msg_dispatcher: Failed to subscribe to topic '%s': %s",
                     topic, str(e))
+
+    @staticmethod
+    def payload_to_json(payload: bytes) -> json:
+        """
+        Converts a payload in bytes to a JSON dictionary.
+        Args:
+            payload (bytes): The payload to be converted.
+        Returns:
+            json: The converted JSON dictionary.
+        """
+        try:
+            return json.loads(payload.decode())
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Error while converting payload to JSON: %s", str(e))
+            return {}
+
+    @staticmethod
+    def extract_timestamp(session_payload: json,
+                          session_type: str = "end") -> int:
+        """
+        Extracts the timestamp from the session payload.
+        Args:
+            session_payload (json): The payload of the session message.
+            session_type (str): The type of session message ("start" or "end").
+        Returns:
+            int: The extracted timestamp as an integer.
+        """
+        field_name: str = session_type + "Timestamp"
+        return session_payload.get(field_name, None)
+
+    def handle_session_message(self, topic: str, payload: bytes) -> None:
+        """
+            Handles incoming session messages by logging the session status.
+            Args:
+                topic (str): The topic of the incoming session message.
+                payload (bytes): The payload of the incoming session message.
+            """
+        logger.debug("MQTT Connection: Handling incoming message on topic: %s",
+                     topic)
+        try:
+            topic_parts = topic.split('/')
+            session_topic = topic_parts[4] if len(topic_parts) > 4 else None
+            if not session_topic:
+                logger.warning(
+                    "MQTT Connection: Session topic not found in topic '%s'",
+                    topic)
+                return
+            if session_topic == self.SESSION_START:
+                logger.info("MQTT Connection: Session started for topic '%s'",
+                            topic)
+                MsgDispatcher.extract_timestamp(
+                    MsgDispatcher.payload_to_json(payload),
+                    session_type="start")
+            elif session_topic == self.SESSION_STOP:
+                logger.info("MQTT Connection: Session stopped for topic '%s'",
+                            topic)
+                MsgDispatcher.extract_timestamp(
+                    MsgDispatcher.payload_to_json(payload), session_type="end")
+            else:
+                logger.warning(
+                    "MQTT Connection: Unknown session topic '%s' in topic '%s'",
+                    session_topic, topic)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "Error while handling session message on topic '%s': %s",
+                topic, str(e))
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''

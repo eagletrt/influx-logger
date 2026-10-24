@@ -38,11 +38,16 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(self,
                  excluded_networks: list[str] = None,
                  log_callback: callable = None) -> None:
-        '''Initialize the parser.'''
+        '''
+        Initialize the parser.
+        Args:
+            excluded_networks (list[str], optional): A list of network identifiers to be excluded.
+            log_callback (callable, optional): A callback function for logging messages.
+        '''
         self.parserfsm: ParserFSM = ParserFSM()
+        '''Finite State Machine for the parser.'''
         if log_callback:
             self.parserfsm.set_log_callback(log_callback)
-        '''Finite State Machine for the parser.'''
         super().__init__(name="Parser")
         self.excluded_networks: list[
             str] = excluded_networks if excluded_networks is not None else []
