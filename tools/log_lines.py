@@ -9,8 +9,9 @@ from influxdb_client.client.write_api import Point
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 
-debug_logs_dir = "debug_logs"
-debug_logs_file = os.path.join(debug_logs_dir, "lines.log")
+DEBUG_LOGS_DIR = "debug_logs"
+DEBUG_LOGS_FILE = os.path.join(DEBUG_LOGS_DIR, "lines.log")
+
 
 @staticmethod
 def log_lines(list_of_lines: list[Point | Line]) -> None:
@@ -21,9 +22,9 @@ def log_lines(list_of_lines: list[Point | Line]) -> None:
         list_of_lines (list): A list of lines to be logged.
     """
     # mkdir debug_logs if it doesn't exist
-    if not os.path.exists(debug_logs_dir):
-        os.makedirs(debug_logs_dir)
-    with open(debug_logs_file, "a", encoding="utf-8") as log_file:
+    if not os.path.exists(DEBUG_LOGS_DIR):
+        os.makedirs(DEBUG_LOGS_DIR)
+    with open(DEBUG_LOGS_FILE, "a", encoding="utf-8") as log_file:
         for point in list_of_lines:
             if isinstance(point, Line):
                 time = point.timestamp
@@ -37,6 +38,7 @@ def log_lines(list_of_lines: list[Point | Line]) -> None:
             logger.debug(log)
             log_file.write(log + "\n")
 
+
 def extract_lines(measurement: str, field: str) -> None:
     """
     Extracts lines from the debug logs that match the specified measurement and field.
@@ -46,13 +48,13 @@ def extract_lines(measurement: str, field: str) -> None:
         field (str): The field to filter lines by.
     """
     output: str = ""
-    with open(debug_logs_file, encoding="utf-8") as log_file:
+    with open(DEBUG_LOGS_FILE, encoding="utf-8") as log_file:
         lines = log_file.readlines()
         for line in lines:
             if measurement in line and field in line:
                 output += line
     if output:
         output_file_name = f"{measurement}_{field}.log"
-        output_file_path = os.path.join(debug_logs_dir, output_file_name)
+        output_file_path = os.path.join(DEBUG_LOGS_DIR, output_file_name)
         with open(output_file_path, "w", encoding="utf-8") as output_file:
             output_file.write(output)

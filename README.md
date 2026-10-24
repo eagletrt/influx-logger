@@ -1,6 +1,10 @@
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Quality & Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/lint.yml)
-[![Latest Release](https://img.shields.io/github/v/release/eagletrt/influx-logger)](https://github.com/eagletrt/influx-logger/releases/latest)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=plastic)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/eagletrt/influx-logger?style=plastic)](https://github.com/eagletrt/influx-logger/releases/latest)
+
+[![Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/yapf.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/yapf.yml)
+[![Pylint](https://github.com/eagletrt/influx-logger/actions/workflows/pylint.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/pylint.yml)
+[![Quality Check](https://github.com/eagletrt/influx-logger/actions/workflows/ruff.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/ruff.yml)
+[![Unit Tests](https://github.com/eagletrt/influx-logger/actions/workflows/pytest.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/pytest.yml)
 
 # Influx Logger
 
