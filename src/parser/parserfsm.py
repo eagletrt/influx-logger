@@ -3,6 +3,8 @@ Finite State Machine for the parser.
 This module defines the states and transitions for the parser's finite state machine.
 """
 
+from queue import Queue
+
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
@@ -56,6 +58,8 @@ class ParserFSM(StateMachine):
         The callback function to be set for logging.
         '''
         StateMachine.__init__(self)
+        self.logging_states: Queue = Queue
+        '''Queue to hold the logging states.'''
 
     def set_log_callback(self, callback: callable) -> None:
         """
