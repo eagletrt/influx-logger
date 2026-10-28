@@ -1,5 +1,7 @@
+"""Test discovery and execution entry point."""
+
+import logging
 import sys
-from asyncio.log import logger
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from unittest import FunctionTestCase, TestLoader, TestSuite, TextTestRunner
@@ -8,8 +10,11 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+logger = logging.getLogger(__name__)
 
-def main():
+
+def main() -> None:
+    """Discover and run the repository's unit tests."""
     loader = TestLoader()
     suite = TestSuite()
 
@@ -26,7 +31,7 @@ def main():
         module = module_from_spec(spec)
         try:
             spec.loader.exec_module(module)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
 
             def _raise_import_error(err=exc, path=file_path):
                 raise ImportError(f"Failed to import {path}: {err}")
@@ -38,19 +43,21 @@ def main():
 
     runner = TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    logger.info(f"Tests run: {result.testsRun}")
+    logger.info("Tests run: %s", result.testsRun)
     logger.info(
-        f"\tPassed: {result.testsRun - len(result.failures) - len(result.errors) - len(result.skipped)}"
+        "\tPassed: %s",
+        result.testsRun - len(result.failures) - len(result.errors) -
+        len(result.skipped),
     )
-    logger.info(f"\tFailures: {len(result.failures)}")
-    logger.info(f"\tErrors: {len(result.errors)}")
-    logger.info(f"\tSkipped: {len(result.skipped)}")
-    logger.info()
+    logger.info("\tFailures: %s", len(result.failures))
+    logger.info("\tErrors: %s", len(result.errors))
+    logger.info("\tSkipped: %s", len(result.skipped))
+    logger.info("")
     if result.wasSuccessful():
         logger.info("All tests passed successfully.")
     else:
         logger.info("Some tests failed or encountered errors.")
-        exit(1)  # Exit with a non-zero status to indicate failure
+        sys.exit(1)
 
 
 if __name__ == '__main__':
