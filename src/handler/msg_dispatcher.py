@@ -211,13 +211,8 @@ class MsgDispatcher:
                     "msg_dispatcher: Commit %s exists, device '%s/%s' will be considered",
                     version, vehicle_id, device_id)
             try:
-                if f"{vehicle_id}/{device_id}" not in self.influx_writer.parser.device_versions:
-                    self.influx_writer.parser.device_versions[
-                        f"{vehicle_id}/{device_id}"] = {}
-                self.influx_writer.parser.device_versions[
-                    f"{vehicle_id}/{device_id}"][library] = version
-                self.influx_writer.parser.protobuf_manager.version_descriptors[
-                    version] = {}
+                self.influx_writer.parser.register_device_version(
+                    vehicle_id, device_id, library, version)
                 logger.info(
                     "msg_dispatcher: Device '%s/%s' is now subscribed to data topics, " \
                     "version_descriptors: %s",
