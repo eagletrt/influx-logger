@@ -1,7 +1,8 @@
 """
 A parser for processing incoming messages and converting them into InfluxDB points.
 """
-from threading import Condition, Lock, Thread, Timer
+from queue import Empty, Queue
+from threading import Condition, Lock, RLock, Thread, Timer
 from typing import Any
 
 from influxdb_client import Point
@@ -22,12 +23,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         excluded_networks (list[str]): A list of network identifiers to be excluded from parsing
         protobuf_manager (ProtobufManager): .proto descriptor handler
         device_versions (dict[str, dict[type, str]]): vehicle_id/device_id -> {lib_type: version}
-        row_messages (list[tuple[list[str], bytes]]): list of unprocessed messages
-        __row_message_lock (Lock): row_messages lock
-        destination_list (list[Point]): List of parsed InfluxDB Point objects
-        __destination_list_lock (Lock): destination_list lock
+        row_messages (Queue[tuple[list[str], bytes]]): queue of unprocessed messages
+        destination_list (Queue[Point]): Queue of parsed InfluxDB Point objects
         stop (bool): A flag to indicate whether the parser should stop processing messages
-        row_queue_not_empty (Condition): Condition to signal that the list is not empty
+        row_queue_not_empty (Condition): Condition to signal that the queue is not empty
         __new_points_event_lock__ (Lock): Lock to new points event
         points_increased (Condition): Event to signal the addition of new points to the destination
         last_parse_timer (Timer): Timer to track the last time a message was parsed
@@ -56,19 +55,17 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''ProtobufManager instance to handle .proto descriptor management and message decoding.'''
         self.device_versions: dict[str, dict[type, str]] = {}
         '''vehicle_id/device_id -> {lib_type: version} '''
-        self.row_messages: list[tuple[list[str], bytes]] = []
-        '''List of unprocessed messages'''
-        self.__row_message_lock: Lock = Lock()
-        '''Lock to synchronize access to the row_messages list'''
-        self.destination_list: list[Point] = []
-        '''List to store parsed InfluxDB Point objects'''
-        self.__destination_list_lock: Lock = Lock()
-        '''Lock to synchronize access to the destination_list'''
+        self.row_messages: Queue[tuple[list[str], bytes]] = Queue()
+        '''Queue of unprocessed messages'''
+        self.destination_list: Queue[Point] = Queue()
+        '''Queue to store parsed InfluxDB Point objects'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
+        self.__row_message_lock = Lock()
+        '''Lock to synchronize access to the row_messages queue'''
         self.row_queue_not_empty: Condition = Condition(
             lock=self.__row_message_lock)
-        '''Condition variable to signal when the row_messages list is not empty'''
+        '''Condition variable to signal when the row_messages queue is not empty'''
         self.__new_points_event_lock__: Lock = Lock()
         '''Lock to synchronize access to the new points event'''
         self.points_increased: Condition = Condition(
@@ -79,6 +76,13 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''A timer to track the last time a message was parsed'''
         self.timer_expired: bool = False
         '''Flag to indicate whether the last_parse_timer has expired'''
+        self.__timer_lock = Lock()
+        '''Lock to synchronize access to the last_parse_timer and timer_expired flag'''
+        self.__parser_state_lock = RLock()
+        '''
+        Lock to synchronize access to the parser state,
+        including device_versions and protobuf_manager
+        '''
         self.network_blacklisting: dict[tuple[str, str], int] = {}
         '''
         Counter to track the number of times a network has
@@ -114,26 +118,25 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         This method is called when the last_parse_timer expires,
         indicating that no messages have been parsed within the defined timeout.
         """
-        with self.__row_message_lock:
-            if len(self.row_messages) <= 0:
-                with self.__destination_list_lock:
-                    self.timer_expired = True
-                logger.warning(
-                    "parser: No messages have been parsed for %d seconds.",
-                    Parser.TIMER_TIMEOUT)
-                with self.__new_points_event_lock__:
-                    self.points_increased.notify_all(
-                    )  # Notify any waiting threads that new points have been added
-            else:
-                logger.warning(
-                    "parser: Messages are still being processed." \
-                    "Resetting the inactivity timer for %d seconds.",
-                    Parser.TIMER_TIMEOUT
-                )
-                with self.__destination_list_lock:
-                    self.timer_expired = False
-                self.timer_touch(
-                )  # Reset the timer if there are still messages in the queue
+        if self.row_messages.empty():
+            with self.__timer_lock:
+                self.timer_expired = True
+            logger.warning(
+                "parser: No messages have been parsed for %d seconds.",
+                Parser.TIMER_TIMEOUT)
+            with self.__new_points_event_lock__:
+                self.points_increased.notify_all(
+                )  # Notify any waiting threads that new points have been added
+        else:
+            logger.warning(
+                "parser: Messages are still being processed." \
+                "Resetting the inactivity timer for %d seconds.",
+                Parser.TIMER_TIMEOUT
+            )
+            with self.__timer_lock:
+                self.timer_expired = False
+            self.timer_touch(
+            )  # Reset the timer if there are still messages in the queue
 
     def add_to_queue(self, message: tuple[list[str], bytes]) -> None:
         '''
@@ -141,9 +144,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Args:
             message (tuple[list[str], bytes]): The message to be added
         '''
-        with self.__row_message_lock:
-            #self.parserfsm.send('message_received')
-            self.row_messages.append(message)
+        with self.row_queue_not_empty:
+            self.row_messages.put(message)
             # Notify the parser thread that a new message has been added to the queue
             self.row_queue_not_empty.notify_all()
 
@@ -157,16 +159,20 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         it will exit without processing.
         '''
         with self.row_queue_not_empty:
-            while len(self.row_messages) == 0 and not self.stop:
+            while self.row_messages.empty() and not self.stop:
                 self.row_queue_not_empty.wait()
-        if self.stop:
-            return
-        with self.__row_message_lock:
-            message: tuple[list[str], bytes] = self.row_messages.pop(0)
+            if self.stop:
+                return
+            message: tuple[list[str], bytes] = self.row_messages.get()
             self.row_queue_not_empty.notify_all()
+        try:
             self.parse_msg(message)
+        finally:
+            self.row_messages.task_done()
+            with self.row_queue_not_empty:
+                self.row_queue_not_empty.notify_all()
 
-    def parse_msg(self, msg: tuple[list[str], bytes]) -> None:  # pylint: disable=too-many-return-statements
+    def parse_msg(self, msg: tuple[list[str], bytes]) -> None:  # pylint: disable=too-many-return-statements,too-many-locals
         """
         Parses a message and appends it to the destination list.
         Args:
@@ -188,7 +194,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         # Library type to be used for decoding the message,
         # determined based on the network identifier.
         library: type = LibcanManager if network != "gps" else LibgpsManager
-        if key not in self.device_versions:
+        with self.__parser_state_lock:
+            version = self.device_versions.get(key, {}).get(library)
+        if version is None:
             logger.error(
                 "parser: Device '%s' started streaming data before sending version. Skipping",
                 key)
@@ -198,18 +206,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 "parser: Network '%s' is in the exclusion list. Skipping message",
                 network)
             return
-        try:
-            version: str = self.device_versions[key][library]
-        except KeyError:
-            logger.error(
-                "parser:" \
-                    "Device '%s' with library '%s' not found in device versions." \
-                    "Skipping.",
-                    key,
-                    library.__name__
-            )
-            return
-        if (network, version) in self.network_blacklist:
+        with self.__parser_state_lock:
+            blacklisted = (network, version) in self.network_blacklist
+        if blacklisted:
             logger.debug(
                 "parser: Network '%s' with version %s is blacklisted due " \
                 "to repeated failures to download its .proto descriptor. " \
@@ -220,8 +219,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             return
         # Check if the network is already registered for the given version, if not,
         # download the .proto descriptor
-        if network not in self.protobuf_manager.version_descriptors.get(
-                version, {}):
+        with self.__parser_state_lock:
+            descriptor = self.protobuf_manager.version_descriptors.get(
+                version, {}).get(network)
+        if descriptor is None:
             # If the proto descriptor
             # is not already downloaded for the given version and network,
             # download it
@@ -232,22 +233,23 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 version
             )
             try:
-                if not self.protobuf_manager.download_proto_descriptor(
-                        version, network):
-                    self.network_blacklisting[(
-                        network, version)] = self.network_blacklisting.get(
-                            (network, version), 0) + 1
-                    if self.network_blacklisting[(
-                            network, version)] >= self.blacklist_threshold:
-                        logger.warning(
-                            "parser: Network '%s' with version %s has failed to " \
-                            "download its .proto descriptor %d times. Blacklisting.",
-                            network,
-                            version,
-                            self.blacklist_threshold
-                        )
-                        self.network_blacklist.add((network, version))
-                    return
+                with self.__parser_state_lock:
+                    if not self.protobuf_manager.download_proto_descriptor(
+                            version, network):
+                        self.network_blacklisting[(
+                            network, version)] = self.network_blacklisting.get(
+                                (network, version), 0) + 1
+                        if self.network_blacklisting[(
+                                network, version)] >= self.blacklist_threshold:
+                            logger.warning(
+                                "parser: Network '%s' with version %s has failed to " \
+                                "download its .proto descriptor %d times. Blacklisting.",
+                                network,
+                                version,
+                                self.blacklist_threshold
+                            )
+                            self.network_blacklist.add((network, version))
+                        return
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "parser: Error while getting proto, skipping message")
@@ -256,16 +258,18 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         try:
             # Use the appropriate decoder for the given version and network
             # to deserialize the payload
-            decoder = self.protobuf_manager.version_descriptors[version][
-                network]
+            with self.__parser_state_lock:
+                decoder = self.protobuf_manager.version_descriptors[version][
+                    network]
             # Expect decoder to provide a `decode` method returning a dict-like object
             message_content = decoder.decode(payload)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 "parser: Cannot deserialize payload with saved descriptor: %s",
                 str(e))
-            logger.error("parser: version descriptors: %s",
-                         self.protobuf_manager.version_descriptors)
+            with self.__parser_state_lock:
+                descriptors = dict(self.protobuf_manager.version_descriptors)
+            logger.error("parser: version descriptors: %s", descriptors)
             return
         tags = {
             "vehicle-id": vehicle_id,
@@ -291,13 +295,14 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         This method should be called whenever a new message is parsed, 
         indicating that the parser is active.
         """
-        if self.last_parse_timer is not None:
-            self.last_parse_timer.cancel()  # Cancel the existing timer
-        self.last_parse_timer = Timer(
-            Parser.TIMER_TIMEOUT,
-            self._handle_inactivity)  # Create a new timer instance
-        self.last_parse_timer.start(
-        )  # Start or restart the timer whenever a new message is parsed
+        with self.__timer_lock:
+            if self.last_parse_timer is not None:
+                self.last_parse_timer.cancel()  # Cancel the existing timer
+            self.last_parse_timer = Timer(
+                Parser.TIMER_TIMEOUT,
+                self._handle_inactivity)  # Create a new timer instance
+            self.last_parse_timer.start(
+            )  # Start or restart the timer whenever a new message is parsed
 
     def reset_timer(self) -> None:
         """
@@ -305,8 +310,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         This method should be called whenever a new message is parsed,
         indicating that the parser is active.
         """
-        with self.__row_message_lock:
-            # Reset the timer_expired flag to indicate that the parser is active
+        # Reset the timer_expired flag to indicate that the parser is active
+        with self.__timer_lock:
             self.timer_expired = False
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
@@ -317,10 +322,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Args:
             line (Line): The Line object to be appended to the destination list.
         """
-        with self.__destination_list_lock:
-            #logger.info("parser: Appending line to destination list: %s", line)
-            self.destination_list.append(line)
-            self.timer_touch()
+        #logger.info("parser: Appending line to destination list: %s", line)
+        self.destination_list.put(line)
+        self.timer_touch()
         with self.__new_points_event_lock__:
             # Notify any waiting threads that new points
             # have been added to the destination list
@@ -501,9 +505,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         It sets the stop flag to True,
         which will signal the run method to exit its loop and stop the thread.
         """
-        with self.row_queue_not_empty:
-            while len(self.row_messages) > 0:
-                self.row_queue_not_empty.wait()
+        self.row_messages.join()
         self.stop_parser()
 
     def stop_parser(self) -> None:
@@ -515,8 +517,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         If you want to stop the parser gracefully, use the `graceful_stop` method instead,
         which will wait for the message queue to be empty before stopping.
         '''
-        self.stop = True
         with self.row_queue_not_empty:
+            self.stop = True
             self.row_queue_not_empty.notify_all(
             )  # Notify the parser thread to wake up and check the stop condition
         with self.__new_points_event_lock__:
@@ -525,8 +527,11 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             self.points_increased.notify_all()
 
     def run(self) -> None:
-        while not self.stop:
+        while True:
             self.__parse_next_message()
+            with self.row_queue_not_empty:
+                if self.stop:
+                    return
 
     def get_points_count(self) -> int:
         '''
@@ -534,8 +539,32 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Returns:
             int: The number of points in the destination list.
         '''
-        with self.__destination_list_lock:
-            return len(self.destination_list)
+        return self.destination_list.qsize()
+
+    def is_timer_expired(self) -> bool:
+        """
+        Returns whether the inactivity timer has expired.
+        Returns:
+            bool: True if the inactivity timer has expired, False otherwise.
+        """
+        with self.__timer_lock:
+            return self.timer_expired
+
+    def register_device_version(self, vehicle_id: str, device_id: str,
+                                library: type, version: str) -> None:
+        """
+        Registers a device decoder version while holding the parser state lock.
+        
+        Args:
+            vehicle_id (str): The unique identifier for the vehicle.
+            device_id (str): The unique identifier for the device.
+            library (type): The library type (e.g., LibcanManager or LibgpsManager).
+            version (str): The version of the decoder to be registered.
+        """
+        key = f"{vehicle_id}/{device_id}"
+        with self.__parser_state_lock:
+            self.device_versions.setdefault(key, {})[library] = version
+            self.protobuf_manager.version_descriptors.setdefault(version, {})
 
     def pop_points(self, max_points_to_pop: int = -1) -> list[Point]:
         '''
@@ -545,20 +574,15 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Returns:
             list[Point]: A list of popped InfluxDB Point objects
         '''
-        with self.__destination_list_lock:
-            if max_points_to_pop <= 0 or max_points_to_pop > len(
-                    self.destination_list):
-                # Get all points
-                points: list[Point] = [
-                    self.destination_list.pop(0)
-                    for _ in range(len(self.destination_list))
-                ]
-            else:
-                # Get the specified number of points
-                points: list[Point] = [
-                    self.destination_list.pop(0)
-                    for _ in range(max_points_to_pop)
-                ]
+        point_count = self.destination_list.qsize()
+        target_count = (point_count if max_points_to_pop <= 0 or
+                        max_points_to_pop > point_count else max_points_to_pop)
+        points: list[Point] = []
+        for _ in range(target_count):
+            try:
+                points.append(self.destination_list.get_nowait())
+            except Empty:
+                break
         return points
 
     def log_session_start(self, timestamp: int) -> None:
