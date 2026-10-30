@@ -46,6 +46,7 @@ class MsgDispatcher:
             "+/+/info/version/libcan": self.handle_libcan_version_message,
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
             "+/+/data/+": self.handle_data_message,
+            "+/+/status/info": self.handle_tlm_status_message,
             "+/+/query/+/data/get": self.handle_query_request,
         }
         self.influx_writer: InfluxWriter = influx_writer
@@ -339,6 +340,19 @@ class MsgDispatcher:
         # Send the query to the InfluxReader to be processed
         self.influx_reader.add_query_to_queue(vehicle_id, device_id,
                                               transaction_id, payload)
+
+    def handle_tlm_status_message(self, _topic: str, payload: bytes,
+                                  ids: list[str]) -> None:
+        """
+        Handles incoming telemetry status messages by deserializing the payload
+        and pushing the records to the line repository.
+        Args:
+            _topic (str): The topic of the incoming telemetry status message.
+            payload (bytes): The payload of the incoming telemetry status message.
+            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+        """
+        raise NotImplementedError(
+            "Telemetry status message handling is not implemented yet.")
 
     def stop(self) -> None:
         '''
