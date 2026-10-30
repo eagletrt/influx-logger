@@ -8,6 +8,7 @@ from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
 
 from src.utils.logger_utils import logger
+from src.utils.tlm_fsm import TelemetryFSM
 
 
 class ParserFSM(StateMachine):
@@ -56,6 +57,11 @@ class ParserFSM(StateMachine):
         The callback function to be set for logging.
         '''
         StateMachine.__init__(self)
+
+        self.tlm_fsm = TelemetryFSM(name="TelemetryFSM")
+        '''
+        Instance of the TelemetryFSM class, used for managing telemetry states.
+        '''
 
     def set_log_callback(self, callback: callable) -> None:
         """
@@ -215,6 +221,16 @@ class ParserFSM(StateMachine):
         """
         self.log_state("Entering final state")
         self.signal_state()
+
+    def new_telemetry_status(self, telemetry_status):
+        """
+        Handles a new telemetry status message.
+        This method is intended to be called when a new telemetry status message is received.
+        It sends the telemetry status message to the TelemetryFSM instance for processing.
+        Args:
+            telemetry_status: The new telemetry status message.
+        """
+        raise NotImplementedError("This method should be implemented.")
 
 
 #ParserFSM.draw('parser_fsm.png')

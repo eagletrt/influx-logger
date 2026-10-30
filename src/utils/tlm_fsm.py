@@ -34,11 +34,17 @@ class TelemetryFSM(StateMachine):
     run_to_error: TransitionList = running.to(erroring)
     error_to_init: TransitionList = erroring.to(initializing)
 
-    def __init__(self):
+    def __init__(self, name: str = "TelemetryFSM") -> None:
         """
         Initializes the TelemetryFSM instance.
+        Args:
+            name (str): The name of the FSM.
         """
-        super().__init__()
+        self.name: str = name
+        '''
+        Name of the FSM, used for logging purposes.
+        '''
+        StateMachine.__init__(self)
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):

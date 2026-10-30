@@ -9,6 +9,7 @@ from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
 
+from lib.external.serializers.py.telemetry.status import Status
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_reader import InfluxReader
 from src.influx.influx_writer import InfluxWriter
@@ -30,11 +31,6 @@ class MsgDispatcher:
         mqtt: An instance of the MQTTConnection class for handling MQTT connections.
         vehicle_whitelist: A list of allowed vehicle IDs.
     """
-
-    SESSION_START: str = "started"
-    """Topic indicating when a session has started."""
-    SESSION_STOP: str = "stopped"
-    """Topic indicating when a session has stopped."""
 
     def __init__(self,
                  influx_writer: InfluxWriter = None,
@@ -345,14 +341,17 @@ class MsgDispatcher:
                                   ids: list[str]) -> None:
         """
         Handles incoming telemetry status messages by deserializing the payload
-        and pushing the records to the line repository.
+        and updating the Telemetry FSM accordingly.
         Args:
             _topic (str): The topic of the incoming telemetry status message.
             payload (bytes): The payload of the incoming telemetry status message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
-        raise NotImplementedError(
-            "Telemetry status message handling is not implemented yet.")
+        # From serializers deserialize the payload and send it to the Telemetry FSM
+        telemetry_status: Status = Status.deserializeFromProtobufString(
+            payload)
+        self.influx_writer.parser.parserfsm.new_telemetry_status(
+            telemetry_status)
 
     def stop(self) -> None:
         '''
