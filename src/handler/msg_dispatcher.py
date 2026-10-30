@@ -337,8 +337,8 @@ class MsgDispatcher:
         self.influx_reader.add_query_to_queue(vehicle_id, device_id,
                                               transaction_id, payload)
 
-    def handle_tlm_status_message(self, _topic: str, payload: bytes,
-                                  ids: list[str]) -> None:
+    def handle_tlm_status_message(
+            self, _topic: str, payload: bytes, ids: list[str]) -> None:  #pylint: disable=unused-argument
         """
         Handles incoming telemetry status messages by deserializing the payload
         and updating the Telemetry FSM accordingly.
