@@ -45,7 +45,6 @@ class MsgDispatcher:
             #"+/+/version":              self.handle_canlib_version_message,
             "+/+/info/version/libcan": self.handle_libcan_version_message,
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
-            "+/+/info/session/+": self.handle_session_message,
             "+/+/data/+": self.handle_data_message,
             "+/+/query/+/data/get": self.handle_query_request,
         }
@@ -135,75 +134,6 @@ class MsgDispatcher:
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Error while converting payload to JSON: %s", str(e))
             return {}
-
-    @staticmethod
-    def extract_timestamp(session_payload: json,
-                          session_type: str = "end") -> int:
-        """
-        Extracts the timestamp from the session payload.
-        Args:
-            session_payload (json): The payload of the session message.
-            session_type (str): The type of session message ("start" or "end").
-        Returns:
-            int: The extracted timestamp as an integer.
-        """
-        field_name: str = session_type + "Timestamp"
-        return session_payload.get(field_name, None)
-
-    def handle_session_message(self, topic: str, payload: bytes) -> None:
-        """
-            Handles incoming session messages by logging the session status.
-            Args:
-                topic (str): The topic of the incoming session message.
-                payload (bytes): The payload of the incoming session message.
-            """
-        logger.debug("MQTT Connection: Handling incoming message on topic: %s",
-                     topic)
-        try:
-            topic_parts = topic.split('/')
-            session_topic = topic_parts[4] if len(topic_parts) > 4 else None
-            if not session_topic:
-                logger.warning(
-                    "MQTT Connection: Session topic not found in topic '%s'",
-                    topic)
-                return
-            if session_topic == self.SESSION_START:
-                self.process_session(topic=topic,
-                                     payload=payload,
-                                     session_type="start",
-                                     log_session_fun=self.influx_writer.parser.
-                                     log_session_start)
-            elif session_topic == self.SESSION_STOP:
-                self.process_session(
-                    topic=topic,
-                    payload=payload,
-                    session_type="end",
-                    log_session_fun=self.influx_writer.parser.log_session_end)
-            else:
-                logger.warning(
-                    "MQTT Connection: Unknown session topic '%s' in topic '%s'",
-                    session_topic, topic)
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error(
-                "Error while handling session message on topic '%s': %s",
-                topic, str(e))
-
-    def process_session(self, topic, payload, session_type: str,
-                        log_session_fun: Callable) -> None:
-        """
-        Processes the session message by extracting the timestamp and logging the session status.
-        Args:
-            topic (str): The topic of the incoming session message.
-            payload (bytes): The payload of the incoming session message.
-            session_type (str): The type of session message ("start" or "end").
-            log_session_fun (Callable): The function to call for handling the session status.
-        """
-        logger.info("MQTT Connection: Session %s for topic '%s'", session_type,
-                    topic)
-        json_payload: json = MsgDispatcher.payload_to_json(payload)
-        timestamp: int = MsgDispatcher.extract_timestamp(
-            json_payload, session_type=session_type)
-        log_session_fun(timestamp)
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
