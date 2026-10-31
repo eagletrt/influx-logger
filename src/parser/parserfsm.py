@@ -7,6 +7,7 @@ from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
 
+from lib.external.serializers.py.telemetry.status import Status, TelemetryState
 from src.utils.logger_utils import logger
 from src.utils.tlm_fsm import TelemetryFSM
 
@@ -24,7 +25,6 @@ class ParserFSM(StateMachine):
     idling: State = State("idle")
     running: State = State("running")
     logging: State = State("logging")
-    erroring: State = State("error")
     final: State = State("stop", final=True)
 
     # Event transitions
@@ -34,9 +34,6 @@ class ParserFSM(StateMachine):
                                               | logging.to(idling))
     log_started: TransitionList = running.to(logging)
     log_stopped: TransitionList = logging.to(running)
-    error_occurred: TransitionList = (running.to(erroring)
-                                      | logging.to(erroring))
-    restore_from_error: TransitionList = erroring.to(idling)
     finish: TransitionList = idling.to(final)
 
     def __init__(self,
@@ -123,14 +120,6 @@ class ParserFSM(StateMachine):
                 self.log_state(f"Error signaling state: {e}", signal=False)
         return False
 
-    def restore(self):
-        """
-        Restores the FSM from an error state to the idling state.
-        This method is intended to be called when an error has occurred
-        and the FSM needs to be restored to a stable state.
-        """
-        self.send('restore_from_error')
-
     def on_message_received(self):
         """
         Callback for the message_received event.
@@ -151,20 +140,6 @@ class ParserFSM(StateMachine):
         Logs the stop of logging.
         """
         self.log_state("Stop logging")
-
-    def on_error_occurred(self):
-        """
-        Callback for the error_occurred event.
-        Logs the occurrence of an error.
-        """
-        self.log_state("Error occurred")
-
-    def on_restore(self):
-        """
-        Callback for the restore event.
-        Logs the restoration from an error state.
-        """
-        self.log_state("Restored from error")
 
     def on_finish(self):
         """
@@ -205,15 +180,6 @@ class ParserFSM(StateMachine):
         self.log_state("Entering logging state")
         self.signal_state()
 
-    def on_enter_erroring(self):
-        """
-        Callback for entering the erroring state.
-        Logs the entry into the erroring state.
-        """
-        self.log_state("Entering erroring state")
-        self.signal_state()
-        self.restore()
-
     def on_enter_final(self):
         """
         Callback for entering the final state.
@@ -222,7 +188,7 @@ class ParserFSM(StateMachine):
         self.log_state("Entering final state")
         self.signal_state()
 
-    def new_telemetry_status(self, telemetry_status):
+    def new_telemetry_status(self, telemetry_status: Status) -> None:
         """
         Handles a new telemetry status message.
         This method is intended to be called when a new telemetry status message is received.
@@ -230,7 +196,21 @@ class ParserFSM(StateMachine):
         Args:
             telemetry_status: The new telemetry status message.
         """
-        raise NotImplementedError("This method should be implemented.")
+        telemetry_state: TelemetryState = telemetry_status.status.telemetryState
+        if telemetry_state:
+            try:
+                state_changed: bool = self.tlm_fsm.set_current_state(
+                    telemetry_state)
+                if state_changed:
+                    self.tlm_state_changed(telemetry_state)
+            except ValueError as e:
+                self.log_state(f"Error setting current state: {e}")
+
+    def tlm_state_changed(self, new_state: TelemetryState) -> None:
+        if new_state == TelemetryState.RUN:
+            self.send('log_started')
+        else:
+            self.send('log_stopped')
 
 
 #ParserFSM.draw('parser_fsm.png')

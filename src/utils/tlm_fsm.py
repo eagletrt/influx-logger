@@ -2,9 +2,13 @@
 Finite State Machine of Telemetry as far as the Influx Logger knows.
 '''
 
+from threading import Lock
+
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
+
+from lib.external.serializers.py.telemetry.status import TelemetryState
 
 
 class TelemetryFSM(StateMachine):
@@ -13,14 +17,14 @@ class TelemetryFSM(StateMachine):
     '''
 
     # States
-    initializing: State = State('INIT', initial=True)
-    waiting: State = State('WAIT_READY')
-    idling: State = State('IDLE')
-    setup_running: State = State('SETUP_RUN')
-    running: State = State('RUN')
-    erroring: State = State('ERROR')
+    initializing: State = State(TelemetryState.INIT.name, initial=True)
+    waiting: State = State(TelemetryState.WAIT_READY.name)
+    idling: State = State(TelemetryState.IDLE.name)
+    setup_running: State = State(TelemetryState.SETUP_RUN.name)
+    running: State = State(TelemetryState.RUN.name)
+    erroring: State = State(TelemetryState.ERROR.name)
 
-    # Transitions
+    # Eventless transitions
     init_to_waitready: TransitionList = initializing.to(waiting)
     init_to_idle: TransitionList = initializing.to(idling)
     init_to_error: TransitionList = initializing.to(erroring)
@@ -45,6 +49,10 @@ class TelemetryFSM(StateMachine):
         Name of the FSM, used for logging purposes.
         '''
         StateMachine.__init__(self)
+        self._mutex: Lock = Lock()
+        '''
+        Mutex for thread-safe operations on the FSM.
+        '''
 
     @staticmethod
     def draw(filename: str = 'handler_fsm.png'):
@@ -54,3 +62,34 @@ class TelemetryFSM(StateMachine):
             filename (str): The name of the file to save the FSM diagram.
         """
         DotGraphMachine(TelemetryFSM).get_graph().write(filename, format='png')
+
+    def set_current_state(self, state: TelemetryState) -> bool:
+        """
+        Sets the current state of the FSM based on the provided state.
+        Args:
+            state (TelemetryState): The state to set as the current state.
+        """
+        if state.name in self.states:
+            if self.current_state != self.states[state.name]:
+                self._change_state(state)
+                return True
+            else:
+                # If the current state is already the desired state, do nothing
+                pass
+        else:
+            raise ValueError(f"Invalid state name: {state}")
+        return False
+
+    def _change_state(self, new_state: TelemetryState) -> None:
+        """
+        Changes the current state of the FSM to the specified state.
+        Args:
+            new_state (TelemetryState): The state to change to.
+        """
+        with self._mutex:
+            self.current_state.exit()
+            self.current_state = self.states[new_state.name]
+            self.current_state.enter()
+
+
+#TelemetryFSM.draw('handler_fsm.png')
