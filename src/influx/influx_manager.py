@@ -16,8 +16,8 @@ class InfluxManager(Thread, ABC):
     This class provides common functionality for both reading and
     writing to InfluxDB, such as managing
     the connection and handling timestamp precision.
-    It is intended to be extended by specific reader and writer
-    classes that implement the actual reading and writing logic.
+    It is intended to be extended by specific writer
+    class which implements the actual writing logic.
     
     Attributes:
         client (InfluxConnection): The connection to the InfluxDB service.

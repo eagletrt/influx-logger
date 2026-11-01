@@ -12,7 +12,6 @@ from statemachine.contrib.diagram import DotGraphMachine
 
 from src.connections.connection_handler import ConnectionHandler
 from src.handler.msg_dispatcher import MsgDispatcher
-from src.influx.influx_reader import InfluxReader
 from src.influx.influx_writer import InfluxWriter
 from src.parser.protobuf_manager import LibcanManager
 from src.utils.configuration import Configuration
@@ -226,10 +225,6 @@ class HandlerFSM(Thread, StateMachine):
                 adr_bucket=self.config.influx.buckets["adr"],
                 log_bucket=self.config.influx.buckets["logs"],
                 excluded_networks=self.config.excluded_networks),
-            influx_reader=InfluxReader(
-                client=self.handler.influx_adr,
-                mqtt_client=self.handler.mqtt,
-                log_bucket=self.config.influx.buckets["adr"]),
             mqtt=self.handler.mqtt,
         )
         # Check if there are already messages on the MQTT broker and

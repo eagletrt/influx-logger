@@ -9,7 +9,6 @@ from re import Pattern
 from re import compile as re_compile
 
 from src.connections.mqtt_connection import MQTTConnection
-from src.influx.influx_reader import InfluxReader
 from src.influx.influx_writer import InfluxWriter
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.utils.logger_utils import logger
@@ -19,20 +18,18 @@ class MsgDispatcher:
     """
     A class that dispatches incoming MQTT messages to the appropriate handlers
     based on the topic. It supports handling version messages, data messages,
-    and query requests. It also manages the InfluxWriter and InfluxReader instances
-    for writing and reading data to/from InfluxDB.
+    and query requests. It also manages the InfluxWriter instance
+    for writing data to InfluxDB.
 
     Attributes:
         topic_callbacks: A dictionary mapping MQTT topics to their corresponding callback.
         influx_writer: An instance of the InfluxWriter class for writing data to InfluxDB.
-        influx_reader: An instance of the InfluxReader class for reading data from InfluxDB.
         mqtt: An instance of the MQTTConnection class for handling MQTT connections.
         vehicle_whitelist: A list of allowed vehicle IDs.
     """
 
     def __init__(self,
                  influx_writer: InfluxWriter = None,
-                 influx_reader: InfluxReader = None,
                  mqtt: MQTTConnection = None,
                  vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
@@ -40,10 +37,8 @@ class MsgDispatcher:
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
             #"+/+/version":              self.handle_canlib_version_message,
             "+/+/data/+": self.handle_data_message,
-            "+/+/query/+/data/get": self.handle_query_request,
         }
         self.influx_writer: InfluxWriter = influx_writer
-        self.influx_reader: InfluxReader = influx_reader
         self.mqtt: MQTTConnection = mqtt
         self.vehicle_whitelist: list = None
         if vehicle_whitelist and vehicle_whitelist != []:
@@ -52,7 +47,6 @@ class MsgDispatcher:
 
     def set(self,
             influx_writer: InfluxWriter = None,
-            influx_reader: InfluxReader = None,
             mqtt: MQTTConnection = None,
             vehicle_whitelist: list = None) -> None:
         '''
@@ -62,8 +56,6 @@ class MsgDispatcher:
         '''
         if influx_writer is not None:
             self.influx_writer = influx_writer
-        if influx_reader is not None:
-            self.influx_reader = influx_reader
         if mqtt is not None:
             self.mqtt = mqtt
         if vehicle_whitelist is not None and vehicle_whitelist != []:
@@ -72,16 +64,11 @@ class MsgDispatcher:
 
     def __run_if_set(self) -> None:
         '''
-        Starts the InfluxWriter and InfluxReader threads if they are set.
+        Starts the InfluxWriter threads if they are set.
         '''
         if self.influx_writer:
             try:
                 self.influx_writer.start()
-            except Exception:  # pylint: disable=broad-except
-                pass
-        if self.influx_reader:
-            try:
-                self.influx_reader.start()
             except Exception:  # pylint: disable=broad-except
                 pass
 
@@ -293,59 +280,25 @@ class MsgDispatcher:
             return
         self.influx_writer.parser.add_to_queue(row_msg)
 
-    def handle_query_request(self, _topic: str, payload: bytes,
-                             ids: list[str]) -> None:
-        """
-        Handles incoming query requests from the GUI.
-        ids will contain: [vehicle_id, device_id, transaction_id]
-        """
-        if not self.influx_reader:
-            logger.warning(
-                "msg_dispatcher: InfluxReader is not set. " \
-                "Cannot handle query request."
-            )
-            return
-
-        if len(ids) < 3:
-            logger.error(
-                "msg_dispatcher: Query topic malformed. ids found: %s", ids)
-            return
-
-        vehicle_id = ids[0]
-        device_id = ids[1]
-        transaction_id = ids[2]
-
-        # Send the query to the InfluxReader to be processed
-        self.influx_reader.add_query_to_queue(vehicle_id, device_id,
-                                              transaction_id, payload)
-
     def stop(self) -> None:
         '''
-        Stops the MsgDispatcher by stopping the InfluxWriter
-        and InfluxReader if they are set.
+        Stops the MsgDispatcher by stopping the InfluxWriter 
+        if it's set.
         '''
         if self.influx_writer:
             self.influx_writer.stop()
             self.influx_writer.join()
             self.influx_writer = None  # Clear the reference to the InfluxWriter instance
-        if self.influx_reader:
-            self.influx_reader.stop()
-            self.influx_reader.join()
-            self.influx_reader = None  # Clear the reference to the InfluxReader instance
 
     def graceful_stop(self) -> None:
         '''
         Gracefully stops the MsgDispatcher by stopping the
-        InfluxWriter and InfluxReader if they are set, and waiting
-        for their threads to finish.
+        InfluxWriter and waiting
+        for its thread to finish.
         '''
         if self.influx_writer:
             self.influx_writer.graceful_stop()
             self.influx_writer.join()
-        if self.influx_reader:
-            # Implement graceful stop for InfluxReader if needed here
-            self.influx_reader.stop()
-            self.influx_reader.join()
 
 
 __all__ = ["MsgDispatcher"]
