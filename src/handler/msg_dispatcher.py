@@ -5,6 +5,7 @@ handlers based on the topic.
 """
 
 import json
+import traceback
 from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
@@ -348,11 +349,23 @@ class MsgDispatcher:
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
         # Decode status with the Python module generated from status.proto.
-        status_pb2 = import_generated_module("telemetry.status_pb2")
-        telemetry_status = status_pb2.Status()
-        telemetry_status.ParseFromString(payload)
-        self.influx_writer.parser.parserfsm.new_telemetry_status(
-            telemetry_status)
+        try:
+            status_pb2 = import_generated_module("telemetry.status_pb2")
+            telemetry_status = status_pb2.Status()
+            telemetry_status.ParseFromString(payload)
+            # TODO improve logging #pylint: disable=fixme
+            #logger.info(
+            #    "msg_dispatcher: Received telemetry status message from %s/%s: %s",
+            #    ids[0] if len(ids) > 0 else "unknown_vehicle",
+            #    ids[1] if len(ids) > 1 else "unknown_id",
+            #    telemetry_status)
+            self.influx_writer.parser.parserfsm.new_telemetry_status(
+                telemetry_status)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "msg_dispatcher: Error while handling telemetry status message: %s",
+                str(e))
+            traceback.print_exc()
 
     def stop(self) -> None:
         '''

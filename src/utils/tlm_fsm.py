@@ -20,6 +20,21 @@ class TelemetryState(IntEnum):
     WAIT_READY = 4
     ERROR = 5
 
+    def get_from_value(self: int) -> "TelemetryState":
+        """
+        Returns the TelemetryState corresponding to the given integer value.
+        Args:
+            value (int): The integer value representing a TelemetryState.
+        Returns:
+            TelemetryState: The corresponding TelemetryState.
+        Raises:
+            ValueError: If the value does not correspond to any TelemetryState.
+        """
+        for state in TelemetryState:
+            if state.value == self:
+                return state
+        raise ValueError(f"Invalid TelemetryState value: {self}")
+
 
 class TelemetryFSM(StateMachine):
     '''
@@ -59,6 +74,7 @@ class TelemetryFSM(StateMachine):
         Name of the FSM, used for logging purposes.
         '''
         StateMachine.__init__(self)
+        self.activate_initial_state()
         self._mutex: Lock = Lock()
         '''
         Mutex for thread-safe operations on the FSM.
@@ -79,24 +95,32 @@ class TelemetryFSM(StateMachine):
         Args:
             state (TelemetryState): The state to set as the current state.
         """
-        if state.name in self.states:
-            if self.current_state != self.states[state.name]:
-                self._change_state(state)
-                return True
-        else:
-            raise ValueError(f"Invalid state name: {state}")
+        state_mapping = {
+            TelemetryState.INIT: "initializing",
+            TelemetryState.WAIT_READY: "waiting",
+            TelemetryState.IDLE: "idling",
+            TelemetryState.SETUP_RUN: "setup_running",
+            TelemetryState.RUN: "running",
+            TelemetryState.ERROR: "erroring",
+        }
+        try:
+            target_state = self.states_map[state_mapping[state]]
+        except KeyError as error:
+            raise ValueError(f"Invalid state name: {state}") from error
+
+        if self.current_state != target_state:
+            self._change_state(target_state)
+            return True
         return False
 
-    def _change_state(self, new_state: TelemetryState) -> None:
+    def _change_state(self, new_state: State) -> None:
         """
         Changes the current state of the FSM to the specified state.
         Args:
             new_state (TelemetryState): The state to change to.
         """
         with self._mutex:
-            self.current_state.exit()
-            self.current_state = self.states[new_state.name]
-            self.current_state.enter()
+            self.current_state = new_state
 
 
 #TelemetryFSM.draw('handler_fsm.png')

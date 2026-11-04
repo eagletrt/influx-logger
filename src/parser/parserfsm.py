@@ -204,8 +204,12 @@ class ParserFSM(StateMachine):
                     telemetry_state)
                 if state_changed:
                     self.tlm_state_changed(telemetry_state)
+                    logger.info("Telemetry state changed to: %s",
+                                telemetry_state.name)
         except ValueError as e:
-            self.log_state(f"Error setting current state: {e}")
+            logger.error("%s - Error setting current state: %s",
+                         self.get_log_header(), str(e))
+            logger.exception("Telemetry status handling failed")
 
     def tlm_state_changed(self, new_state: TelemetryState) -> None:
         """
@@ -215,9 +219,9 @@ class ParserFSM(StateMachine):
         Args:
             new_state: The new telemetry state.
         """
-        if new_state == TelemetryState.RUN:
+        if new_state == TelemetryState.RUN and self.current_state == self.running:
             self.send('log_started')
-        else:
+        elif new_state != TelemetryState.RUN and self.current_state == self.logging:
             self.send('log_stopped')
 
 
