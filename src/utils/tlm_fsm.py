@@ -2,13 +2,23 @@
 Finite State Machine of Telemetry as far as the Influx Logger knows.
 '''
 
+from enum import IntEnum
 from threading import Lock
 
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
 
-from lib.external.serializers.py.telemetry.status import TelemetryState
+
+class TelemetryState(IntEnum):
+    """State values defined by ``telemetry/status.proto``."""
+
+    INIT = 0
+    IDLE = 1
+    SETUP_RUN = 2
+    RUN = 3
+    WAIT_READY = 4
+    ERROR = 5
 
 
 class TelemetryFSM(StateMachine):
@@ -73,9 +83,6 @@ class TelemetryFSM(StateMachine):
             if self.current_state != self.states[state.name]:
                 self._change_state(state)
                 return True
-            else:
-                # If the current state is already the desired state, do nothing
-                pass
         else:
             raise ValueError(f"Invalid state name: {state}")
         return False

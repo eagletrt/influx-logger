@@ -3,13 +3,13 @@ Finite State Machine for the parser.
 This module defines the states and transitions for the parser's finite state machine.
 """
 
+from google.protobuf.message import Message
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
 from statemachine.transition_list import TransitionList
 
-from lib.external.serializers.py.telemetry.status import Status, TelemetryState
 from src.utils.logger_utils import logger
-from src.utils.tlm_fsm import TelemetryFSM
+from src.utils.tlm_fsm import TelemetryFSM, TelemetryState
 
 
 class ParserFSM(StateMachine):
@@ -188,7 +188,7 @@ class ParserFSM(StateMachine):
         self.log_state("Entering final state")
         self.signal_state()
 
-    def new_telemetry_status(self, telemetry_status: Status) -> None:
+    def new_telemetry_status(self, telemetry_status: Message) -> None:
         """
         Handles a new telemetry status message.
         This method is intended to be called when a new telemetry status message is received.
@@ -196,17 +196,25 @@ class ParserFSM(StateMachine):
         Args:
             telemetry_status: The new telemetry status message.
         """
-        telemetry_state: TelemetryState = telemetry_status.status.telemetryState
-        if telemetry_state:
-            try:
+        try:
+            telemetry_state: TelemetryState = TelemetryState(
+                telemetry_status.state)
+            if telemetry_state:
                 state_changed: bool = self.tlm_fsm.set_current_state(
                     telemetry_state)
                 if state_changed:
                     self.tlm_state_changed(telemetry_state)
-            except ValueError as e:
-                self.log_state(f"Error setting current state: {e}")
+        except ValueError as e:
+            self.log_state(f"Error setting current state: {e}")
 
     def tlm_state_changed(self, new_state: TelemetryState) -> None:
+        """
+        Handles a change in the telemetry state.
+        This method is intended to be called when the telemetry state changes.
+        It sends the appropriate event to the parser's FSM based on the new telemetry state.
+        Args:
+            new_state: The new telemetry state.
+        """
         if new_state == TelemetryState.RUN:
             self.send('log_started')
         else:

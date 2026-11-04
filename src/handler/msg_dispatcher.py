@@ -9,12 +9,12 @@ from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
 
-from lib.external.serializers.py.telemetry.status import Status
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_reader import InfluxReader
 from src.influx.influx_writer import InfluxWriter
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.utils.logger_utils import logger
+from src.utils.proto_compiler import import_generated_module
 
 
 class MsgDispatcher:
@@ -347,9 +347,10 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming telemetry status message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
-        # From serializers deserialize the payload and send it to the Telemetry FSM
-        telemetry_status: Status = Status.deserializeFromProtobufString(
-            payload)
+        # Decode status with the Python module generated from status.proto.
+        status_pb2 = import_generated_module("telemetry.status_pb2")
+        telemetry_status = status_pb2.Status()
+        telemetry_status.ParseFromString(payload)
         self.influx_writer.parser.parserfsm.new_telemetry_status(
             telemetry_status)
 
