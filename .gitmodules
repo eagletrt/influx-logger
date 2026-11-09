@@ -1,4 +1,0 @@
-[submodule "lib/external/telemetry-serializers"]
-	path = lib/external/serializers
-	url = git@github.com:eagletrt/telemetry-serializers.git
-	branch = dev-build
