@@ -71,9 +71,6 @@ def print_fsm() -> None:
     Prints the FSM structure of the HandlerFSM instance.
     """
     fsm_dir: Path = Path("images/fsm")
-    '''
-    Path to the directory where FSM diagrams will be saved. 
-    '''
     fsm_dir.mkdir(parents=True, exist_ok=True)
     HandlerFSM.draw(fsm_dir / 'handler_fsm.png')
     ParserFSM.draw(fsm_dir / 'parser_fsm.png')
