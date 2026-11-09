@@ -18,7 +18,6 @@ from src.influx.influx_writer import InfluxWriter
 from src.parser.protobuf_manager import LibcanManager
 from src.utils.configuration import Configuration
 from src.utils.logger_utils import logger
-from src.utils.proto_compiler import compile_proto_files
 
 # Info about FSM at https://github.com/fgmacedo/python-statemachine
 
@@ -255,7 +254,6 @@ class HandlerFSM(Thread, StateMachine):
         It triggers the init event to transition from the start state
         to the idle state and begins the FSM operation.
         """
-        compile_proto_files()
         if self.config.github_token and self.config.github_token != "":
             LibcanManager.TOKEN = self.config.github_token
         self.handler.set(

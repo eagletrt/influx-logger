@@ -132,6 +132,7 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
     def __subscribe_topics(self) -> None:
         if not self.connection:
             return
+        self.connection.subscribe("+/+/info/version/serializers")
         #self.connection.subscribe("+/+/version")
         self.connection.subscribe("+/+/info/version/libcan")
         self.connection.subscribe("+/+/info/version/gpslib")

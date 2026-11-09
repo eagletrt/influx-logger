@@ -5,7 +5,6 @@ handlers based on the topic.
 """
 
 import json
-import traceback
 from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
@@ -13,9 +12,9 @@ from re import compile as re_compile
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_reader import InfluxReader
 from src.influx.influx_writer import InfluxWriter
+from src.parser.libmanager import LibSerializersManager
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.utils.logger_utils import logger
-from src.utils.proto_compiler import import_generated_module
 
 
 class MsgDispatcher:
@@ -39,6 +38,8 @@ class MsgDispatcher:
                  mqtt: MQTTConnection = None,
                  vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
+            "+/+/info/version/serializers":
+            self.handle_serializers_version_message,
             #"+/+/version":              self.handle_canlib_version_message,
             "+/+/info/version/libcan": self.handle_libcan_version_message,
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
@@ -174,7 +175,8 @@ class MsgDispatcher:
         return re_compile(pattern)
 
     def handle_version_message(self, library: type[LibcanManager]
-                               | type[LibgpsManager], version: str,
+                               | type[LibgpsManager]
+                               | type[LibSerializersManager], version: str,
                                ids: list[str]) -> None:
         """
         Handles incoming version messages by checking the existence of
@@ -249,6 +251,19 @@ class MsgDispatcher:
                 vehicle_id,
                 device_id
             )
+
+    def handle_serializers_version_message(self, _topic: str, payload: bytes,
+                                           ids: list[str]) -> None:
+        '''
+        Handles incoming Serializers version messages by checking the existence of
+        the commit and subscribing to data topics if the commit exists.
+        Args:
+            _topic (str): The topic of the incoming Serializers version message.
+            payload (bytes): The payload of the incoming Serializers version message.
+            ids (list[str]): A list containing the vehicle ID and device ID.
+        '''
+        self.handle_version_message(LibSerializersManager, payload.decode(),
+                                    ids)
 
     def handle_libcan_version_message(self, _topic: str, payload: bytes,
                                       ids: list[str]) -> None:
@@ -348,24 +363,8 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming telemetry status message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
-        # Decode status with the Python module generated from status.proto.
-        try:
-            status_pb2 = import_generated_module("telemetry.status_pb2")
-            telemetry_status = status_pb2.Status()
-            telemetry_status.ParseFromString(payload)
-            # TODO improve logging #pylint: disable=fixme
-            #logger.info(
-            #    "msg_dispatcher: Received telemetry status message from %s/%s: %s",
-            #    ids[0] if len(ids) > 0 else "unknown_vehicle",
-            #    ids[1] if len(ids) > 1 else "unknown_id",
-            #    telemetry_status)
-            self.influx_writer.parser.parserfsm.new_telemetry_status(
-                telemetry_status)
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error(
-                "msg_dispatcher: Error while handling telemetry status message: %s",
-                str(e))
-            traceback.print_exc()
+        raise NotImplementedError(
+            "Telemetry status message handling is not implemented yet.")
 
     def stop(self) -> None:
         '''

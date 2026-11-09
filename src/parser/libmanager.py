@@ -290,3 +290,49 @@ class LibgpsManager(LibManager):
                                    network,
                                    LibgpsManager.GPS_PROTO_URL,
                                    cache=LibgpsManager.CACHE_DIR)
+
+
+class LibSerializersManager(LibManager):
+    '''
+    A utility class for interacting with the Serializers repository to check commit existence.
+    '''
+    SERIALIZERS_COMMIT_URL: str = "https://api.github.com" \
+            "/repos/eagletrt/telemetry-serializers/commits/hash"
+    '''URL to the commit page in the serializers repository'''
+    SERIALIZERS_PROTO_URL: str = "https://raw.githubusercontent.com" \
+        "/eagletrt/telemetry-serializers/hash/network.proto"
+    '''URL to the raw .proto file in the serializers repository'''
+
+    CACHE_DIR: str = os.path.join(LibManager.CACHE_DIR, "serializers")
+    '''Cache directory used for storing .proto files and descriptor sets for Serializers.'''
+
+    @staticmethod
+    def check_commit_existence(commit_hash: str) -> bool:
+        '''
+        Checks if a given commit hash exists in the Seralizers repository.
+        Args:
+            commit_hash (str): The commit hash to check.
+        Returns:
+            bool: True if the commit exists, False otherwise.
+        '''
+        return LibManager.check(commit_hash,
+                                LibSerializersManager.SERIALIZERS_COMMIT_URL)
+
+    @staticmethod
+    def download_proto_version(commit_hash: str, network: str) -> bool:
+        '''
+        Downloads the protobuf descriptor for a given 
+        commit hash and network from the Seralizers repository.
+        Args:
+            commit_hash (str): The commit hash for which to download the protobuf descriptor.
+            network (str): The network for which to download the protobuf descriptor.
+        Returns:
+            bool: True if the download is successful, False otherwise.
+        '''
+        logger.info(
+            "protobuf_manager: Downloading Serializers proto for network '%s' (version %s),",
+            network, commit_hash)
+        return LibManager.download(commit_hash,
+                                   network,
+                                   LibSerializersManager.SERIALIZERS_PROTO_URL,
+                                   cache=LibSerializersManager.CACHE_DIR)
