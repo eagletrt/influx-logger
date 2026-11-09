@@ -324,6 +324,7 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming telemetry status message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
+        # TODO Implement # pylint: disable=fixme
         raise NotImplementedError(
             "Telemetry status message handling is not implemented yet.")
 

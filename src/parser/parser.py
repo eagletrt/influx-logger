@@ -592,6 +592,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             timestamp (int): The timestamp indicating when the session started.
         """
         logger.info("parser: Session started at timestamp %d", timestamp)
+        # TODO: Implement # pylint: disable=fixme
         raise NotImplementedError(
             "log_session_start method is not implemented.")
 
@@ -602,6 +603,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             timestamp (int): The timestamp indicating when the session ended.
         """
         logger.info("parser: Session ended at timestamp %d", timestamp)
+        # TODO: Implement # pylint: disable=fixme
         raise NotImplementedError("log_session_end method is not implemented.")
 
 
