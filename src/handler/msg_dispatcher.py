@@ -19,8 +19,8 @@ from src.utils.logger_utils import logger
 class MsgDispatcher:
     """
     A class that dispatches incoming MQTT messages to the appropriate handlers
-    based on the topic. It supports handling version messages, data messages,
-    and query requests. It also manages the InfluxWriter instance
+    based on the topic. It supports handling version messages and data messages.
+    It also manages the InfluxWriter instance
     for writing data to InfluxDB.
 
     Attributes:
