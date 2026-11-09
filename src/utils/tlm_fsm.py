@@ -121,6 +121,3 @@ class TelemetryFSM(StateMachine):
         """
         with self._mutex:
             self.current_state = new_state
-
-
-#TelemetryFSM.draw('handler_fsm.png')

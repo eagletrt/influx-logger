@@ -223,6 +223,3 @@ class ParserFSM(StateMachine):
             self.send('log_started')
         elif new_state != TelemetryState.RUN and self.current_state == self.logging:
             self.send('log_stopped')
-
-
-#ParserFSM.draw('parser_fsm.png')
