@@ -104,6 +104,7 @@ class TelemetryFSM(StateMachine):
             TelemetryState.ERROR: "erroring",
         }
         try:
+            #logger.info("Setting current state to: %s", state.name)
             target_state = self.states_map[state_mapping[state]]
         except KeyError as error:
             raise ValueError(f"Invalid state name: {state}") from error

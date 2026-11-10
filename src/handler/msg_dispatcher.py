@@ -298,7 +298,7 @@ class MsgDispatcher:
         Args:
             _topic (str): The topic of the incoming data message.
             payload (bytes): The payload of the incoming data message.
-            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+            ids (list[str]): A list containing vehicle ID, device ID, and network.
         '''
         if not self.influx_writer:
             logger.warning(
@@ -322,8 +322,18 @@ class MsgDispatcher:
         Args:
             _topic (str): The topic of the incoming telemetry status message.
             payload (bytes): The payload of the incoming telemetry status message.
-            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+            ids (list[str]): A list containing the vehicle ID and device ID.
         """
+        if not self.influx_writer:
+            logger.warning(
+                "msg_dispatcher: InfluxWriter is not set. Cannot handle telemetry status message."
+            )
+            return
+        if len(ids) < 2:
+            logger.warning(
+                "msg_dispatcher: Cannot handle telemetry status message with "
+                "malformed topic IDs: %s", ids)
+            return
         if self.vehicle_whitelist and ids[0] not in self.vehicle_whitelist:
             #logger.debug(
             #    "msg_dispatcher: Vehicle '%s' is not in the whitelist.",

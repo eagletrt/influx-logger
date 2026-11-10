@@ -32,7 +32,7 @@ class ParserFSM(StateMachine):
     message_received: TransitionList = idling.to(running)
     no_messages_to_process: TransitionList = (running.to(idling)
                                               | logging.to(idling))
-    log_started: TransitionList = running.to(logging)
+    log_started: TransitionList = (running.to(logging) | idling.to(logging))
     log_stopped: TransitionList = logging.to(running)
     finish: TransitionList = idling.to(final)
 
@@ -120,6 +120,7 @@ class ParserFSM(StateMachine):
                 self.log_state(f"Error signaling state: {e}", signal=False)
         return False
 
+    # TODO: Call this method # pylint: disable=fixme
     def on_message_received(self):
         """
         Callback for the message_received event.
@@ -196,6 +197,7 @@ class ParserFSM(StateMachine):
         Args:
             telemetry_status: The new telemetry status message.
         """
+        #logger.info("parserfsm: New telemetry status received: %s", telemetry_status)
         try:
             telemetry_state: TelemetryState = TelemetryState(
                 telemetry_status.state)
@@ -204,8 +206,6 @@ class ParserFSM(StateMachine):
                     telemetry_state)
                 if state_changed:
                     self.tlm_state_changed(telemetry_state)
-                    logger.info("Telemetry state changed to: %s",
-                                telemetry_state.name)
         except ValueError as e:
             logger.error("%s - Error setting current state: %s",
                          self.get_log_header(), str(e))
@@ -219,7 +219,8 @@ class ParserFSM(StateMachine):
         Args:
             new_state: The new telemetry state.
         """
-        if new_state == TelemetryState.RUN and self.current_state == self.running:
+        self.log_state(f"Telemetry state changed to: {new_state.name}")
+        if new_state == TelemetryState.RUN and self.current_state != self.logging:
             self.send('log_started')
         elif new_state != TelemetryState.RUN and self.current_state == self.logging:
             self.send('log_stopped')

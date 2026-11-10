@@ -7,7 +7,7 @@ from typing import Any
 
 from influxdb_client import Point
 
-from src.parser.libmanager import LibcanManager, LibgpsManager
+from src.parser.libmanager import LibcanManager, LibgpsManager, LibSerializersManager
 from src.parser.parserfsm import ParserFSM
 from src.parser.protobuf_manager import ProtobufManager
 from src.utils.line import Line
@@ -43,10 +43,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             excluded_networks (list[str], optional): A list of network identifiers to be excluded.
             log_callback (callable, optional): A callback function for logging messages.
         '''
-        self.parserfsm: ParserFSM = ParserFSM()
-        '''Finite State Machine for the parser.'''
-        if log_callback:
-            self.parserfsm.set_log_callback(log_callback)
+        self.parserfsms: dict[tuple[str, str], ParserFSM] = {}
+        '''Per-device finite state machines, keyed by (vehicle ID, device ID).'''
+        self.log_callback: callable = log_callback
+        '''Callback used by each per-device parser state machine.'''
         super().__init__(name="Parser")
         self.excluded_networks: list[
             str] = excluded_networks if excluded_networks is not None else []
@@ -101,7 +101,6 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Threshold for blacklisting a network after consecutive
         failures to download its .proto descriptor.
         '''
-        self.parserfsm.send('initialization')
 
     def set_log_callback(self, callback: callable) -> None:
         """
@@ -109,7 +108,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Args:
             callback (callable): The callback function to be set for logging.
         """
-        self.parserfsm.set_log_callback(callback)
+        self.log_callback = callback
+        with self.__parser_state_lock:
+            for parser_fsm in self.parserfsms.values():
+                parser_fsm.set_log_callback(callback)
 
     def _handle_inactivity(self) -> None:
         """
@@ -553,18 +555,41 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     def register_device_version(self, vehicle_id: str, device_id: str,
                                 library: type, version: str) -> None:
         """
-        Registers a device decoder version while holding the parser state lock.
+        Registers a device decoder version and prepares its status FSM/schema
+        when the version belongs to the serializers library.
         
         Args:
             vehicle_id (str): The unique identifier for the vehicle.
             device_id (str): The unique identifier for the device.
-            library (type): The library type (e.g., LibcanManager or LibgpsManager).
+            library (type): A library manager class for the device version.
             version (str): The version of the decoder to be registered.
         """
-        key = f"{vehicle_id}/{device_id}"
+        device_key = f"{vehicle_id}/{device_id}"
+        fsm_key = (vehicle_id, device_id)
         with self.__parser_state_lock:
-            self.device_versions.setdefault(key, {})[library] = version
+            self.device_versions.setdefault(device_key, {})[library] = version
             self.protobuf_manager.version_descriptors.setdefault(version, {})
+            if library == LibSerializersManager:
+                parser_fsm = self.parserfsms.get(fsm_key)
+                if parser_fsm is None:
+                    parser_fsm = ParserFSM(
+                        name=f"ParserFSM[{vehicle_id}/{device_id}]",
+                        log_callback=self.log_callback)
+                    parser_fsm.send('initialization')
+                    self.parserfsms[fsm_key] = parser_fsm
+                status_decoder = self.protobuf_manager.version_descriptors[
+                    version].get(
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH)
+                if status_decoder is None:
+                    downloaded = self.protobuf_manager.download_proto_descriptor(
+                        version,
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH,
+                        lib_manager=LibSerializersManager,
+                        message_field="state")
+                    if not downloaded:
+                        logger.error(
+                            "parser: Failed to prepare telemetry status decoder "
+                            "for serializers version %s", version)
 
     def pop_points(self, max_points_to_pop: int = -1) -> list[Point]:
         '''
@@ -606,16 +631,69 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         # TODO: Implement # pylint: disable=fixme
         raise NotImplementedError("log_session_end method is not implemented.")
 
-    def handle_tlm_status_message(self, ids, payload):
+    def handle_tlm_status_message(self, ids: list[str],
+                                  payload: bytes) -> None:
         """
         Handles incoming telemetry status messages.
-        It decodes the payload, creates a TelemetryState object and alter
-        the current use it in self.parserfsm.new_telemetry_status(state).
+        It decodes the payload with the device's serializers schema and sends
+        the resulting protobuf message to that device's ParserFSM.
         Args:
-            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+            ids (list[str]): A list containing the vehicle ID and device ID.
             payload (bytes): The payload of the incoming telemetry status message.
         """
-        pass
+        if len(ids) < 2:
+            logger.warning(
+                "parser: Cannot handle telemetry status message without vehicle/device IDs"
+            )
+            return
+
+        vehicle_id, device_id = ids[0], ids[1]
+        device_key = f"{vehicle_id}/{device_id}"
+        fsm_key = (vehicle_id, device_id)
+        with self.__parser_state_lock:
+            version = self.device_versions.get(device_key,
+                                               {}).get(LibSerializersManager)
+            parser_fsm = self.parserfsms.get(fsm_key)
+            decoder = (self.protobuf_manager.version_descriptors.get(
+                version, {}).get(
+                    LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH)
+                       if version else None)
+
+        if version is None:
+            logger.warning(
+                "parser: Device '%s' sent telemetry status before serializers version; skipping",
+                device_key)
+            return
+        if parser_fsm is None:
+            logger.warning(
+                "parser: No ParserFSM is registered for device '%s'; skipping telemetry status",
+                device_key)
+            return
+        if decoder is None:
+            logger.info(
+                "parser: Loading telemetry status decoder for serializers version %s",
+                version)
+            with self.__parser_state_lock:
+                if not self.protobuf_manager.download_proto_descriptor(
+                        version,
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH,
+                        lib_manager=LibSerializersManager,
+                        message_field="state"):
+                    logger.error(
+                        "parser: Cannot load telemetry status decoder for serializers version %s",
+                        version)
+                    return
+                decoder = self.protobuf_manager.version_descriptors[version][
+                    LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH]
+
+        try:
+            state = decoder.decode_message(payload)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "parser: Cannot deserialize telemetry status for device '%s': %s",
+                device_key, error)
+            return
+        parser_fsm.new_telemetry_status(state)
 
 
 __all__ = ["Parser"]

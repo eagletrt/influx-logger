@@ -22,6 +22,16 @@ class LibManager(ABC):
     '''Base cache directory used for storing .proto files and descriptor sets.'''
 
     @staticmethod
+    def proto_cache_path(proto_path: str) -> str:
+        """Map a repository proto path to its path beneath a version cache."""
+        cache_path = proto_path
+        if not cache_path.endswith(".proto"):
+            cache_path += ".proto"
+        if cache_path.startswith("proto/"):
+            cache_path = cache_path.removeprefix("proto/")
+        return cache_path
+
+    @staticmethod
     def check(commit_hash: str,
               urls: str | list[str],
               token: str = None) -> bool:
@@ -79,11 +89,12 @@ class LibManager(ABC):
             "Subclasses must implement the check_commit_existence method.")
 
     @staticmethod
-    def download(commit_hash: str,
-                 network: str,
-                 in_url: str | list[str],
-                 cache: str,
-                 token: str = None) -> bool:
+    def download(  # pylint: disable=too-many-locals
+            commit_hash: str,
+            network: str,
+            in_url: str | list[str],
+            cache: str,
+            token: str = None) -> bool:
         '''
         Downloads the protobuf descriptor for a given commit hash and network from the repository.
         Args:
@@ -110,10 +121,12 @@ class LibManager(ABC):
             urls = in_url
         elif isinstance(in_url, str):
             urls.append(in_url)
+        resp = None
         for url_sample in urls:
             try:
+                remote_proto_path = network.removesuffix(".proto")
                 url: str = url_sample.replace("hash", commit_hash).replace(
-                    "network", network)
+                    "network", remote_proto_path)
                 logger.info("protobuf_manager: URL: %s", url)
                 resp = get(url, headers=headers, timeout=10)
                 if resp and resp.ok:
@@ -133,9 +146,10 @@ class LibManager(ABC):
         try:
             proto_dir: str = LibManager.create_cache_directories(
                 cache, version_dir)
-            with open(os.path.join(proto_dir, f"{network}.proto"),
-                      "w",
-                      encoding="utf-8") as fh:
+            proto_file = os.path.join(proto_dir,
+                                      LibManager.proto_cache_path(network))
+            os.makedirs(os.path.dirname(proto_file), exist_ok=True)
+            with open(proto_file, "w", encoding="utf-8") as fh:
                 fh.write(resp.text)
                 return True
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -302,6 +316,9 @@ class LibSerializersManager(LibManager):
     SERIALIZERS_PROTO_URL: str = "https://raw.githubusercontent.com" \
         "/eagletrt/telemetry-serializers/hash/network.proto"
     '''URL to the raw .proto file in the serializers repository'''
+
+    TELEMETRY_STATUS_PROTO_PATH: str = "proto/telemetry/status.proto"
+    '''Repository path to the telemetry status proto.'''
 
     CACHE_DIR: str = os.path.join(LibManager.CACHE_DIR, "serializers")
     '''Cache directory used for storing .proto files and descriptor sets for Serializers.'''
