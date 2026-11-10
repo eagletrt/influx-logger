@@ -40,8 +40,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 packages = [
     {include = "src"},
-    {include = "test"},
-    {exclude = "lib/external"}
+    {include = "test"}
 ]
 
 [tool.ruff]
