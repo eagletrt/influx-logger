@@ -324,9 +324,12 @@ class MsgDispatcher:
             payload (bytes): The payload of the incoming telemetry status message.
             ids (list[str]): A list containing the vehicle ID, device ID, and network.
         """
-        # TODO Implement # pylint: disable=fixme
-        raise NotImplementedError(
-            "Telemetry status message handling is not implemented yet.")
+        if self.vehicle_whitelist and ids[0] not in self.vehicle_whitelist:
+            #logger.debug(
+            #    "msg_dispatcher: Vehicle '%s' is not in the whitelist.",
+            #    ids[0])
+            return
+        self.influx_writer.parser.handle_tlm_status_message(ids, payload)
 
     def stop(self) -> None:
         '''

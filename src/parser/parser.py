@@ -606,5 +606,16 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         # TODO: Implement # pylint: disable=fixme
         raise NotImplementedError("log_session_end method is not implemented.")
 
+    def handle_tlm_status_message(self, ids, payload):
+        """
+        Handles incoming telemetry status messages.
+        It decodes the payload, creates a TelemetryState object and alter
+        the current use it in self.parserfsm.new_telemetry_status(state).
+        Args:
+            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+            payload (bytes): The payload of the incoming telemetry status message.
+        """
+        pass
+
 
 __all__ = ["Parser"]
