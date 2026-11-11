@@ -24,10 +24,9 @@ class TestParserFSM(unittest.TestCase):
     def test_signal_state_sends_to_mqtt_topic(self) -> None:
         """signal_state invokes log_callback with state and expected MQTT topic."""
         mock_callback = MagicMock()
-        parser_fsm = ParserFSM(
-            vehicle_id="kraken",
-            device_id="onboard",
-            log_callback=mock_callback)
+        parser_fsm = ParserFSM(vehicle_id="kraken",
+                               device_id="onboard",
+                               log_callback=mock_callback)
 
         mock_callback.reset_mock()
         result = parser_fsm.signal_state()
@@ -53,9 +52,7 @@ class TestParserFSM(unittest.TestCase):
         def single_arg_callback(state):
             calls.append(state)
 
-        parser_fsm = ParserFSM(
-            vehicle_id="kraken",
-            device_id="onboard")
+        parser_fsm = ParserFSM(vehicle_id="kraken", device_id="onboard")
         parser_fsm.set_log_callback(single_arg_callback)
         calls.clear()
 
