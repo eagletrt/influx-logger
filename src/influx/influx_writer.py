@@ -148,6 +148,7 @@ class InfluxWriter(InfluxManager):
             return False
         logger.info("influx_writer: Sending %d lines to bucket '%s'",
                     len(points), bucket)
+        self.__commit_log_points(len(points))
         try:
             #logger.info(
             #    "influx_writer: bucket: %s, " \
@@ -196,6 +197,41 @@ class InfluxWriter(InfluxManager):
             except Exception:  # pylint: disable=broad-except
                 pass
             return False
+
+    def __commit_log_points(self, max_points: int) -> None:
+        """Write queued log points alongside the current destination batch."""
+        if self.log_bucket is None:
+            logger.debug("influx_writer: No log bucket configured")
+            return
+
+        log_points = self.parser.pop_log_points(max_points)
+        if not log_points:
+            return
+
+        record = InfluxWriter.__pack_lines(log_points)
+        if not record:
+            return
+        logger.info("influx_writer: Sending %d log lines to bucket '%s'",
+                    len(log_points), self.log_bucket)
+        try:
+            result = self.write_api.write(
+                bucket=self.log_bucket,
+                org=self.client.org,
+                record=record,
+                write_precision=self.timestamp_precision,
+            )
+            if result is None:
+                logger.info(
+                    "influx_writer: Successfully committed %d log lines to bucket '%s'",
+                    len(log_points), self.log_bucket)
+            else:
+                logger.warning(
+                    "influx_writer: Log commit returned unexpected result: %s",
+                    result)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("influx_writer: Failed to commit log lines: %s",
+                         e,
+                         exc_info=True)
 
     @staticmethod
     def __pack_lines(lines: list) -> str:

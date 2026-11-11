@@ -654,6 +654,19 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 break
         return points
 
+    def pop_log_points(self, max_points_to_pop: int = -1) -> list[Point]:
+        """Pop up to the requested number of points from the log queue."""
+        point_count = self.log_queue.qsize()
+        target_count = (point_count if max_points_to_pop <= 0 or
+                        max_points_to_pop > point_count else max_points_to_pop)
+        points: list[Point] = []
+        for _ in range(target_count):
+            try:
+                points.append(self.log_queue.get_nowait())
+            except Empty:
+                break
+        return points
+
     def log_session_start(self, timestamp: int) -> None:
         """
         Logs the start of a session with the provided timestamp.
