@@ -27,3 +27,5 @@ if [ "$PASSED" -ne 1 ]; then
     echo "Commit rejected: Pylint score ($SCORE) is below $THRESHOLD threshold."
     exit 1
 fi
+
+python3 -m pytest --maxfail=1
