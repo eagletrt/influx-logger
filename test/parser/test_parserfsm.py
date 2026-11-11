@@ -46,8 +46,9 @@ class TestParserFSM(unittest.TestCase):
 
         self.assertEqual(parser_fsm.vehicle_id, "fenice")
         self.assertEqual(parser_fsm.device_id, "telemetry")
-        self.assertEqual(parser_fsm.topic,
-                         "fenice/telemetry/info/status/influx-logger/parserfsm")
+        self.assertEqual(
+            parser_fsm.topic,
+            "fenice/telemetry/info/status/influx-logger/parserfsm")
 
     def test_signal_state_rejects_single_arg_callback(self) -> None:
         """signal_state reports failure when the callback has the wrong signature."""
