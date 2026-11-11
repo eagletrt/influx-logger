@@ -3,6 +3,8 @@ Finite State Machine for the parser.
 This module defines the states and transitions for the parser's finite state machine.
 """
 
+from threading import Lock, Timer
+
 from google.protobuf.message import Message
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
@@ -29,12 +31,20 @@ class ParserFSM(StateMachine):
 
     # Event transitions
     initialization: TransitionList = starting.to(idling)
-    message_received: TransitionList = idling.to(running)
+    message_received: TransitionList = (idling.to(running)
+                                        | running.to(running)
+                                        | logging.to(logging))
     no_messages_to_process: TransitionList = (running.to(idling)
                                               | logging.to(idling))
     log_started: TransitionList = (running.to(logging) | idling.to(logging))
     log_stopped: TransitionList = logging.to(running)
     finish: TransitionList = idling.to(final)
+
+    MESSAGE_TIMEOUT: float = 5.5
+    '''
+    The timeout duration in seconds for waiting for messages.
+    If no messages are received within this duration, the FSM will transition to the idle state.
+    '''
 
     def __init__(self,
                  name: str = "ParserFSM",
@@ -54,6 +64,10 @@ class ParserFSM(StateMachine):
         The callback function to be set for logging.
         '''
         StateMachine.__init__(self)
+
+        self._message_timer: Timer | None = None
+        self._message_timer_lock = Lock()
+        self._timeout_waiting_for_run = False
 
         self.tlm_fsm = TelemetryFSM(name="TelemetryFSM")
         '''
@@ -120,13 +134,36 @@ class ParserFSM(StateMachine):
                 self.log_state(f"Error signaling state: {e}", signal=False)
         return False
 
-    # TODO: Call this method # pylint: disable=fixme
     def on_message_received(self):
         """
         Callback for the message_received event.
         Logs the reception of a message.
         """
-        self.log_state("Message received")
+        self._reset_message_timer()
+        #self.log_state("Message received")
+
+    def _reset_message_timer(self) -> None:
+        """
+        Restart the inactivity timer after receiving a message.
+        """
+        with self._message_timer_lock:
+            if self._message_timer is not None:
+                self._message_timer.cancel()
+            self._message_timer = Timer(self.MESSAGE_TIMEOUT,
+                                        self._handle_message_timeout)
+            self._message_timer.daemon = True
+            self._message_timer.start()
+
+    def _handle_message_timeout(self) -> None:
+        """
+        Return to idle after X seconds without a message.
+        """
+        with self._message_timer_lock:
+            self._message_timer = None
+            if self.current_state == self.running:
+                self.send('no_messages_to_process')
+            elif self.current_state == self.logging:
+                self._timeout_waiting_for_run = True
 
     def on_log_started(self):
         """
@@ -141,12 +178,20 @@ class ParserFSM(StateMachine):
         Logs the stop of logging.
         """
         self.log_state("Stop logging")
+        if self._timeout_waiting_for_run:
+            self._timeout_waiting_for_run = False
+            if self.current_state == self.running:
+                self.send('no_messages_to_process')
 
     def on_finish(self):
         """
         Callback for the finish event.
         Logs the termination of the FSM.
         """
+        with self._message_timer_lock:
+            if self._message_timer is not None:
+                self._message_timer.cancel()
+                self._message_timer = None
         self.log_state("Terminating")
 
     def on_enter_starting(self):
@@ -162,7 +207,7 @@ class ParserFSM(StateMachine):
         Callback for entering the idling state.
         Logs the entry into the idling state.
         """
-        self.log_state("Entering idling state")
+        #self.log_state("Entering idling state")
         self.signal_state()
 
     def on_enter_running(self):
@@ -170,7 +215,7 @@ class ParserFSM(StateMachine):
         Callback for entering the running state.
         Logs the entry into the running state.
         """
-        self.log_state("Entering running state")
+        #self.log_state("Entering running state")
         self.signal_state()
 
     def on_enter_logging(self):
