@@ -94,8 +94,19 @@ class MsgDispatcher:
                 "msg_dispatcher: MQTTConnection is not connected. Cannot handle existing messages."
             )
             return
-        # Subscribe to the relevant topics to receive existing messages
-        for topic in self.topic_callbacks:
+        # Subscribe to retained serializers versions before telemetry status.
+        # The MQTT client processes broker packets in order, so the version
+        # callback registers each device before retained status is delivered.
+        version_topics = [
+            "+/+/info/version/serializers",
+            "+/+/info/version/libcan",
+            "+/+/info/version/gpslib",
+        ]
+        remaining_topics = [
+            topic for topic in self.topic_callbacks
+            if topic not in version_topics
+        ]
+        for topic in version_topics + remaining_topics:
             try:
                 self.mqtt.connection.subscribe(topic)
                 logger.info(
