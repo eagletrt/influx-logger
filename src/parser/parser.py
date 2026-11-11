@@ -147,9 +147,41 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             message (tuple[list[str], bytes]): The message to be added
         '''
         with self.row_queue_not_empty:
+            ids, _ = message
+            self.notify_fsm_running(ids[0], ids[1])
             self.row_messages.put(message)
             # Notify the parser thread that a new message has been added to the queue
             self.row_queue_not_empty.notify_all()
+
+    def new_fsm(self, fsm_key: tuple[str, str]) -> bool:
+        """
+        Creates a new finite state machine (FSM) for the given key.
+        Args:
+            fsm_key (tuple[str, str]): The key for the new FSM.
+        Returns:
+            ParserFSM: The newly created FSM.
+        """
+        if fsm_key not in self.parserfsms:
+            parser_fsm: ParserFSM = ParserFSM(
+                name=f"ParserFSM[{fsm_key[0]}/{fsm_key[1]}]",
+                log_callback=self.log_callback)
+            parser_fsm.send('initialization')
+            self.parserfsms[fsm_key] = parser_fsm
+            return True
+        return False
+
+    def notify_fsm_running(self, vehicle_id: str, device_id: str) -> None:
+        """
+        Notifies the parser's finite state machine (FSM) that a device is running.
+        This method is used to inform the FSM that a specific device, identified by its
+        vehicle_id and device_id, is currently active and running.
+        Args:
+            vehicle_id (str): The unique identifier for the vehicle.
+            device_id (str): The unique identifier for the device.
+        """
+        fsm_key: tuple[str, str] = (vehicle_id, device_id)
+        self.new_fsm(fsm_key)
+        self.parserfsms[fsm_key].msg_incoming()
 
     def __parse_next_message(self) -> None:
         '''
@@ -572,11 +604,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             if library == LibSerializersManager:
                 parser_fsm = self.parserfsms.get(fsm_key)
                 if parser_fsm is None:
-                    parser_fsm = ParserFSM(
-                        name=f"ParserFSM[{vehicle_id}/{device_id}]",
-                        log_callback=self.log_callback)
-                    parser_fsm.send('initialization')
-                    self.parserfsms[fsm_key] = parser_fsm
+                    self.new_fsm(fsm_key)
                 status_decoder = self.protobuf_manager.version_descriptors[
                     version].get(
                         LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH)

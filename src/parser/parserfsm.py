@@ -224,3 +224,11 @@ class ParserFSM(StateMachine):
             self.send('log_started')
         elif new_state != TelemetryState.RUN and self.current_state == self.logging:
             self.send('log_stopped')
+
+    def msg_incoming(self) -> None:
+        """
+        Handles an incoming message.
+        This method is intended to be called when a new message is received.
+        It sends the 'message_received' event to the parser's FSM.
+        """
+        self.send('message_received')
