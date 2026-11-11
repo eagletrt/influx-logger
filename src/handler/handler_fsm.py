@@ -105,7 +105,7 @@ class HandlerFSM(Thread, StateMachine):
         """
         DotGraphMachine(HandlerFSM).get_graph().write(filename, format='png')
 
-    def log_on_mqtt(self) -> None:
+    def log_on_mqtt(self, message: str = None) -> None:
         """
         Logs the current state of the FSM to the configured MQTT topic
         if the MQTT connection is established
@@ -113,7 +113,7 @@ class HandlerFSM(Thread, StateMachine):
         It publishes a message containing the current state of
         the FSM to the specified MQTT topic.
         """
-        msg = f"{self.current_state}"
+        msg = str(message) if message is not None else str(self.current_state)
         if (self.config and self.config.log_on_mqtt and self.handler
                 and self.handler.mqtt and self.handler.mqtt.is_connected()):
             try:
@@ -229,6 +229,8 @@ class HandlerFSM(Thread, StateMachine):
                 excluded_networks=self.config.excluded_networks),
             mqtt=self.handler.mqtt,
         )
+        self.msg_dispatcher.influx_writer.parser.set_log_callback(
+            self.log_on_mqtt)
         # Check if there are already messages on the MQTT broker and
         # handle them before starting the main operation
         self.msg_dispatcher.handle_existing_messages()

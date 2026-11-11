@@ -245,9 +245,9 @@ class InfluxConnection(Connection):
         """
         try:
             self.connection_checker.reset_timer()
-            logger.info(
-                "influx-connection: Ping timer reset successfully for InfluxDB at %s:%d",
-                self.url, self.port)
+            #logger.info(
+            #    "influx-connection: Ping timer reset successfully for InfluxDB at %s:%d",
+            #    self.url, self.port)
             return True
         except Exception as e:  # pylint: disable=broad-except
             logger.error(

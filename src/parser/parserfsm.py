@@ -101,14 +101,14 @@ class ParserFSM(StateMachine):
         """
         return f"{self.name} {self.current_state}"
 
-    def log_state(self, message: str = "", signal: bool = True):
+    def log_state(self, message: str = "", signal: bool = True):  # pylint: disable=unused-argument
         """
         Logs a message with the FSM name and current state.
         Args:
             message (str): The message to log.
             signal (bool): Whether to signal the current state after logging.
         """
-        logger.info("%s - %s", self.get_log_header(), message)
+        #logger.notice("%s - %s", self.get_log_header(), message)
         if signal:
             self.signal_state()
 
@@ -215,7 +215,7 @@ class ParserFSM(StateMachine):
         Callback for entering the running state.
         Logs the entry into the running state.
         """
-        #self.log_state("Entering running state")
+        self.log_state("Entering running state")
         self.signal_state()
 
     def on_enter_logging(self):
