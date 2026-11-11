@@ -43,3 +43,29 @@ class TestHandlerFSM(unittest.TestCase):
 
         self.assertEqual(dummy_condition.wait_calls, [60])
         fsm.send.assert_called_once_with('disconnection')
+
+    def test_log_on_mqtt_with_custom_topic(self):
+        """Publish to custom topic when provided to log_on_mqtt."""
+        fsm = object.__new__(HandlerFSM)
+        mock_mqtt_conn = MagicMock()
+        mock_mqtt_conn.is_connected.return_value = True
+        mock_publish_result = MagicMock()
+        mock_publish_result.rc = 0
+        mock_mqtt_conn.connection.publish.return_value = mock_publish_result
+        mock_handler = MagicMock()
+        mock_handler.mqtt = mock_mqtt_conn
+        fsm.handler = mock_handler
+        mock_config = MagicMock()
+        mock_config.log_on_mqtt = "default/topic"
+        fsm.config = mock_config
+
+        HandlerFSM.log_on_mqtt(
+            fsm,
+            message="running",
+            topic="vehicle/device/info/status/influx-logger")
+
+        mock_mqtt_conn.connection.publish.assert_called_once_with(
+            topic="vehicle/device/info/status/influx-logger",
+            payload="running",
+            qos=0,
+            retain=False)

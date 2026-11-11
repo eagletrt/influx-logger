@@ -105,23 +105,27 @@ class HandlerFSM(Thread, StateMachine):
         """
         DotGraphMachine(HandlerFSM).get_graph().write(filename, format='png')
 
-    def log_on_mqtt(self, message: str = None) -> None:
+    def log_on_mqtt(self, topic: str, message: str = None) -> bool:
         """
         Logs the current state of the FSM to the configured MQTT topic
         if the MQTT connection is established
         and the log_on_mqtt configuration is set.
         It publishes a message containing the current state of
         the FSM to the specified MQTT topic.
+        Args:
+            message (str, optional): The message to log. Defaults to current state.
+            topic (str, optional): The MQTT topic to publish to. Defaults to config.log_on_mqtt.
         """
         msg = str(message) if message is not None else str(self.current_state)
-        if (self.config and self.config.log_on_mqtt and self.handler
-                and self.handler.mqtt and self.handler.mqtt.is_connected()):
+        if topic is None:
+            return False
+        if (self.handler and self.handler.mqtt
+                and self.handler.mqtt.is_connected()):
             try:
-                result = self.handler.mqtt.connection.publish(
-                    topic=self.config.log_on_mqtt,
-                    payload=msg,
-                    qos=0,
-                    retain=False)
+                result = self.handler.mqtt.connection.publish(topic=topic,
+                                                              payload=msg,
+                                                              qos=0,
+                                                              retain=False)
                 if result.rc != 0:
                     logger.error(
                         "%s - Failed to publish log message to MQTT, return code: %d",
@@ -129,6 +133,9 @@ class HandlerFSM(Thread, StateMachine):
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("%s - Failed to publish log message to MQTT: %s",
                              self.get_log_header(), str(e))
+                return False
+            return True
+        return False
 
     def log_state(self, message: str):
         """
@@ -137,7 +144,7 @@ class HandlerFSM(Thread, StateMachine):
             message (str): The message to log.
         """
         logger.info("%s - %s", self.get_log_header(), message)
-        self.log_on_mqtt()
+        self.log_on_mqtt(self.config.log_on_mqtt)
 
     def get_log_header(self) -> str:
         """

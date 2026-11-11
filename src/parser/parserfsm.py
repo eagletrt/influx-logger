@@ -14,7 +14,7 @@ from src.utils.logger_utils import logger
 from src.utils.tlm_fsm import TelemetryFSM, TelemetryState
 
 
-class ParserFSM(StateMachine):
+class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
     """
     Finite State Machine for the parser.
     This class defines the states and transitions for
@@ -48,17 +48,41 @@ class ParserFSM(StateMachine):
 
     def __init__(self,
                  name: str = "ParserFSM",
-                 log_callback: callable = None) -> None:
+                 log_callback: callable = None,
+                 vehicle_id: str | None = None,
+                 device_id: str | None = None,
+                 topic: str | None = None) -> None:
         """
         Initialize the parser.
         Args:
             name (str): The name of the FSM.
             log_callback (callable): The callback function to be set for logging.
+            vehicle_id (str, optional): The unique identifier for the vehicle.
+            device_id (str, optional): The unique identifier for the device.
+            topic (str, optional): The MQTT topic for signaling the FSM status.
         """
         self.name = name
         '''
         Name of the FSM, used for logging purposes.
         '''
+        self.vehicle_id = vehicle_id
+        '''
+        Vehicle ID associated with this FSM.
+        '''
+        self.device_id = device_id
+        '''
+        Device ID associated with this FSM.
+        '''
+        if (self.vehicle_id is None or self.device_id is None) and self.name:
+            if self.name.startswith("ParserFSM[") and self.name.endswith("]"):
+                parts = self.name[10:-1].split("/", 1)
+                if len(parts) == 2:
+                    if self.vehicle_id is None:
+                        self.vehicle_id = parts[0]
+                    if self.device_id is None:
+                        self.device_id = parts[1]
+
+        self._topic = topic
         self.log_callback = log_callback
         '''
         The callback function to be set for logging.
@@ -73,6 +97,22 @@ class ParserFSM(StateMachine):
         '''
         Instance of the TelemetryFSM class, used for managing telemetry states.
         '''
+
+    @property
+    def topic(self) -> str | None:
+        """
+        Returns the MQTT topic for signaling the FSM status.
+        Formatted as vehicle_id/device_id/info/status/influx-logger.
+        """
+        if self._topic is not None:
+            return self._topic
+        if self.vehicle_id and self.device_id:
+            return f"{self.vehicle_id}/{self.device_id}/info/status/influx-logger/parserfsm"
+        return None
+
+    @topic.setter
+    def topic(self, value: str | None) -> None:
+        self._topic = value
 
     def set_log_callback(self, callback: callable) -> None:
         """
@@ -108,7 +148,7 @@ class ParserFSM(StateMachine):
             message (str): The message to log.
             signal (bool): Whether to signal the current state after logging.
         """
-        #logger.notice("%s - %s", self.get_log_header(), message)
+        #logger.info("%s - %s", self.get_log_header(), message)
         if signal:
             self.signal_state()
 
@@ -128,7 +168,17 @@ class ParserFSM(StateMachine):
         """
         if self.log_callback:
             try:
-                self.log_callback(self.current_state)
+                topic = self.topic
+                if topic is not None:
+                    try:
+                        self.log_callback(topic, self.current_state)
+                    except TypeError:
+                        try:
+                            self.log_callback(topic, self.current_state)
+                        except TypeError:
+                            return False
+                else:
+                    self.log_callback(self.current_state)
                 return True
             except Exception as e:  # pylint: disable=broad-except
                 self.log_state(f"Error signaling state: {e}", signal=False)

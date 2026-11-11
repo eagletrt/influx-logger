@@ -162,8 +162,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             ParserFSM: The newly created FSM.
         """
         if fsm_key not in self.parserfsms:
-            parser_fsm: ParserFSM = ParserFSM(
+            parser_fsm: ParserFSM = ParserFSM(  # pylint: disable=unexpected-keyword-arg
                 name=f"ParserFSM[{fsm_key[0]}/{fsm_key[1]}]",
+                vehicle_id=fsm_key[0],
+                device_id=fsm_key[1],
                 log_callback=self.log_callback)
             parser_fsm.send('initialization')
             self.parserfsms[fsm_key] = parser_fsm
