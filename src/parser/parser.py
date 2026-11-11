@@ -59,6 +59,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''Queue of unprocessed messages'''
         self.destination_list: Queue[Point] = Queue()
         '''Queue to store parsed InfluxDB Point objects'''
+        self.log_queue: Queue[Point] = Queue()
+        '''Queue to store parsed InfluxDB Points for logging instance'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
         self.__row_message_lock = Lock()
@@ -352,6 +354,17 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
 
+    def __handle_line_to_log(self, line: Line) -> None:
+        """
+        Check whether the line should be logged and, if so, add it to the log queue.
+        """
+        ids: tuple[str,
+                   str] = (line.tags.get("vehicle-id",
+                                         ""), line.tags.get("device-id", ""))
+        state = self.parserfsms.get(ids)
+        if state == ParserFSM.running:
+            self.log_queue.put(line)
+
     def __append_to_destination_list(self, line: Line) -> None:
         """
         Appends a Line object to the destination list in a thread-safe manner.
@@ -360,6 +373,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         """
         #logger.info("parser: Appending line to destination list: %s", line)
         self.destination_list.put(line)
+        self.__handle_line_to_log(line)
         self.timer_touch()
         with self.__new_points_event_lock__:
             # Notify any waiting threads that new points
