@@ -4,8 +4,12 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.parser.parserfsm import ParserFSM
 from src.utils.tlm_fsm import TelemetryState
+
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 class TestParserFSM(unittest.TestCase):
@@ -33,8 +37,8 @@ class TestParserFSM(unittest.TestCase):
 
         self.assertTrue(result)
         mock_callback.assert_called_once_with(
-            parser_fsm.current_state,
-            topic="kraken/onboard/info/status/influx-logger")
+            "kraken/onboard/info/status/influx-logger/parserfsm",
+            parser_fsm.current_state)
 
     def test_topic_derived_from_name_if_not_explicit(self) -> None:
         """Topic is derived from ParserFSM[vehicle_id/device_id] name if not explicitly set."""
@@ -43,10 +47,10 @@ class TestParserFSM(unittest.TestCase):
         self.assertEqual(parser_fsm.vehicle_id, "fenice")
         self.assertEqual(parser_fsm.device_id, "telemetry")
         self.assertEqual(parser_fsm.topic,
-                         "fenice/telemetry/info/status/influx-logger")
+                         "fenice/telemetry/info/status/influx-logger/parserfsm")
 
-    def test_signal_state_fallback_for_single_arg_callback(self) -> None:
-        """signal_state falls back to single-argument callback if topic keyword is not accepted."""
+    def test_signal_state_rejects_single_arg_callback(self) -> None:
+        """signal_state reports failure when the callback has the wrong signature."""
         calls = []
 
         def single_arg_callback(state):
@@ -58,5 +62,5 @@ class TestParserFSM(unittest.TestCase):
 
         result = parser_fsm.signal_state()
 
-        self.assertTrue(result)
-        self.assertEqual(calls, [parser_fsm.current_state])
+        self.assertFalse(result)
+        self.assertEqual(calls, [])
