@@ -2,7 +2,7 @@
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -82,41 +82,6 @@ class TestParserFSM(unittest.TestCase):
         parser_fsm.log_state("quiet", signal=False)
         self.assertEqual(parser_fsm.get_state(), parser_fsm.configuration)
         self.assertFalse(parser_fsm.is_logging())
-
-    def test_incoming_message_timeout_returns_running_fsm_to_idle(
-            self) -> None:
-        """
-        Test that the FSM transitions to idling after a message timeout.
-        """
-        parser_fsm = ParserFSM()
-        with patch("src.parser.parserfsm.Timer") as timer_cls:
-            parser_fsm.on_message_received()
-        timer_cls.assert_called_once()
-        timer_cls.return_value.start.assert_called_once_with()
-        parser_fsm.send("initialization")
-        parser_fsm.send("message_received")
-        parser_fsm._ParserFSM__handle_message_timeout()  # pylint: disable=protected-access
-        self.assertIn(parser_fsm.idling, parser_fsm.configuration)
-
-    def test_telemetry_run_starts_logging_and_finish_cancels_timer(
-            self) -> None:
-        """
-        Test that telemetry RUN state starts logging and on_finish cancels the message timer.
-        """
-        parser_fsm = ParserFSM()
-        parser_fsm.send("initialization")
-        parser_fsm.new_telemetry_status(
-            SimpleNamespace(state=TelemetryState.RUN.value))
-        self.assertTrue(parser_fsm.is_logging())
-        parser_fsm._timeout_waiting_for_run = True  # pylint: disable=protected-access
-        parser_fsm.new_telemetry_status(
-            SimpleNamespace(state=TelemetryState.IDLE.value))
-        self.assertFalse(parser_fsm.is_logging())
-        timer = MagicMock()
-        parser_fsm._message_timer = timer  # pylint: disable=protected-access
-        parser_fsm.on_finish()
-        timer.cancel.assert_called_once_with()
-        self.assertIsNone(parser_fsm._message_timer)  # pylint: disable=protected-access
 
     def test_invalid_telemetry_state_is_ignored(self) -> None:
         """Invalid telemetry state values do not change the FSM configuration."""

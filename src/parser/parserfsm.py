@@ -139,7 +139,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Returns:
             str: A string containing the name of the FSM and its current state.
         """
-        return f"{self.name} {self.current_state}"
+        return f"{self.name} {self.get_state()}"
 
     def log_state(self, message: str = "", signal: bool = True):  # pylint: disable=unused-argument
         """
@@ -178,7 +178,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
                         except TypeError:
                             return False
                 else:
-                    self.log_callback(self.current_state)
+                    self.log_callback(self.get_state())
                 return True
             except Exception as e:  # pylint: disable=broad-except
                 self.log_state(f"Error signaling state: {e}", signal=False)
@@ -210,9 +210,9 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         """
         with self._message_timer_lock:
             self._message_timer = None
-            if self.current_state == self.running:
+            if self.get_state() == self.running:
                 self.send('no_messages_to_process')
-            elif self.current_state == self.logging:
+            elif self.get_state() == self.logging:
                 self._timeout_waiting_for_run = True
 
     def on_log_started(self):
@@ -230,7 +230,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         self.log_state("Stop logging")
         if self._timeout_waiting_for_run:
             self._timeout_waiting_for_run = False
-            if self.current_state == self.running:
+            if self.get_state() == self.running:
                 self.send('no_messages_to_process')
 
     def on_finish(self):
@@ -315,9 +315,11 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
             new_state: The new telemetry state.
         """
         self.log_state(f"Telemetry state changed to: {new_state.name}")
-        if new_state == TelemetryState.RUN and self.current_state != self.logging:
+        if new_state == TelemetryState.RUN and self.get_state(
+        ) != self.logging:
             self.send('log_started')
-        elif new_state != TelemetryState.RUN and self.current_state == self.logging:
+        elif new_state != TelemetryState.RUN and self.get_state(
+        ) == self.logging:
             self.send('log_stopped')
 
     def msg_incoming(self) -> None:
@@ -342,4 +344,4 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Returns:
             bool: True if the FSM is in the logging state, False otherwise.
         """
-        return self.current_state == self.logging
+        return self.get_state() == self.logging
