@@ -1,6 +1,6 @@
 [project]
 name = "influx-logger"
-version = "0.10.0"
+version = "0.11.0"
 description = "E-Agle Trento Racing Team Influx Logger for the Telemetry system"
 authors = [
     {name = "ozneroL541",email = "l.21radice@gmail.com"}
