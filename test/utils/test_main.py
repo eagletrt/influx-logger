@@ -7,14 +7,24 @@ import src.main as main_module
 
 
 class TestMain(TestCase):
+    """
+    Tests for the main.py executable entry point helpers.
+    """
 
     def test_safe_stop_stops_and_joins_handler(self):
+        """
+        Tests that safe_stop calls stop_machine and join on the provided handler.
+        """
         handler = MagicMock()
         main_module.safe_stop(handler)
         handler.stop_machine.assert_called_once_with()
         handler.join.assert_called_once_with()
 
     def test_main_uses_default_or_supplied_config_and_runs_handler(self):
+        """
+        Tests that main uses the default config file if none is supplied,
+        or the supplied config file if provided, and that it starts and joins the handler.
+        """
         configuration = MagicMock()
         handler = MagicMock()
         with patch.object(
@@ -38,6 +48,10 @@ class TestMain(TestCase):
         load.assert_called_once_with("config.json")
 
     def test_main_exits_when_config_fails_and_print_fsm_delegates(self):
+        """
+        Tests that main exits with code 1 when configuration loading fails,
+        and that print_fsm calls the draw methods of each FSM.
+        """
         with patch.object(main_module.Configuration,
                           "load_from_file",
                           side_effect=OSError("missing")):

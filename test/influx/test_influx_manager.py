@@ -7,8 +7,15 @@ from src.influx.influx_manager import InfluxManager
 
 
 class TestInfluxManager(TestCase):
+    """
+    Tests for InfluxManager stop flag and configuration attributes.
+    """
 
     def test_stop_flag_and_configuration(self):
+        """
+        Tests that InfluxManager stop flag and configuration
+        attributes are set and retrieved correctly.
+        """
         manager = InfluxManager(MagicMock(),
                                 timestamp_precision="ms",
                                 name="worker")

@@ -12,6 +12,9 @@ from src.utils.bucket_type import BucketType
 
 
 class TestInfluxWriter(TestCase):
+    """
+    Tests for InfluxWriter batching, commit, and write behavior.
+    """
 
     def setUp(self):
         self.client = MagicMock(org="org")
@@ -22,6 +25,11 @@ class TestInfluxWriter(TestCase):
         self.writer.parser = MagicMock()
 
     def test_batch_limit_prepare_commit_and_success(self):
+        """
+        Tests that is_list_limit_reached returns True when the batch size is reached,
+        that prepare_for_commit retrieves points from the parser, and that commit
+        writes the points to InfluxDB and resets the parser timer.
+        """
         self.assertFalse(self.writer.is_list_limit_reached(1))
         self.assertTrue(self.writer.is_list_limit_reached(2))
         points = [MagicMock(), MagicMock()]
@@ -38,6 +46,10 @@ class TestInfluxWriter(TestCase):
 
     def test_commit_rejects_invalid_empty_missing_bucket_and_write_failure(
             self):
+        """
+        Tests that commit returns False for invalid bucket types, empty points,
+        missing buckets, and write failures.
+        """
         self.assertFalse(self.writer.commit("unknown"))
         self.writer.parser.pop_points.return_value = []
         self.assertFalse(self.writer.commit(BucketType.LOG))
@@ -55,6 +67,10 @@ class TestInfluxWriter(TestCase):
             self.assertFalse(self.writer.commit(BucketType.ADR))
 
     def test_prepare_batch_and_pack_lines(self):
+        """
+        Tests that prepare_for_commit retrieves points from the parser and that
+        __pack_lines converts them to line protocol strings.
+        """
         self.writer.parser.pop_points.return_value = ["point"]
         self.assertEqual(self.writer.prepare_for_commit(BucketType.LOG),
                          ["point"])
@@ -64,12 +80,19 @@ class TestInfluxWriter(TestCase):
         fake_point.to_line_protocol.return_value = "measurement value=1i"
         with patch.object(Point, "from_dict", return_value=fake_point):
             self.assertEqual(
-                InfluxWriter._InfluxWriter__pack_lines([{
-                    "x": 1
-                }, None, object()]), "measurement value=1i\n")
-        self.assertEqual(InfluxWriter._InfluxWriter__pack_lines([]), "")
+                InfluxWriter._InfluxWriter__pack_lines([  # pylint: disable=protected-access
+                    {
+                        "x": 1
+                    }, None,
+                    object()
+                ]),
+                "measurement value=1i\n")
+        self.assertEqual(InfluxWriter._InfluxWriter__pack_lines([]), "")  # pylint: disable=protected-access
 
     def test_commit_checks_batches_expiration_and_shutdown_paths(self):
+        """
+        Tests that check_and_commit checks for batch expiration and handles shutdown paths.
+        """
         self.writer.parser.is_timer_expired.return_value = False
         with patch.object(self.writer, "commit") as commit:
             with patch.object(self.writer,
@@ -91,6 +114,9 @@ class TestInfluxWriter(TestCase):
         stop.assert_called_once_with()
 
     def test_run_starts_parser_processes_signal_and_stops_gracefully(self):
+        """
+        Tests that the run method starts the parser, processes signals, and stops gracefully.
+        """
         self.writer.stopped = MagicMock(side_effect=[False, True])
         parser = SimpleNamespace(
             __new_points_event_lock__=Lock(),

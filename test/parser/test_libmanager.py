@@ -9,6 +9,9 @@ from src.parser.libmanager import LibcanManager, LibgpsManager, LibManager, LibS
 
 
 class ConcreteLibManager(LibManager):
+    """
+    A concrete implementation of LibManager for testing purposes.
+    """
 
     @staticmethod
     def check_commit_existence(commit_hash):
@@ -20,13 +23,23 @@ class ConcreteLibManager(LibManager):
 
 
 class TestLibManager(TestCase):
+    """
+    Tests for LibManager descriptor caching and download helpers.
+    """
 
     def test_proto_cache_path_normalizes_extension_and_prefix(self):
+        """
+        Tests that proto_cache_path normalizes the extension and removes the 'proto/' prefix.
+        """
         self.assertEqual(LibManager.proto_cache_path("proto/can/Pack"),
                          "can/Pack.proto")
         self.assertEqual(LibManager.proto_cache_path("gps.proto"), "gps.proto")
 
     def test_check_tries_multiple_urls_and_adds_token_header(self):
+        """
+        Tests that check attempts to retrieve the commit from multiple URLs,
+        and that it adds the Authorization header when a token is provided.
+        """
         failed = MagicMock(ok=False, status_code=404, text="missing")
         success = MagicMock(ok=True)
         with patch("src.parser.libmanager.get", side_effect=[failed,
@@ -40,6 +53,10 @@ class TestLibManager(TestCase):
             "Bearer token")
 
     def test_cache_directories_and_download_file(self):
+        """
+        Tests that create_cache_directories creates the expected directory structure,
+        and that download creates the expected file in the cache.
+        """
         with TemporaryDirectory() as temp:
             cache = Path(temp) / "cache"
             version = cache / "abc"
@@ -57,6 +74,9 @@ class TestLibManager(TestCase):
             self.assertTrue((version / "proto" / "network.proto").exists())
 
     def test_concrete_manager_contracts(self):
+        """
+        Tests that ConcreteLibManager implements the required methods of LibManager.
+        """
         self.assertTrue(ConcreteLibManager.check_commit_existence("abc"))
         self.assertFalse(ConcreteLibManager.check_commit_existence(""))
         with self.assertRaises(NotImplementedError):
@@ -65,6 +85,10 @@ class TestLibManager(TestCase):
             LibManager.download_proto_version("hash", "can")
 
     def test_repository_managers_delegate_to_shared_lookup_and_download(self):
+        """
+        Tests that LibcanManager, LibgpsManager, and LibSerializersManager
+        delegate to the shared check and download methods.
+        """
         managers = (LibcanManager, LibgpsManager, LibSerializersManager)
         with patch.object(LibManager, "check", return_value=True) as check, \
                 patch.object(LibManager, "download", return_value=True) as download:

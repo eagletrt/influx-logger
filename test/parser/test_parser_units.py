@@ -9,14 +9,22 @@ from src.utils.bucket_type import BucketType
 
 
 class TestParserUnits(TestCase):
+    """Tests for the Parser class."""
 
     def setUp(self):
+        """Sets up a Parser instance with a mocked ParserFSM for testing."""
         self.parser = Parser()
         self.parser.parserfsms[("v", "d")] = MagicMock()
         self.parser.parserfsms[("v", "d")].is_logging.return_value = True
         self.parser.timer_touch = MagicMock()
 
     def test_queue_and_fsm_helpers(self):
+        """
+        Tests that add_to_queue adds a message to the row_messages queue,
+        that new_fsm creates a new ParserFSM instance,
+        that notify_fsm_running calls msg_incoming on the FSM,
+        and that set_log_callback sets a callable log callback.
+        """
         self.parser.add_to_queue((["v", "d", "can"], b"x"))
         self.assertEqual(self.parser.row_messages.get_nowait(),
                          (["v", "d", "can"], b"x"))
@@ -29,6 +37,10 @@ class TestParserUnits(TestCase):
         self.assertTrue(callable(self.parser.log_callback))
 
     def test_columnar_expansion_and_unwrap(self):
+        """
+        Tests that _expand_columnar_record expands columnar records into row records,
+        and that _unwrap_values returns the underlying value for single-value fields.
+        """
         record = {
             "timestamp": {
                 "values": [10, 20]
@@ -40,20 +52,28 @@ class TestParserUnits(TestCase):
                 "short": [7]
             }
         }
-        self.assertEqual(Parser._expand_columnar_record(record), [{
-            "timestamp": 10,
-            "speed": 1.5,
-            "short": 7
-        }, {
-            "timestamp": 20,
-            "speed": 2.5
-        }])
-        self.assertEqual(Parser._unwrap_values({"values": [1]}), [1])
-        self.assertEqual(Parser._unwrap_values(3), 3)
+        self.assertEqual(
+            Parser._expand_columnar_record(record),  # pylint: disable=protected-access
+            [
+                {  # pylint: disable=protected-access
+                    "timestamp": 10,
+                    "speed": 1.5,
+                    "short": 7
+                },
+                {
+                    "timestamp": 20,
+                    "speed": 2.5
+                }
+            ])
+        self.assertEqual(Parser._unwrap_values({"values": [1]}), [1])  # pylint: disable=protected-access
+        self.assertEqual(Parser._unwrap_values(3), 3)  # pylint: disable=protected-access
         with self.assertRaisesRegex(ValueError, "timestamp"):
-            Parser._expand_columnar_record({"valuesMap": {}})
+            Parser._expand_columnar_record({"valuesMap": {}})  # pylint: disable=protected-access
 
     def test_push_rows_columnar_records_and_ignores_invalid_records(self):
+        """
+        Tests that push handles both row and columnar records, and ignores invalid records.
+        """
         with patch.object(self.parser, "timer_touch"):
             self.parser.push("m", {
                 "time": 10,
@@ -80,6 +100,10 @@ class TestParserUnits(TestCase):
         self.assertEqual(len(self.parser.pop_points(BucketType.ADR)), 1)
 
     def test_commit_records_handles_lists_and_invalid_empty_records(self):
+        """
+        Tests that commit_to_destination_list handles
+        lists of records and ignores invalid records.
+        """
         with patch.object(self.parser, "push") as push:
             self.parser.commit_to_destination_list(
                 {
@@ -98,6 +122,11 @@ class TestParserUnits(TestCase):
         })
 
     def test_parse_message_decodes_and_registers_measurements(self):
+        """
+        Tests that parse_msg decodes a message and commits the resulting records
+        to the appropriate destination list, and that register_device_version
+        registers a decoder for the given version and message type.
+        """
         self.parser.register_device_version("v", "d", LibcanManager, "version")
         decoder = MagicMock()
         decoder.decode.return_value = {
@@ -123,6 +152,9 @@ class TestParserUnits(TestCase):
         })
 
     def test_version_registration_and_telemetry_status_decoder(self):
+        """
+        Tests that register_device_version registers a decoder for the telemetry status message.
+        """
         status_path = LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH
         self.parser.new_fsm(("v", "d"))
         decoder = MagicMock()
@@ -141,6 +173,10 @@ class TestParserUnits(TestCase):
         update.assert_called_once_with(decoder.decode_message.return_value)
 
     def test_timer_and_stop_helpers(self):
+        """
+        Tests that the inactivity timer can be reset and
+        that the stop flag is set on graceful stop.
+        """
         self.parser.timer_expired = True
         self.parser.reset_timer()
         self.assertFalse(self.parser.is_timer_expired())
@@ -154,6 +190,11 @@ class TestParserUnits(TestCase):
             self.parser.log_session_end(2)
 
     def test_inactivity_timer_and_queued_message_processing(self):
+        """
+        Tests that the inactivity timer is restarted when a message is received,
+        that queued messages are processed,
+        and that the inactivity handler sets the timer expired flag.
+        """
         del self.parser.timer_touch
         with patch("src.parser.parser.Timer") as timer_cls:
             self.parser.timer_touch()
@@ -161,18 +202,22 @@ class TestParserUnits(TestCase):
         timer_cls.return_value.start.assert_called_once_with()
         self.parser.row_messages.put((["v", "d", "can"], b"payload"))
         with patch.object(self.parser, "parse_msg") as parse:
-            self.parser._Parser__parse_next_message()
+            self.parser._Parser__parse_next_message()  # pylint: disable=protected-access
         parse.assert_called_once_with((["v", "d", "can"], b"payload"))
         self.assertEqual(self.parser.row_messages.unfinished_tasks, 0)
         with patch.object(self.parser.points_increased, "notify_all"):
-            self.parser._handle_inactivity()
+            self.parser._handle_inactivity()  # pylint: disable=protected-access
         self.assertTrue(self.parser.is_timer_expired())
 
     def test_inactivity_with_queued_work_restarts_timer_and_graceful_stop(
             self):
+        """
+        Tests that the inactivity handler restarts the timer when there are queued messages,
+        and that graceful_stop sets the stop flag.
+        """
         self.parser.row_messages.put((["v", "d", "can"], b"pending"))
         self.parser.timer_touch = MagicMock()
-        self.parser._handle_inactivity()
+        self.parser._handle_inactivity()  # pylint: disable=protected-access
         self.assertFalse(self.parser.is_timer_expired())
         self.parser.timer_touch.assert_called_once_with()
         self.parser.row_messages.get_nowait()

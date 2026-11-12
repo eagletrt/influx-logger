@@ -8,8 +8,16 @@ from src.parser.libmanager import LibcanManager, LibgpsManager, LibSerializersMa
 
 
 class TestMsgDispatcher(TestCase):
+    """
+    Tests for MsgDispatcher topic dispatch and message routing.
+    """
 
     def test_payload_conversion_and_topic_patterns(self):
+        """
+        Tests that payload_to_json correctly decodes JSON payloads and returns an empty
+        dictionary for non-JSON payloads, and that build_topic_regex converts MQTT
+        topic patterns with wildcards into regex patterns that match the expected topics.
+        """
         self.assertEqual(MsgDispatcher.payload_to_json(b'{"x":1}'), {"x": 1})
         self.assertEqual(MsgDispatcher.payload_to_json(b"not-json"), {})
         regex = MsgDispatcher.build_topic_regex("+/+/data/#")
@@ -17,6 +25,11 @@ class TestMsgDispatcher(TestCase):
         self.assertIsNone(regex.fullmatch("car/data/a"))
 
     def test_incoming_message_dispatches_matching_callback(self):
+        """
+        Tests that handle_incoming_message dispatches to the correct callback
+        based on the topic pattern and that the callback is called with the
+        expected arguments.
+        """
         dispatcher = MsgDispatcher()
         callback = MagicMock()
         dispatcher.topic_callbacks = {"+/+/data/+": callback}
@@ -25,6 +38,11 @@ class TestMsgDispatcher(TestCase):
                                          ["car", "sensor", "can"])
 
     def test_data_and_status_routes_respect_whitelist_and_ids(self):
+        """
+        Tests that handle_data_message and handle_tlm_status_message respect the
+        vehicle whitelist and that the correct parser methods are called with the
+        appropriate arguments.
+        """
         parser = MagicMock()
         dispatcher = MsgDispatcher(influx_writer=MagicMock(parser=parser),
                                    vehicle_whitelist=["v1"])
@@ -40,6 +58,10 @@ class TestMsgDispatcher(TestCase):
                                                                  b"status")
 
     def test_version_routes_check_commit_subscribe_and_register(self):
+        """
+        Tests that handle_serializers_version_message checks commit existence,
+        subscribes to the data topic, and registers the version with the parser.
+        """
         parser = MagicMock()
         writer = MagicMock(parser=parser)
         mqtt = MagicMock()
@@ -56,6 +78,11 @@ class TestMsgDispatcher(TestCase):
             "v", "d", LibSerializersManager, "abc123")
 
     def test_each_library_version_topic_routes_to_its_manager(self):
+        """
+        Tests that each library version topic is routed to the appropriate
+        manager (LibcanManager, LibgpsManager) and that handle_version_message
+        is called with the correct arguments.
+        """
         dispatcher = MsgDispatcher()
         dispatcher.handle_libcan_version_message("", b"can", ["v", "d"])
         dispatcher.handle_canlib_version_message("", b"old-can", ["v", "d"])
@@ -74,6 +101,10 @@ class TestMsgDispatcher(TestCase):
                          (LibgpsManager, "gps", ["v", "d"]))
 
     def test_subscribe_existing_messages_in_version_order(self):
+        """
+        Tests that handle_existing_messages subscribes to version topics in the
+        correct order and registers the appropriate version descriptors.
+        """
         mqtt = MagicMock()
         dispatcher = MsgDispatcher(mqtt=mqtt)
         dispatcher.handle_existing_messages()
@@ -86,6 +117,11 @@ class TestMsgDispatcher(TestCase):
         ])
 
     def test_set_writer_lifecycle_and_version_wrappers(self):
+        """
+        Tests that set() starts the writer, stop() stops it, and graceful_stop()
+        calls graceful_stop on the writer, and that version_descriptors are
+        registered correctly for the given version and message type.
+        """
         dispatcher = MsgDispatcher()
         writer = MagicMock()
         dispatcher.set(influx_writer=writer)

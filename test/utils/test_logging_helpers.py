@@ -12,8 +12,15 @@ from tools import log_lines as log_lines_module
 
 
 class TestLoggingHelpers(TestCase):
+    """
+    Tests for logging and debug line output helpers.
+    """
 
     def test_trace_level_emits_only_when_enabled(self):
+        """
+        Tests that the _trace function emits log messages only
+        when the logger is set to the TRACE level.
+        """
         logger = logging.getLogger("test-trace")
         logger.setLevel(5)
         with self.assertLogs(logger, level=5) as captured:
@@ -21,6 +28,10 @@ class TestLoggingHelpers(TestCase):
         self.assertIn("TRACE:test-trace:detail value", captured.output[0])
 
     def test_log_and_extract_line_files(self):
+        """
+        Tests that log_lines writes to the debug log file and that extract_lines
+        creates a new file with the expected lines.
+        """
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp) / "debug"
             log_file = directory / "lines.log"
@@ -34,6 +45,9 @@ class TestLoggingHelpers(TestCase):
             self.assertTrue((directory / "lap_time.log").exists())
 
     def test_extract_nonmatching_line_does_not_create_output(self):
+        """
+        Tests that extract_lines does not create an output file when no lines match the given name.
+        """
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             source = directory / "lines.log"
