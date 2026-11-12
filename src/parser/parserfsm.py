@@ -171,10 +171,10 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
                 topic = self.topic
                 if topic is not None:
                     try:
-                        self.log_callback(topic, self.current_state)
+                        self.log_callback(topic, self.get_state())
                     except TypeError:
                         try:
-                            self.log_callback(topic, self.current_state)
+                            self.log_callback(topic, self.get_state())
                         except TypeError:
                             return False
                 else:
@@ -334,7 +334,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Returns:
             State: The current state of the parser's FSM.
         """
-        return self.current_state
+        return self.configuration
 
     def is_logging(self) -> bool:
         """

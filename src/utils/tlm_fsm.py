@@ -7,6 +7,7 @@ from threading import Lock
 
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
+from statemachine.orderedset import OrderedSet
 from statemachine.transition_list import TransitionList
 
 
@@ -105,14 +106,22 @@ class TelemetryFSM(StateMachine):
         }
         try:
             #logger.info("Setting current state to: %s", state.name)
-            target_state = self.states_map[state_mapping[state]]
+            target_state: State = self.states_map[state_mapping[state]]
         except KeyError as error:
             raise ValueError(f"Invalid state name: {state}") from error
 
-        if self.current_state != target_state:
+        if target_state not in self.configuration:
             self._change_state(target_state)
             return True
         return False
+
+    def get_state(self) -> State:
+        """
+        Returns the current state of the FSM.
+        Returns:
+            State: The current state of the FSM.
+        """
+        return self.configuration
 
     def _change_state(self, new_state: State) -> None:
         """
@@ -121,4 +130,4 @@ class TelemetryFSM(StateMachine):
             new_state (TelemetryState): The state to change to.
         """
         with self._mutex:
-            self.current_state = new_state
+            self.configuration = OrderedSet([new_state])

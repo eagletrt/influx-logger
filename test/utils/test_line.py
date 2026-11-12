@@ -3,6 +3,7 @@
 import sys
 from types import ModuleType
 from unittest import TestCase
+from unittest.mock import patch
 
 if "influxdb_client" not in sys.modules:
     influxdb_client_module = ModuleType("influxdb_client")
@@ -55,6 +56,37 @@ class TestLine(TestCase):
 
         self.assertEqual(line.timestamp, 123)
         self.assertEqual(line.fields, {"lap_time": 42.5})
+
+    def test_from_object_uses_fallback_timestamp_and_validates_fields(self):
+        """
+        Test the fallback timestamp and field validation.
+        """
+        with patch("src.utils.line.time.time_ns", return_value=123_000):
+            line = Line.from_object({"value": 1}, "sample", {})
+        self.assertEqual(line.timestamp, 123)
+        self.assertEqual(Line.obj_to_str({"a": 1, "b": 2}), "a=1, b=2")
+        with self.assertRaisesRegex(ValueError, "Missing fields"):
+            Line.from_object({"timestamp": 1}, "sample", {})
+        with self.assertRaisesRegex(ValueError, "Invalid timestamp"):
+            Line.from_object({"timestamp": [], "value": 1}, "sample", {})
+
+    def test_timestamp_precision_range_and_string_rendering(self):
+        """
+        Test timestamp normalization, range checking, and string representation.
+        """
+        self.assertEqual(Line._normalize_timestamp(2, "ns"), 2_000)  # pylint: disable=protected-access
+        self.assertEqual(Line._normalize_timestamp(5, "unknown"), 5)  # pylint: disable=protected-access
+        with self.assertRaisesRegex(ValueError, "out of range"):
+            Line._normalize_timestamp(2**63, "us")  # pylint: disable=protected-access
+        line = Line("sample", {"tag": "x"}, {
+            "text": "v",
+            "bytes": b"ok",
+            "n": 1
+        }, 7)
+        self.assertEqual(
+            str(line),
+            '_measurement=sample;tags=[tag=x];text="v",bytes="ok",n=1;timestamp=7'
+        )
 
     def test_to_point_preserves_each_field_type(self):
         """Preserve scalar field types when creating a point."""

@@ -116,7 +116,7 @@ class HandlerFSM(Thread, StateMachine):
             message (str, optional): The message to log. Defaults to current state.
             topic (str, optional): The MQTT topic to publish to. Defaults to config.log_on_mqtt.
         """
-        msg = str(message) if message is not None else str(self.current_state)
+        msg = str(message) if message is not None else str(self.get_state())
         if topic is None:
             return False
         if (self.handler and self.handler.mqtt
@@ -137,6 +137,14 @@ class HandlerFSM(Thread, StateMachine):
             return True
         return False
 
+    def get_state(self) -> State:
+        """
+        Returns the current state of the FSM.
+        Returns:
+            State: The current state of the FSM.
+        """
+        return self.configuration
+
     def log_state(self, message: str):
         """
         Logs a message with the FSM name and current state.
@@ -152,7 +160,7 @@ class HandlerFSM(Thread, StateMachine):
         Returns:
             str: A string containing the name of the FSM and its current state.
         """
-        return f"{self.name} {self.current_state}"
+        return f"{self.name} {self.get_state()}"
 
     def are_both_connected(self) -> bool:
         """
@@ -262,7 +270,7 @@ class HandlerFSM(Thread, StateMachine):
         self.handler.set(
             self.config,
             on_state_change=self.__notify_connection_change,
-            on_message=self.on_mqtt_message,
+            on_message=self.__on_mqtt_message,
         )
         self.send('init')
 
@@ -326,11 +334,11 @@ class HandlerFSM(Thread, StateMachine):
         This method is called in the run method to continuously
         check andhandle the current state of the FSM.
         """
-        if self.current_state == self.starting:
+        if self.get_state() == self.starting:
             self.do_start()
-        elif self.current_state == self.idling:
+        elif self.get_state() == self.idling:
             self.do_idle()
-        elif self.current_state == self.running:
+        elif self.get_state() == self.running:
             self.do_run()
         else:
             self.do_stop()
@@ -348,14 +356,14 @@ class HandlerFSM(Thread, StateMachine):
 
     def run(self):
         self.log_state("Thread started")
-        while self and self.current_state != self.final:
-            self.log_state(f"Current state: {self.current_state}")
+        while self and self.get_state() != self.final:
+            self.log_state(f"Current state: {self.get_state()}")
             self.do_state()
         if self:
             self.do_stop()
         self.log_state("Thread finished")
 
-    def on_mqtt_message(self, topic: str, payload: bytes):
+    def __on_mqtt_message(self, topic: str, payload: bytes):
         '''
         Callback method to handle incoming MQTT messages.
         It is called by the MQTT connection when a message is received.
@@ -366,5 +374,5 @@ class HandlerFSM(Thread, StateMachine):
         # Handle message only if the FSM is in the running state
         logger.debug("%s - Received message on topic: %s",
                      self.get_log_header(), topic)
-        if self.current_state == self.running:
+        if self.get_state() == self.running:
             self.msg_dispatcher.handle_incoming_message(topic, payload)
