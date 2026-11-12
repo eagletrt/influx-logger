@@ -10,6 +10,7 @@ from influxdb_client import Point
 from src.parser.libmanager import LibcanManager, LibgpsManager, LibSerializersManager
 from src.parser.parserfsm import ParserFSM
 from src.parser.protobuf_manager import ProtobufManager
+from src.utils.bucket_type import BucketType
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
@@ -57,10 +58,11 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''vehicle_id/device_id -> {lib_type: version} '''
         self.row_messages: Queue[tuple[list[str], bytes]] = Queue()
         '''Queue of unprocessed messages'''
-        self.destination_list: Queue[Point] = Queue()
-        '''Queue to store parsed InfluxDB Point objects'''
-        self.log_queue: Queue[Point] = Queue()
-        '''Queue to store parsed InfluxDB Points for logging instance'''
+        self.destination_lists: dict[BucketType, Queue[Point]] = {
+            BucketType.ADR: Queue(),
+            BucketType.LOG: Queue()
+        }
+        '''Dictionary of queues to store parsed InfluxDB Point objects, keyed by bucket type'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
         self.__row_message_lock = Lock()
@@ -361,9 +363,10 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         ids: tuple[str,
                    str] = (line.tags.get("vehicle-id",
                                          ""), line.tags.get("device-id", ""))
-        state = self.parserfsms.get(ids)
-        if state == ParserFSM.running:
-            self.log_queue.put(line)
+        if self.parserfsms.get(ids).is_logging():
+            self.destination_lists[BucketType.LOG].put(line)
+            #logger.info("parser: LOG LINES: %d",
+            #            self.destination_lists[BucketType.LOG].qsize())
 
     def __append_to_destination_list(self, line: Line) -> None:
         """
@@ -372,7 +375,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             line (Line): The Line object to be appended to the destination list.
         """
         #logger.info("parser: Appending line to destination list: %s", line)
-        self.destination_list.put(line)
+        self.destination_lists[BucketType.ADR].put(line)
         self.__handle_line_to_log(line)
         self.timer_touch()
         with self.__new_points_event_lock__:
@@ -583,13 +586,13 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 if self.stop:
                     return
 
-    def get_points_count(self) -> int:
+    def get_points_count(self, bucket_type: BucketType) -> int:
         '''
         Returns the number of points currently stored in the destination list.
         Returns:
             int: The number of points in the destination list.
         '''
-        return self.destination_list.qsize()
+        return self.destination_lists[bucket_type].qsize()
 
     def is_timer_expired(self) -> bool:
         """
@@ -635,7 +638,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                             "parser: Failed to prepare telemetry status decoder "
                             "for serializers version %s", version)
 
-    def pop_points(self, max_points_to_pop: int = -1) -> list[Point]:
+    def pop_points(self,
+                   bucket_type: BucketType,
+                   max_points_to_pop: int = -1) -> list[Point]:
         '''
         Pops a specified number of points from the destination list and returns them.
         Args:
@@ -643,26 +648,13 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Returns:
             list[Point]: A list of popped InfluxDB Point objects
         '''
-        point_count = self.destination_list.qsize()
+        point_count = self.destination_lists[bucket_type].qsize()
         target_count = (point_count if max_points_to_pop <= 0 or
                         max_points_to_pop > point_count else max_points_to_pop)
         points: list[Point] = []
         for _ in range(target_count):
             try:
-                points.append(self.destination_list.get_nowait())
-            except Empty:
-                break
-        return points
-
-    def pop_log_points(self, max_points_to_pop: int = -1) -> list[Point]:
-        """Pop up to the requested number of points from the log queue."""
-        point_count = self.log_queue.qsize()
-        target_count = (point_count if max_points_to_pop <= 0 or
-                        max_points_to_pop > point_count else max_points_to_pop)
-        points: list[Point] = []
-        for _ in range(target_count):
-            try:
-                points.append(self.log_queue.get_nowait())
+                points.append(self.destination_lists[bucket_type].get_nowait())
             except Empty:
                 break
         return points

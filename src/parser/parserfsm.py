@@ -189,10 +189,10 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Callback for the message_received event.
         Logs the reception of a message.
         """
-        self._reset_message_timer()
+        self.__reset_message_timer()
         #self.log_state("Message received")
 
-    def _reset_message_timer(self) -> None:
+    def __reset_message_timer(self) -> None:
         """
         Restart the inactivity timer after receiving a message.
         """
@@ -200,11 +200,11 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
             if self._message_timer is not None:
                 self._message_timer.cancel()
             self._message_timer = Timer(self.MESSAGE_TIMEOUT,
-                                        self._handle_message_timeout)
+                                        self.__handle_message_timeout)
             self._message_timer.daemon = True
             self._message_timer.start()
 
-    def _handle_message_timeout(self) -> None:
+    def __handle_message_timeout(self) -> None:
         """
         Return to idle after X seconds without a message.
         """
@@ -300,13 +300,13 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
                 state_changed: bool = self.tlm_fsm.set_current_state(
                     telemetry_state)
                 if state_changed:
-                    self.tlm_state_changed(telemetry_state)
+                    self.__tlm_state_changed(telemetry_state)
         except ValueError as e:
             logger.error("%s - Error setting current state: %s",
                          self.get_log_header(), str(e))
             logger.exception("Telemetry status handling failed")
 
-    def tlm_state_changed(self, new_state: TelemetryState) -> None:
+    def __tlm_state_changed(self, new_state: TelemetryState) -> None:
         """
         Handles a change in the telemetry state.
         This method is intended to be called when the telemetry state changes.
@@ -327,3 +327,19 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         It sends the 'message_received' event to the parser's FSM.
         """
         self.send('message_received')
+
+    def get_state(self) -> State:
+        """
+        Returns the current state of the parser's FSM as a string.
+        Returns:
+            State: The current state of the parser's FSM.
+        """
+        return self.current_state
+
+    def is_logging(self) -> bool:
+        """
+        Checks if the parser's FSM is currently in the logging state.
+        Returns:
+            bool: True if the FSM is in the logging state, False otherwise.
+        """
+        return self.current_state == self.logging

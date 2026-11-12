@@ -10,10 +10,9 @@ from influxdb_client.client.write_api import SYNCHRONOUS, Point, WriteApi, Write
 from src.connections.influx_connection import InfluxConnection
 from src.influx.influx_manager import InfluxManager
 from src.parser.parser import Line, Parser
+from src.utils.bucket_type import BucketType
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TimestampPrecision
-
-#from tools.log_lines import log_lines
 
 
 class InfluxWriter(InfluxManager):
@@ -67,17 +66,14 @@ class InfluxWriter(InfluxManager):
         This API is used to write points to InfluxDB in batches,
         with automatic handling of retries and flush intervals.
         '''
-        self.adr_bucket = adr_bucket
+        self.buckets: dict[BucketType, str] = {
+            BucketType.ADR: adr_bucket,
+            BucketType.LOG: log_bucket
+        }
         '''
-        The name of the InfluxDB bucket where address points will be written.
-        This bucket is specified in the InfluxConnection instance and
-        is used to organize and store time-series data in InfluxDB.
-        '''
-        self.log_bucket = log_bucket
-        '''
-        The name of the InfluxDB bucket where log points will be written.
-        This bucket is specified in the InfluxConnection instance and is
-        used to organize and store log data in InfluxDB.
+        Dictionary of InfluxDB bucket names for different types of data,
+        including ADR and LOG buckets. These buckets are used to
+        categorize and store different types of data in InfluxDB.
         '''
         self.parser: Parser = Parser(excluded_networks=excluded_networks)
         '''
@@ -111,7 +107,7 @@ class InfluxWriter(InfluxManager):
         '''
         return count >= self.write_options.batch_size
 
-    def prepare_for_commit(self) -> list[Point]:
+    def prepare_for_commit(self, bucket_type: BucketType) -> list[Point]:
         '''
         Prepares the points for committing to InfluxDB by popping a
         batch of points from the parser and packing them into a string
@@ -122,33 +118,37 @@ class InfluxWriter(InfluxManager):
         points: list[Point] = []
         with self.__lock__:
             points: list[Point] = self.parser.pop_points(
-                self.write_options.batch_size)
+                bucket_type=bucket_type,
+                max_points_to_pop=self.write_options.batch_size)
         return points
 
-    def commit(self) -> bool:
+    def commit(self, bucket_type: BucketType) -> bool:
         '''
         Commits the prepared points to InfluxDB using the write API.
         Returns:
             bool: True if the commit was successful, False otherwise.
         '''
+        if bucket_type not in self.buckets:
+            logger.error(
+                "influx_writer: Invalid bucket type specified for commit: %s",
+                bucket_type)
+            return False
+        bucket: str = self.buckets[bucket_type]
         self.parser.reset_timer(
         )  # Reset the parser's timer to prevent it from expiring due to inactivity
-        points: list[Point] = self.prepare_for_commit()
+        points: list[Point] = self.prepare_for_commit(bucket_type=bucket_type)
         if len(points) == 0:
             logger.debug("influx_writer: No points available to commit")
             return False
         #log_lines(points)
         # Record to send to InfluxDB
         record: str = InfluxWriter.__pack_lines(points)
-        # Target bucket for committing points to InfluxDB
-        bucket: str = self.adr_bucket
         if bucket is None:
             logger.error(
                 "influx_writer: No bucket specified for committing points")
             return False
         logger.info("influx_writer: Sending %d lines to bucket '%s'",
                     len(points), bucket)
-        self.__commit_log_points(len(points))
         try:
             #logger.info(
             #    "influx_writer: bucket: %s, " \
@@ -198,41 +198,6 @@ class InfluxWriter(InfluxManager):
                 pass
             return False
 
-    def __commit_log_points(self, max_points: int) -> None:
-        """Write queued log points alongside the current destination batch."""
-        if self.log_bucket is None:
-            logger.debug("influx_writer: No log bucket configured")
-            return
-
-        log_points = self.parser.pop_log_points(max_points)
-        if not log_points:
-            return
-
-        record = InfluxWriter.__pack_lines(log_points)
-        if not record:
-            return
-        logger.info("influx_writer: Sending %d log lines to bucket '%s'",
-                    len(log_points), self.log_bucket)
-        try:
-            result = self.write_api.write(
-                bucket=self.log_bucket,
-                org=self.client.org,
-                record=record,
-                write_precision=self.timestamp_precision,
-            )
-            if result is None:
-                logger.info(
-                    "influx_writer: Successfully committed %d log lines to bucket '%s'",
-                    len(log_points), self.log_bucket)
-            else:
-                logger.warning(
-                    "influx_writer: Log commit returned unexpected result: %s",
-                    result)
-        except Exception as e:  # pylint: disable=broad-except
-            logger.error("influx_writer: Failed to commit log lines: %s",
-                         e,
-                         exc_info=True)
-
     @staticmethod
     def __pack_lines(lines: list) -> str:
         """
@@ -273,15 +238,15 @@ class InfluxWriter(InfluxManager):
                          exc_info=True)
             return ""
 
-    def check_to_commit(self) -> bool:
+    def __check_to_commit(self, bucket_type: BucketType) -> bool:
         '''
         Checks if the number of points in the parser has reached
         the batch size limit for pushing to InfluxDB.
         Returns:
-            bool: True if the number of points in the parser has reached the batch size limit.
+            str: The bucket to commit to, or None if no commit is needed.
         '''
         return self.is_list_limit_reached(
-            self.parser.get_points_count()) or self.parser.is_timer_expired()
+            self.parser.get_points_count(bucket_type))
 
     def run(self) -> None:
         """
@@ -296,9 +261,24 @@ class InfluxWriter(InfluxManager):
         while self.stopped() is False:
             with self.parser.__new_points_event_lock__:
                 self.parser.points_increased.wait()
-            if self.check_to_commit():
-                self.commit()
+            self.check_and_commit()
         self.parser.graceful_stop()
+
+    def check_and_commit(self) -> None:
+        """
+        Checks if the batch size limit is reached for either the LOG or ADR bucket,
+        and commits the points to InfluxDB if necessary.
+        """
+        if self.parser.is_timer_expired():
+            logger.info(
+                "influx_writer: Parser timer expired, committing points")
+            self.commit(bucket_type=BucketType.LOG)
+            self.commit(bucket_type=BucketType.ADR)
+        else:
+            if self.__check_to_commit(bucket_type=BucketType.LOG):
+                self.commit(bucket_type=BucketType.LOG)
+            if self.__check_to_commit(bucket_type=BucketType.ADR):
+                self.commit(bucket_type=BucketType.ADR)
 
     def graceful_stop(self) -> None:
         '''
