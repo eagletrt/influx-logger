@@ -82,7 +82,6 @@ as the first command-line argument.
   },
   "vehicle_whitelist": ["kraken"],
   "github_token": "optional_github_personal_access_token",
-  "log_on_mqtt": "kraken/onboard/info/status/influx-logger/handlerfsm",
   "excluded_networks": ["odometer"]
 }
 ```

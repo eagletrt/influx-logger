@@ -144,7 +144,6 @@ class HandlerFSM(Thread, StateMachine):
             message (str): The message to log.
         """
         logger.info("%s - %s", self.get_log_header(), message)
-        self.log_on_mqtt(self.config.log_on_mqtt)
 
     def get_log_header(self) -> str:
         """
