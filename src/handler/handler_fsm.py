@@ -125,7 +125,7 @@ class HandlerFSM(Thread, StateMachine):
                 result = self.handler.mqtt.connection.publish(topic=topic,
                                                               payload=msg,
                                                               qos=0,
-                                                              retain=False)
+                                                              retain=True)
                 if result.rc != 0:
                     logger.error(
                         "%s - Failed to publish log message to MQTT, return code: %d",
