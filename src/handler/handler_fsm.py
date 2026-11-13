@@ -9,6 +9,7 @@ from threading import Condition, Thread
 
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
+from statemachine.orderedset import OrderedSet
 from statemachine.transition_list import TransitionList
 
 from src.connections.connection_handler import ConnectionHandler
@@ -116,7 +117,8 @@ class HandlerFSM(Thread, StateMachine):
             message (str, optional): The message to log. Defaults to current state.
             topic (str, optional): The MQTT topic to publish to. Defaults to config.log_on_mqtt.
         """
-        msg = str(message) if message is not None else str(self.get_state())
+        msg = str(message) if message is not None else str(
+            self.get_state().name)
         if topic is None:
             return False
         if (self.handler and self.handler.mqtt
@@ -143,7 +145,9 @@ class HandlerFSM(Thread, StateMachine):
         Returns:
             State: The current state of the FSM.
         """
-        return self.configuration
+        set_of_states: OrderedSet[State] = self.configuration
+        state: State = next(iter(set_of_states))
+        return state
 
     def log_state(self, message: str):
         """
@@ -160,7 +164,7 @@ class HandlerFSM(Thread, StateMachine):
         Returns:
             str: A string containing the name of the FSM and its current state.
         """
-        return f"{self.name} {self.get_state()}"
+        return f"{self.name} {str(self.get_state())}"
 
     def are_both_connected(self) -> bool:
         """
