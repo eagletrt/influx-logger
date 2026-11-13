@@ -3,6 +3,7 @@ This module defines the InfluxWriter class,
 which is responsible for writing data to InfluxDB.
 """
 
+import socket
 from threading import Condition, Lock
 
 from influxdb_client.client.write_api import SYNCHRONOUS, Point, WriteApi, WriteOptions
@@ -180,23 +181,72 @@ class InfluxWriter(InfluxManager):
                     result)
             return result is None
         except Exception as e:  # pylint: disable=broad-except
-            logger.info(
+            if InfluxWriter.__is_name_resolution_error(e):
+                logger.error(
+                    "influx_writer: URL mismatch: configured InfluxDB URL '%s' "
+                    "could not be resolved. Check the hostname and Docker network. Error: %s",
+                    self.client.get_full_link(), e)
+            else:
+                self.__log_generic_commit_failure(bucket, points, e)
+            return False
+
+    def __log_generic_commit_failure(self, bucket: str, points: list[Point],
+                                     e: Exception) -> None:
+        """
+        Logs a generic commit failure to InfluxDB, including the bucket,
+        the number of points, and the exception details.
+
+        Args:
+            bucket (str): The InfluxDB bucket to which the commit was attempted.
+            points (list[Point]): The list of points that were attempted to be committed.
+            e (Exception): The exception that occurred during the commit attempt.
+        Returns:
+            None
+        """
+        logger.info(
                 "influx_writer: Trying to commit with configuration " \
                 "bucket: %s, org: %s, write_precision: %s",
                 bucket,
                 self.client.org,
                 self.timestamp_precision
             )
-            logger.error("influx_writer: Failed to commit lines: %s",
-                         e,
-                         exc_info=True)
-            try:
-                pack: str = InfluxWriter.__pack_lines(points)
-                logger.debug("influx_writer: Lines that failed to commit: %s",
-                             pack)
-            except Exception:  # pylint: disable=broad-except
-                pass
-            return False
+        logger.error("influx_writer: Failed to commit lines: %s",
+                     e,
+                     exc_info=True)
+        try:
+            pack: str = InfluxWriter.__pack_lines(points)
+            logger.debug("influx_writer: Lines that failed to commit: %s",
+                         pack)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    @staticmethod
+    def __is_name_resolution_error(error: BaseException) -> bool:
+        """
+        Returns whether an exception or one of its wrapped causes is a DNS failure.
+        
+        Args:
+            error (BaseException): The exception to check.
+
+        Returns:
+            bool: True if the exception or one of its wrapped causes is a DNS failure,
+                False otherwise.
+        """
+        pending: list[BaseException] = [error]
+        seen: set[int] = set()
+        while pending:
+            current = pending.pop()
+            if id(current) in seen:
+                continue
+            seen.add(id(current))
+            if (isinstance(current, socket.gaierror)
+                    or type(current).__name__ == "NameResolutionError"):
+                return True
+            for wrapped in (current.__cause__, current.__context__,
+                            getattr(current, "reason", None)):
+                if isinstance(wrapped, BaseException):
+                    pending.append(wrapped)
+        return False
 
     @staticmethod
     def __pack_lines(lines: list) -> str:
