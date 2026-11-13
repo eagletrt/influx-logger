@@ -80,7 +80,6 @@ class TestParserFSM(unittest.TestCase):
         self.assertIs(parser_fsm.log_callback, callback)
         self.assertIn("ParserFSM", parser_fsm.get_log_header())
         parser_fsm.log_state("quiet", signal=False)
-        self.assertEqual(parser_fsm.get_state(), parser_fsm.configuration)
         self.assertFalse(parser_fsm.is_logging())
 
     def test_invalid_telemetry_state_is_ignored(self) -> None:

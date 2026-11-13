@@ -115,14 +115,6 @@ class TelemetryFSM(StateMachine):
             return True
         return False
 
-    def get_state(self) -> State:
-        """
-        Returns the current state of the FSM.
-        Returns:
-            State: The current state of the FSM.
-        """
-        return self.configuration
-
     def _change_state(self, new_state: State) -> None:
         """
         Changes the current state of the FSM to the specified state.

@@ -8,6 +8,7 @@ from threading import Lock, Timer
 from google.protobuf.message import Message
 from statemachine import State, StateMachine
 from statemachine.contrib.diagram import DotGraphMachine
+from statemachine.orderedset import OrderedSet
 from statemachine.transition_list import TransitionList
 
 from src.utils.logger_utils import logger
@@ -139,7 +140,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Returns:
             str: A string containing the name of the FSM and its current state.
         """
-        return f"{self.name} {self.get_state()}"
+        return f"{self.name} {str(self.get_state().name)}"
 
     def log_state(self, message: str = "", signal: bool = True):  # pylint: disable=unused-argument
         """
@@ -336,7 +337,9 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Returns:
             State: The current state of the parser's FSM.
         """
-        return self.configuration
+        set_of_states: OrderedSet[State] = self.configuration
+        state: State = next(iter(set_of_states))
+        return state
 
     def is_logging(self) -> bool:
         """
