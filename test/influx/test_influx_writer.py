@@ -113,16 +113,17 @@ class TestInfluxWriter(TestCase):
             self.writer.stop()
         stop.assert_called_once_with()
 
-    def test_run_starts_parser_processes_signal_and_stops_gracefully(self):
+    def test_run_starts_parser_processes_signal_and_joins_parser_on_stop(self):
         """
-        Tests that the run method starts the parser, processes signals, and stops gracefully.
+        Tests that the run method starts the parser, processes signals, and
+        joins it after the writer is stopped without draining its queue.
         """
-        self.writer.stopped = MagicMock(side_effect=[False, True])
+        self.writer.stopped = MagicMock(side_effect=[False, False, True])
         parser = SimpleNamespace(
             __new_points_event_lock__=Lock(),
             points_increased=MagicMock(),
             start=MagicMock(),
-            graceful_stop=MagicMock(),
+            join=MagicMock(),
         )
         parser.points_increased.wait = MagicMock()
         self.writer.parser = parser
@@ -131,4 +132,4 @@ class TestInfluxWriter(TestCase):
         parser.start.assert_called_once_with()
         parser.points_increased.wait.assert_called_once_with()
         check.assert_called_once_with()
-        parser.graceful_stop.assert_called_once_with()
+        parser.join.assert_called_once_with()
