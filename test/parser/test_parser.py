@@ -21,7 +21,7 @@ def test_parser_wakes_for_queued_message_and_stops() -> None:
 
         assert message_processed.wait(timeout=1)
 
-        parser.stop_parser()
+        parser.hard_stop()
         parser.join(timeout=1)
 
     assert not parser.is_alive()

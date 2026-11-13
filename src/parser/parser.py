@@ -124,6 +124,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         This method is called when the last_parse_timer expires,
         indicating that no messages have been parsed within the defined timeout.
         """
+        with self.__timer_lock:
+            if self.stop:
+                return
         if self.row_messages.empty():
             with self.__timer_lock:
                 self.timer_expired = True
@@ -151,6 +154,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             message (tuple[list[str], bytes]): The message to be added
         '''
         with self.row_queue_not_empty:
+            if self.stop:
+                return
             ids, _ = message
             self.notify_fsm_running(ids[0], ids[1])
             self.row_messages.put(message)
@@ -336,6 +341,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         indicating that the parser is active.
         """
         with self.__timer_lock:
+            if self.stop:
+                return
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
             self.last_parse_timer = Timer(
@@ -559,25 +566,42 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         which will signal the run method to exit its loop and stop the thread.
         """
         self.row_messages.join()
-        self.stop_parser()
+        self.hard_stop()
 
-    def stop_parser(self) -> None:
-        '''
-        Method to stop the parser thread.
-        It sets the stop flag to True and notifies the parser thread
-        to wake up and check the stop condition. This allows the parser to
-        exit its loop and stop processing messages.
-        If you want to stop the parser gracefully, use the `graceful_stop` method instead,
-        which will wait for the message queue to be empty before stopping.
-        '''
+    def hard_stop(self) -> int:
+        """
+        Stop parsing immediately and discard messages that have not started.
+
+        A message already removed from the queue is allowed to finish. Pending
+        queue items are discarded and marked done so a later queue join cannot
+        wait forever for work that the stopped parser will never process.
+
+        Returns:
+            int: Number of queued messages discarded.
+        """
+        discarded = 0
         with self.row_queue_not_empty:
             self.stop = True
-            self.row_queue_not_empty.notify_all(
-            )  # Notify the parser thread to wake up and check the stop condition
+            while True:
+                try:
+                    self.row_messages.get_nowait()
+                except Empty:
+                    break
+                self.row_messages.task_done()
+                discarded += 1
+            self.row_queue_not_empty.notify_all()
+
+        with self.__timer_lock:
+            if self.last_parse_timer is not None:
+                self.last_parse_timer.cancel()
+                self.last_parse_timer = None
+
         with self.__new_points_event_lock__:
-            # Notify any waiting threads that the parser is stopping,
-            # allowing them to exit their wait state
             self.points_increased.notify_all()
+        if discarded:
+            logger.warning("parser: Hard stop discarded %d queued messages.",
+                           discarded)
+        return discarded
 
     def run(self) -> None:
         while True:

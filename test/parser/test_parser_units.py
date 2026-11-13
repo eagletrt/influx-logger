@@ -182,7 +182,7 @@ class TestParserUnits(TestCase):
         self.assertFalse(self.parser.is_timer_expired())
         self.parser.destination_lists[BucketType.LOG].put(object())
         self.assertEqual(self.parser.get_points_count(BucketType.LOG), 1)
-        self.parser.stop_parser()
+        self.parser.hard_stop()
         self.assertTrue(self.parser.stop)
         with self.assertRaises(NotImplementedError):
             self.parser.log_session_start(1)

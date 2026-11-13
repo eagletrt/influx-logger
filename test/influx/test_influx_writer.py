@@ -108,7 +108,7 @@ class TestInfluxWriter(TestCase):
                 patch.object(self.writer.parser, "join"):
             self.writer.graceful_stop()
         stop.assert_called_once_with()
-        with patch.object(self.writer.parser, "stop_parser") as stop, \
+        with patch.object(self.writer.parser, "hard_stop") as stop, \
                 patch.object(self.writer.parser, "join"):
             self.writer.stop()
         stop.assert_called_once_with()

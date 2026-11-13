@@ -183,8 +183,9 @@ class InfluxWriter(InfluxManager):
         except Exception as e:  # pylint: disable=broad-except
             if InfluxWriter.__is_name_resolution_error(e):
                 logger.error(
-                    "influx_writer: URL mismatch: configured InfluxDB URL '%s' "
-                    "could not be resolved. Check the hostname and Docker network. Error: %s",
+                    "influx_writer: URL unreachable: configured InfluxDB URL '%s' "
+                    "could not be resolved. " \
+                    "Check service availability and network connectivity. Error: %s",
                     self.client.get_full_link(), e)
             else:
                 self.__log_generic_commit_failure(bucket, points, e)
@@ -311,8 +312,12 @@ class InfluxWriter(InfluxManager):
         while self.stopped() is False:
             with self.parser.__new_points_event_lock__:
                 self.parser.points_increased.wait()
+            if self.stopped():
+                break
             self.check_and_commit()
-        self.parser.graceful_stop()
+        # stop() already signals the parser to halt. Do not call graceful_stop
+        # here: on a hard stop the input queue may intentionally be non-empty.
+        self.parser.join()
 
     def check_and_commit(self) -> None:
         """
@@ -347,7 +352,7 @@ class InfluxWriter(InfluxManager):
         before termination.
         '''
         super().stop()
-        self.parser.stop_parser()
+        self.parser.hard_stop()
         self.parser.join()
 
 
