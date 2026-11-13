@@ -11,6 +11,30 @@
 Influx Logger is the telemetry middleware used by E-Agle Trento Racing Team. It
 subscribes to MQTT topics, decodes Protobuf messages, and stores the resulting
 measurements in InfluxDB.
+```mermaid
+flowchart LR
+    sensors["Sensor 1"]
+    sensor2["Sensor 2"]
+    sensorN["Sensor N"]
+    sensors -->|CAN bus| telemetry
+    sensor2 -->|CAN bus| telemetry
+    sensorN -->|CAN bus| telemetry
+
+    telemetry["Telemetry"]
+    broker["MQTT broker"]
+    logger["Influx Logger"]
+    influx[("InfluxDB")]
+
+    telemetry -->|publishes data| broker
+    broker -->|read data| logger
+    logger -->|writes data| influx
+
+    class sensors,sensor2,sensorN source
+    class canbus,broker transport
+    class telemetry application
+    class logger main
+    class influx storage
+```
 
 ## How it works
 
@@ -47,7 +71,7 @@ as the first command-line argument.
     "client_id": "influx-logger-optional123"
   },
   "influx": {
-    "url": "influxdb",
+    "url": "influxdb2",
     "port": 8086,
     "token": "influx_token",
     "org": "eagletrt",
@@ -58,7 +82,6 @@ as the first command-line argument.
   },
   "vehicle_whitelist": ["kraken"],
   "github_token": "optional_github_personal_access_token",
-  "log_on_mqtt": "kraken/onboard/info/status/influx-logger",
   "excluded_networks": ["odometer"]
 }
 ```

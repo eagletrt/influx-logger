@@ -7,7 +7,10 @@ from typing import Any
 
 from influxdb_client import Point
 
-from src.parser.protobuf_manager import LibcanManager, LibgpsManager, ProtobufManager
+from src.parser.libmanager import LibcanManager, LibgpsManager, LibSerializersManager
+from src.parser.parserfsm import ParserFSM
+from src.parser.protobuf_manager import ProtobufManager
+from src.utils.bucket_type import BucketType
 from src.utils.line import Line
 from src.utils.logger_utils import logger
 from src.utils.timestamp import TIMESTAMP_KEYS
@@ -32,7 +35,19 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     TIMER_TIMEOUT: int = 5
     '''Timeout in seconds indicating how long to wait before the system is considered inactive.'''
 
-    def __init__(self, excluded_networks: list[str] = None) -> None:
+    def __init__(self,
+                 excluded_networks: list[str] = None,
+                 log_callback: callable = None) -> None:
+        '''
+        Initialize the parser.
+        Args:
+            excluded_networks (list[str], optional): A list of network identifiers to be excluded.
+            log_callback (callable, optional): A callback function for logging messages.
+        '''
+        self.parserfsms: dict[tuple[str, str], ParserFSM] = {}
+        '''Per-device finite state machines, keyed by (vehicle ID, device ID).'''
+        self.log_callback: callable = log_callback
+        '''Callback used by each per-device parser state machine.'''
         super().__init__(name="Parser")
         self.excluded_networks: list[
             str] = excluded_networks if excluded_networks is not None else []
@@ -43,8 +58,11 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         '''vehicle_id/device_id -> {lib_type: version} '''
         self.row_messages: Queue[tuple[list[str], bytes]] = Queue()
         '''Queue of unprocessed messages'''
-        self.destination_list: Queue[Point] = Queue()
-        '''Queue to store parsed InfluxDB Point objects'''
+        self.destination_lists: dict[BucketType, Queue[Point]] = {
+            BucketType.ADR: Queue(),
+            BucketType.LOG: Queue()
+        }
+        '''Dictionary of queues to store parsed InfluxDB Point objects, keyed by bucket type'''
         self.stop: bool = False
         '''Flag to indicate whether the parser should stop processing messages.'''
         self.__row_message_lock = Lock()
@@ -88,6 +106,17 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         failures to download its .proto descriptor.
         '''
 
+    def set_log_callback(self, callback: callable) -> None:
+        """
+        Sets the log callback function for the parser's finite state machine.
+        Args:
+            callback (callable): The callback function to be set for logging.
+        """
+        self.log_callback = callback
+        with self.__parser_state_lock:
+            for parser_fsm in self.parserfsms.values():
+                parser_fsm.set_log_callback(callback)
+
     def _handle_inactivity(self) -> None:
         """
         Handles inactivity by logging a warning message when the
@@ -95,6 +124,9 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         This method is called when the last_parse_timer expires,
         indicating that no messages have been parsed within the defined timeout.
         """
+        with self.__timer_lock:
+            if self.stop:
+                return
         if self.row_messages.empty():
             with self.__timer_lock:
                 self.timer_expired = True
@@ -106,7 +138,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 )  # Notify any waiting threads that new points have been added
         else:
             logger.warning(
-                "parser: Messages are still being processed." \
+                "parser: Messages are still being processed. " \
                 "Resetting the inactivity timer for %d seconds.",
                 Parser.TIMER_TIMEOUT
             )
@@ -122,9 +154,45 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             message (tuple[list[str], bytes]): The message to be added
         '''
         with self.row_queue_not_empty:
+            if self.stop:
+                return
+            ids, _ = message
+            self.notify_fsm_running(ids[0], ids[1])
             self.row_messages.put(message)
             # Notify the parser thread that a new message has been added to the queue
             self.row_queue_not_empty.notify_all()
+
+    def new_fsm(self, fsm_key: tuple[str, str]) -> bool:
+        """
+        Creates a new finite state machine (FSM) for the given key.
+        Args:
+            fsm_key (tuple[str, str]): The key for the new FSM.
+        Returns:
+            ParserFSM: The newly created FSM.
+        """
+        if fsm_key not in self.parserfsms:
+            parser_fsm: ParserFSM = ParserFSM(  # pylint: disable=unexpected-keyword-arg
+                name=f"ParserFSM[{fsm_key[0]}/{fsm_key[1]}]",
+                vehicle_id=fsm_key[0],
+                device_id=fsm_key[1],
+                log_callback=self.log_callback)
+            parser_fsm.send('initialization')
+            self.parserfsms[fsm_key] = parser_fsm
+            return True
+        return False
+
+    def notify_fsm_running(self, vehicle_id: str, device_id: str) -> None:
+        """
+        Notifies the parser's finite state machine (FSM) that a device is running.
+        This method is used to inform the FSM that a specific device, identified by its
+        vehicle_id and device_id, is currently active and running.
+        Args:
+            vehicle_id (str): The unique identifier for the vehicle.
+            device_id (str): The unique identifier for the device.
+        """
+        fsm_key: tuple[str, str] = (vehicle_id, device_id)
+        self.new_fsm(fsm_key)
+        self.parserfsms[fsm_key].msg_incoming()
 
     def __parse_next_message(self) -> None:
         '''
@@ -273,6 +341,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         indicating that the parser is active.
         """
         with self.__timer_lock:
+            if self.stop:
+                return
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
             self.last_parse_timer = Timer(
@@ -293,6 +363,18 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
 
+    def __handle_line_to_log(self, line: Line) -> None:
+        """
+        Check whether the line should be logged and, if so, add it to the log queue.
+        """
+        ids: tuple[str,
+                   str] = (line.tags.get("vehicle-id",
+                                         ""), line.tags.get("device-id", ""))
+        if self.parserfsms.get(ids).is_logging():
+            self.destination_lists[BucketType.LOG].put(line)
+            #logger.info("parser: LOG LINES: %d",
+            #            self.destination_lists[BucketType.LOG].qsize())
+
     def __append_to_destination_list(self, line: Line) -> None:
         """
         Appends a Line object to the destination list in a thread-safe manner.
@@ -300,7 +382,8 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
             line (Line): The Line object to be appended to the destination list.
         """
         #logger.info("parser: Appending line to destination list: %s", line)
-        self.destination_list.put(line)
+        self.destination_lists[BucketType.ADR].put(line)
+        self.__handle_line_to_log(line)
         self.timer_touch()
         with self.__new_points_event_lock__:
             # Notify any waiting threads that new points
@@ -483,25 +566,42 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         which will signal the run method to exit its loop and stop the thread.
         """
         self.row_messages.join()
-        self.stop_parser()
+        self.hard_stop()
 
-    def stop_parser(self) -> None:
-        '''
-        Method to stop the parser thread.
-        It sets the stop flag to True and notifies the parser thread
-        to wake up and check the stop condition. This allows the parser to
-        exit its loop and stop processing messages.
-        If you want to stop the parser gracefully, use the `graceful_stop` method instead,
-        which will wait for the message queue to be empty before stopping.
-        '''
+    def hard_stop(self) -> int:
+        """
+        Stop parsing immediately and discard messages that have not started.
+
+        A message already removed from the queue is allowed to finish. Pending
+        queue items are discarded and marked done so a later queue join cannot
+        wait forever for work that the stopped parser will never process.
+
+        Returns:
+            int: Number of queued messages discarded.
+        """
+        discarded = 0
         with self.row_queue_not_empty:
             self.stop = True
-            self.row_queue_not_empty.notify_all(
-            )  # Notify the parser thread to wake up and check the stop condition
+            while True:
+                try:
+                    self.row_messages.get_nowait()
+                except Empty:
+                    break
+                self.row_messages.task_done()
+                discarded += 1
+            self.row_queue_not_empty.notify_all()
+
+        with self.__timer_lock:
+            if self.last_parse_timer is not None:
+                self.last_parse_timer.cancel()
+                self.last_parse_timer = None
+
         with self.__new_points_event_lock__:
-            # Notify any waiting threads that the parser is stopping,
-            # allowing them to exit their wait state
             self.points_increased.notify_all()
+        if discarded:
+            logger.warning("parser: Hard stop discarded %d queued messages.",
+                           discarded)
+        return discarded
 
     def run(self) -> None:
         while True:
@@ -510,13 +610,13 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 if self.stop:
                     return
 
-    def get_points_count(self) -> int:
+    def get_points_count(self, bucket_type: BucketType) -> int:
         '''
         Returns the number of points currently stored in the destination list.
         Returns:
             int: The number of points in the destination list.
         '''
-        return self.destination_list.qsize()
+        return self.destination_lists[bucket_type].qsize()
 
     def is_timer_expired(self) -> bool:
         """
@@ -530,20 +630,41 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
     def register_device_version(self, vehicle_id: str, device_id: str,
                                 library: type, version: str) -> None:
         """
-        Registers a device decoder version while holding the parser state lock.
+        Registers a device decoder version and prepares its status FSM/schema
+        when the version belongs to the serializers library.
         
         Args:
             vehicle_id (str): The unique identifier for the vehicle.
             device_id (str): The unique identifier for the device.
-            library (type): The library type (e.g., LibcanManager or LibgpsManager).
+            library (type): A library manager class for the device version.
             version (str): The version of the decoder to be registered.
         """
-        key = f"{vehicle_id}/{device_id}"
+        device_key = f"{vehicle_id}/{device_id}"
+        fsm_key = (vehicle_id, device_id)
         with self.__parser_state_lock:
-            self.device_versions.setdefault(key, {})[library] = version
+            self.device_versions.setdefault(device_key, {})[library] = version
             self.protobuf_manager.version_descriptors.setdefault(version, {})
+            if library == LibSerializersManager:
+                parser_fsm = self.parserfsms.get(fsm_key)
+                if parser_fsm is None:
+                    self.new_fsm(fsm_key)
+                status_decoder = self.protobuf_manager.version_descriptors[
+                    version].get(
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH)
+                if status_decoder is None:
+                    downloaded = self.protobuf_manager.download_proto_descriptor(
+                        version,
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH,
+                        lib_manager=LibSerializersManager,
+                        message_field="state")
+                    if not downloaded:
+                        logger.error(
+                            "parser: Failed to prepare telemetry status decoder "
+                            "for serializers version %s", version)
 
-    def pop_points(self, max_points_to_pop: int = -1) -> list[Point]:
+    def pop_points(self,
+                   bucket_type: BucketType,
+                   max_points_to_pop: int = -1) -> list[Point]:
         '''
         Pops a specified number of points from the destination list and returns them.
         Args:
@@ -551,16 +672,101 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
         Returns:
             list[Point]: A list of popped InfluxDB Point objects
         '''
-        point_count = self.destination_list.qsize()
+        point_count = self.destination_lists[bucket_type].qsize()
         target_count = (point_count if max_points_to_pop <= 0 or
                         max_points_to_pop > point_count else max_points_to_pop)
         points: list[Point] = []
         for _ in range(target_count):
             try:
-                points.append(self.destination_list.get_nowait())
+                points.append(self.destination_lists[bucket_type].get_nowait())
             except Empty:
                 break
         return points
+
+    def log_session_start(self, timestamp: int) -> None:
+        """
+        Logs the start of a session with the provided timestamp.
+        Args:
+            timestamp (int): The timestamp indicating when the session started.
+        """
+        logger.info("parser: Session started at timestamp %d", timestamp)
+        # TODO: Implement # pylint: disable=fixme
+        raise NotImplementedError(
+            "log_session_start method is not implemented.")
+
+    def log_session_end(self, timestamp: int) -> None:
+        """
+        Logs the end of a session with the provided timestamp.
+        Args:
+            timestamp (int): The timestamp indicating when the session ended.
+        """
+        logger.info("parser: Session ended at timestamp %d", timestamp)
+        # TODO: Implement # pylint: disable=fixme
+        raise NotImplementedError("log_session_end method is not implemented.")
+
+    def handle_tlm_status_message(self, ids: list[str],
+                                  payload: bytes) -> None:
+        """
+        Handles incoming telemetry status messages.
+        It decodes the payload with the device's serializers schema and sends
+        the resulting protobuf message to that device's ParserFSM.
+        Args:
+            ids (list[str]): A list containing the vehicle ID and device ID.
+            payload (bytes): The payload of the incoming telemetry status message.
+        """
+        if len(ids) < 2:
+            logger.warning(
+                "parser: Cannot handle telemetry status message without vehicle/device IDs"
+            )
+            return
+
+        vehicle_id, device_id = ids[0], ids[1]
+        device_key = f"{vehicle_id}/{device_id}"
+        fsm_key = (vehicle_id, device_id)
+        with self.__parser_state_lock:
+            version = self.device_versions.get(device_key,
+                                               {}).get(LibSerializersManager)
+            parser_fsm = self.parserfsms.get(fsm_key)
+            decoder = (self.protobuf_manager.version_descriptors.get(
+                version, {}).get(
+                    LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH)
+                       if version else None)
+
+        if version is None:
+            logger.warning(
+                "parser: Device '%s' sent telemetry status before serializers version; skipping",
+                device_key)
+            return
+        if parser_fsm is None:
+            logger.warning(
+                "parser: No ParserFSM is registered for device '%s'; skipping telemetry status",
+                device_key)
+            return
+        if decoder is None:
+            logger.info(
+                "parser: Loading telemetry status decoder for serializers version %s",
+                version)
+            with self.__parser_state_lock:
+                if not self.protobuf_manager.download_proto_descriptor(
+                        version,
+                        LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH,
+                        lib_manager=LibSerializersManager,
+                        message_field="state"):
+                    logger.error(
+                        "parser: Cannot load telemetry status decoder for serializers version %s",
+                        version)
+                    return
+                decoder = self.protobuf_manager.version_descriptors[version][
+                    LibSerializersManager.TELEMETRY_STATUS_PROTO_PATH]
+
+        try:
+            state = decoder.decode_message(payload)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "parser: Cannot deserialize telemetry status for device '%s': %s",
+                device_key, error)
+            return
+        parser_fsm.new_telemetry_status(state)
 
 
 __all__ = ["Parser"]

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -euo pipefail
 
 THRESHOLD=9.95
@@ -11,7 +11,8 @@ yapf --in-place --parallel --recursive $(find . -type f -name "*.py" ! -path "./
 
 echo "Running pylint..."
 set +e
-PYLINT_OUTPUT=$(PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" pylint $(git ls-files '*.py'))
+PYLINT_OUTPUT=$(PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" pylint \
+    $(git -c safe.directory="$(pwd)" ls-files '*.py'))
 set -e
 echo "$PYLINT_OUTPUT"
 # Extract score from output
@@ -26,3 +27,5 @@ if [ "$PASSED" -ne 1 ]; then
     echo "Commit rejected: Pylint score ($SCORE) is below $THRESHOLD threshold."
     exit 1
 fi
+
+python3 -m pytest --maxfail=1

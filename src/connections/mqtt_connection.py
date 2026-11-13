@@ -94,7 +94,6 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
                 self.url, self.port)
             self._connected = True
             self._connecting = False
-            self.__subscribe_topics()
         self.__notify_state_change()
 
     def on_disconnect(
@@ -128,13 +127,6 @@ class MQTTConnection(Connection):  # pylint: disable=too-many-instance-attribute
             self._connecting = False
             self._connected = False
         self.__notify_state_change()
-
-    def __subscribe_topics(self) -> None:
-        if not self.connection:
-            return
-        #self.connection.subscribe("+/+/version")
-        self.connection.subscribe("+/+/info/version/libcan")
-        self.connection.subscribe("+/+/info/version/gpslib")
 
     def on_message(self, client, _userdata, msg) -> None:  # pylint: disable=unused-argument
         """

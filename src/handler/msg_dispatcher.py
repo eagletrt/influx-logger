@@ -4,12 +4,14 @@ incoming MQTT messages and dispatches them to the appropriate
 handlers based on the topic.
 """
 
+import json
 from collections.abc import Callable
 from re import Pattern
 from re import compile as re_compile
 
 from src.connections.mqtt_connection import MQTTConnection
 from src.influx.influx_writer import InfluxWriter
+from src.parser.libmanager import LibSerializersManager
 from src.parser.protobuf_manager import LibcanManager, LibgpsManager
 from src.utils.logger_utils import logger
 
@@ -17,8 +19,8 @@ from src.utils.logger_utils import logger
 class MsgDispatcher:
     """
     A class that dispatches incoming MQTT messages to the appropriate handlers
-    based on the topic. It supports handling version messages, data messages,
-    and query requests. It also manages the InfluxWriter instance
+    based on the topic. It supports handling version messages and data messages.
+    It also manages the InfluxWriter instance
     for writing data to InfluxDB.
 
     Attributes:
@@ -33,10 +35,13 @@ class MsgDispatcher:
                  mqtt: MQTTConnection = None,
                  vehicle_whitelist: list = None) -> None:
         self.topic_callbacks: dict[str, Callable] = {
+            "+/+/info/version/serializers":
+            self.handle_serializers_version_message,
+            #"+/+/version":              self.handle_canlib_version_message,
             "+/+/info/version/libcan": self.handle_libcan_version_message,
             "+/+/info/version/gpslib": self.handle_libgps_version_message,
-            #"+/+/version":              self.handle_canlib_version_message,
             "+/+/data/+": self.handle_data_message,
+            "+/+/status/info": self.handle_tlm_status_message,
         }
         self.influx_writer: InfluxWriter = influx_writer
         self.mqtt: MQTTConnection = mqtt
@@ -89,8 +94,19 @@ class MsgDispatcher:
                 "msg_dispatcher: MQTTConnection is not connected. Cannot handle existing messages."
             )
             return
-        # Subscribe to the relevant topics to receive existing messages
-        for topic in self.topic_callbacks:
+        # Subscribe to retained serializers versions before telemetry status.
+        # The MQTT client processes broker packets in order, so the version
+        # callback registers each device before retained status is delivered.
+        version_topics = [
+            "+/+/info/version/serializers",
+            "+/+/info/version/libcan",
+            "+/+/info/version/gpslib",
+        ]
+        remaining_topics = [
+            topic for topic in self.topic_callbacks
+            if topic not in version_topics
+        ]
+        for topic in version_topics + remaining_topics:
             try:
                 self.mqtt.connection.subscribe(topic)
                 logger.info(
@@ -100,6 +116,21 @@ class MsgDispatcher:
                 logger.error(
                     "msg_dispatcher: Failed to subscribe to topic '%s': %s",
                     topic, str(e))
+
+    @staticmethod
+    def payload_to_json(payload: bytes) -> json:
+        """
+        Converts a payload in bytes to a JSON dictionary.
+        Args:
+            payload (bytes): The payload to be converted.
+        Returns:
+            json: The converted JSON dictionary.
+        """
+        try:
+            return json.loads(payload.decode())
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Error while converting payload to JSON: %s", str(e))
+            return {}
 
     def handle_incoming_message(self, topic: str, payload: bytes) -> None:
         '''
@@ -142,7 +173,8 @@ class MsgDispatcher:
         return re_compile(pattern)
 
     def handle_version_message(self, library: type[LibcanManager]
-                               | type[LibgpsManager], version: str,
+                               | type[LibgpsManager]
+                               | type[LibSerializersManager], version: str,
                                ids: list[str]) -> None:
         """
         Handles incoming version messages by checking the existence of
@@ -218,6 +250,19 @@ class MsgDispatcher:
                 device_id
             )
 
+    def handle_serializers_version_message(self, _topic: str, payload: bytes,
+                                           ids: list[str]) -> None:
+        '''
+        Handles incoming Serializers version messages by checking the existence of
+        the commit and subscribing to data topics if the commit exists.
+        Args:
+            _topic (str): The topic of the incoming Serializers version message.
+            payload (bytes): The payload of the incoming Serializers version message.
+            ids (list[str]): A list containing the vehicle ID and device ID.
+        '''
+        self.handle_version_message(LibSerializersManager, payload.decode(),
+                                    ids)
+
     def handle_libcan_version_message(self, _topic: str, payload: bytes,
                                       ids: list[str]) -> None:
         '''
@@ -264,7 +309,7 @@ class MsgDispatcher:
         Args:
             _topic (str): The topic of the incoming data message.
             payload (bytes): The payload of the incoming data message.
-            ids (list[str]): A list containing the vehicle ID, device ID, and network.
+            ids (list[str]): A list containing vehicle ID, device ID, and network.
         '''
         if not self.influx_writer:
             logger.warning(
@@ -279,6 +324,33 @@ class MsgDispatcher:
             #    vehicle_id)
             return
         self.influx_writer.parser.add_to_queue(row_msg)
+
+    def handle_tlm_status_message(
+            self, _topic: str, payload: bytes, ids: list[str]) -> None:  #pylint: disable=unused-argument
+        """
+        Handles incoming telemetry status messages by deserializing the payload
+        and updating the Telemetry FSM accordingly.
+        Args:
+            _topic (str): The topic of the incoming telemetry status message.
+            payload (bytes): The payload of the incoming telemetry status message.
+            ids (list[str]): A list containing the vehicle ID and device ID.
+        """
+        if not self.influx_writer:
+            logger.warning(
+                "msg_dispatcher: InfluxWriter is not set. Cannot handle telemetry status message."
+            )
+            return
+        if len(ids) < 2:
+            logger.warning(
+                "msg_dispatcher: Cannot handle telemetry status message with "
+                "malformed topic IDs: %s", ids)
+            return
+        if self.vehicle_whitelist and ids[0] not in self.vehicle_whitelist:
+            #logger.debug(
+            #    "msg_dispatcher: Vehicle '%s' is not in the whitelist.",
+            #    ids[0])
+            return
+        self.influx_writer.parser.handle_tlm_status_message(ids, payload)
 
     def stop(self) -> None:
         '''

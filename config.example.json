@@ -7,7 +7,7 @@
         "client_id": "influx-logger-optional123"
     },
     "influx": {
-        "url": "influxdb",
+        "url": "influxdb2",
         "port": 8086,
         "token": "influx_token",
         "org": "eagletrt",
@@ -18,6 +18,5 @@
     },
     "vehicle_whitelist": ["kraken"],
     "github_token": "optional_github_personal_access_token",
-    "log_on_mqtt": "kraken/onboard/info/status/influx-logger",
     "excluded_networks": ["odometer"]
 }
