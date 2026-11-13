@@ -135,7 +135,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 )  # Notify any waiting threads that new points have been added
         else:
             logger.warning(
-                "parser: Messages are still being processed." \
+                "parser: Messages are still being processed. " \
                 "Resetting the inactivity timer for %d seconds.",
                 Parser.TIMER_TIMEOUT
             )
