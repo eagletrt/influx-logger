@@ -71,7 +71,7 @@ as the first command-line argument.
     "client_id": "influx-logger-optional123"
   },
   "influx": {
-    "url": "influxdb",
+    "url": "influxdb2",
     "port": 8086,
     "token": "influx_token",
     "org": "eagletrt",
