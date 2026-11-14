@@ -12,7 +12,11 @@ from statemachine.orderedset import OrderedSet
 from statemachine.transition_list import TransitionList
 
 from src.utils.logger_utils import logger
-from src.utils.tlm_fsm import TelemetryFSM, TelemetryState
+
+TLM_LOGGING_STATES: set[int] = {
+    2,  # TelemetryState.SETUP_RUN.value,
+    3  # TelemetryState.RUN.value,
+}
 
 
 class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
@@ -94,9 +98,9 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         self._message_timer_lock = Lock()
         self._timeout_waiting_for_run = False
 
-        self.tlm_fsm = TelemetryFSM(name="TelemetryFSM")
+        self.tlm_state: int = 0
         '''
-        Instance of the TelemetryFSM class, used for managing telemetry states.
+        Current Telemetry known state
         '''
 
     @property
@@ -285,6 +289,22 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         self.log_state("Entering final state")
         self.signal_state()
 
+    def __set_tlm_state(self, telemetry_state: int) -> bool:
+        """
+        Sets the current telemetry state.
+        This method is intended to be called when a new telemetry state is received.
+        It updates the current telemetry state and handles any necessary
+        state changes in the parser's FSM.
+        Args:
+            telemetry_state: The new telemetry state.
+        Returns:
+            bool: True if the telemetry state changed, False otherwise.
+        """
+        if telemetry_state != self.tlm_state:
+            self.tlm_state = telemetry_state
+            return True
+        return False
+
     def new_telemetry_status(self, telemetry_status: Message) -> None:
         """
         Handles a new telemetry status message.
@@ -295,19 +315,26 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         """
         #logger.info("parserfsm: New telemetry status received: %s", telemetry_status)
         try:
-            telemetry_state: TelemetryState = TelemetryState(
-                telemetry_status.state)
+            telemetry_state: int = int(telemetry_status.state)
             if telemetry_state:
-                state_changed: bool = self.tlm_fsm.set_current_state(
-                    telemetry_state)
-                if state_changed:
+                if self.__set_tlm_state(telemetry_state):
                     self.__tlm_state_changed(telemetry_state)
         except ValueError as e:
             logger.error("%s - Error setting current state: %s",
                          self.get_log_header(), str(e))
             logger.exception("Telemetry status handling failed")
 
-    def __tlm_state_changed(self, new_state: TelemetryState) -> None:
+    def __is_state_in_logging_states(self, tlm_state: int) -> bool:
+        """
+        Checks if the given telemetry state is in the set of logging states.
+        Args:
+            tlm_state: The telemetry state to check.
+        Returns:
+            bool: True if the telemetry state is in the set of logging states, False otherwise.
+        """
+        return tlm_state in TLM_LOGGING_STATES
+
+    def __tlm_state_changed(self, new_state: int) -> None:
         """
         Handles a change in the telemetry state.
         This method is intended to be called when the telemetry state changes.
@@ -315,12 +342,12 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Args:
             new_state: The new telemetry state.
         """
-        self.log_state(f"Telemetry state changed to: {new_state.name}")
-        if new_state == TelemetryState.RUN and self.get_state(
-        ) != self.logging:
+        self.log_state(f"Telemetry state changed to: {new_state}")
+        if self.__is_state_in_logging_states(
+                new_state) and not self.is_logging():
             self.send('log_started')
-        elif new_state != TelemetryState.RUN and self.get_state(
-        ) == self.logging:
+        elif self.__is_state_in_logging_states(
+                new_state) and self.is_logging():
             self.send('log_stopped')
 
     def msg_incoming(self) -> None:

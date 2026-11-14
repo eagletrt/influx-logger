@@ -3,9 +3,10 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+from src.utils.tlm_fsm import TelemetryFSM
+
 from src.handler.handler_fsm import HandlerFSM
 from src.parser.parserfsm import ParserFSM
-from src.utils.tlm_fsm import TelemetryFSM
 
 
 class TestFSMDiagrams(TestCase):

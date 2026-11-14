@@ -4,11 +4,12 @@ Main entry point for the Influx Logger service.
 import sys
 from pathlib import Path
 
+from src.utils.tlm_fsm import TelemetryFSM
+
 from src.handler.handler_fsm import HandlerFSM
 from src.parser.parserfsm import ParserFSM
 from src.utils.configuration import Configuration
 from src.utils.logger_utils import logger
-from src.utils.tlm_fsm import TelemetryFSM
 
 
 def safe_stop(handler: HandlerFSM):
