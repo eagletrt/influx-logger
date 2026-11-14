@@ -309,7 +309,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         """
         Handles a new telemetry status message.
         This method is intended to be called when a new telemetry status message is received.
-        It sends the telemetry status message to the TelemetryFSM instance for processing.
+        It updates the parser FSM with the received telemetry state.
         Args:
             telemetry_status: The new telemetry status message.
         """

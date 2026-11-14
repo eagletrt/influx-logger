@@ -3,8 +3,6 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from src.utils.tlm_fsm import TelemetryFSM
-
 from src.handler.handler_fsm import HandlerFSM
 from src.parser.parserfsm import ParserFSM
 
@@ -22,9 +20,7 @@ class TestFSMDiagrams(TestCase):
         for module, machine, filename in (("src.handler.handler_fsm",
                                            HandlerFSM, "handler.png"),
                                           ("src.parser.parserfsm", ParserFSM,
-                                           "parser.png"), ("src.utils.tlm_fsm",
-                                                           TelemetryFSM,
-                                                           "telemetry.png")):
+                                           "parser.png")):
             with self.subTest(machine=machine.__name__):
                 renderer = MagicMock()
                 with patch(f"{module}.DotGraphMachine", return_value=renderer):

@@ -4,8 +4,6 @@ Main entry point for the Influx Logger service.
 import sys
 from pathlib import Path
 
-from src.utils.tlm_fsm import TelemetryFSM
-
 from src.handler.handler_fsm import HandlerFSM
 from src.parser.parserfsm import ParserFSM
 from src.utils.configuration import Configuration
@@ -75,7 +73,6 @@ def print_fsm() -> None:
     fsm_dir.mkdir(parents=True, exist_ok=True)
     HandlerFSM.draw(fsm_dir / 'handler_fsm.png')
     ParserFSM.draw(fsm_dir / 'parser_fsm.png')
-    TelemetryFSM.draw(fsm_dir / 'telemetry_fsm.png')
 
 
 if __name__ == "__main__":
