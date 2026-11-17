@@ -316,12 +316,20 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
             new_state: The new telemetry state.
         """
         self.log_state(f"Telemetry state changed to: {new_state.name}")
-        if new_state == TelemetryState.RUN and self.get_state(
-        ) != self.logging:
+        if self.is_telemetry_running(new_state) and not self.is_logging():
             self.send('log_started')
-        elif new_state != TelemetryState.RUN and self.get_state(
-        ) == self.logging:
+        elif new_state != TelemetryState.RUN and self.is_logging():
             self.send('log_stopped')
+
+    def is_telemetry_running(self, new_state) -> bool:
+        """
+        Checks if the telemetry state is RUN.
+        Args:
+            new_state: The new telemetry state.
+        Returns:
+            bool: True if the telemetry state is RUN, False otherwise.
+        """
+        return new_state == TelemetryState.RUN
 
     def msg_incoming(self) -> None:
         """
