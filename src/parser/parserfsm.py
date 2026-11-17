@@ -350,16 +350,6 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
                 new_state) and self.is_logging():
             self.send('log_stopped')
 
-    def __is_tlm_state_running(self, new_tlm_state: TelemetryState) -> bool:
-        """
-        Checks if the telemetry state is RUN.
-        Args:
-            new_state: The new telemetry state.
-        Returns:
-            bool: True if the telemetry state is RUN, False otherwise.
-        """
-        return new_tlm_state == TelemetryState.RUN
-
     def msg_incoming(self) -> None:
         """
         Handles an incoming message.
