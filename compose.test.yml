@@ -18,12 +18,9 @@ services:
             dockerfile: Dockerfile.influx-logger.yml
         user: "1000:1000"
         depends_on:
-            influxdb2:
-                condition: service_healthy
-            mosquitto:
-                condition: service_healthy
-            cache-init:
-                condition: service_completed_successfully
+            - influxdb2
+            - mosquitto
+            - cache-init
         init: true
         cap_drop:
             - ALL

@@ -53,8 +53,11 @@ def main(argv=None):
             handler: HandlerFSM = HandlerFSM(configuration)
             handler.start()
             handler.join()
-        except KeyboardInterrupt | SystemExit:
+        except KeyboardInterrupt:
             logger.info("Ctrl+C received, stopping handler")
+            safe_stop(handler)
+        except SystemExit:
+            logger.info("SystemExit received, stopping handler")
             safe_stop(handler)
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("HandlerFSM encountered an error: %s", str(e))
