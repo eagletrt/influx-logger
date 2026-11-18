@@ -489,6 +489,7 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
                     measurement, str(e))
+                return
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(
                     "parser: Error creating Line from record for measurement '%s': %s",
