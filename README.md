@@ -1,4 +1,4 @@
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=plastic)](LICENSE)
+[![E-Agle Trento Racing Team License](https://img.shields.io/badge/License-eagletrt-blue.svg?style=plastic)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/eagletrt/influx-logger?style=plastic)](https://github.com/eagletrt/influx-logger/releases/latest)
 
 [![Formatting Checks](https://github.com/eagletrt/influx-logger/actions/workflows/yapf.yml/badge.svg)](https://github.com/eagletrt/influx-logger/actions/workflows/yapf.yml)
