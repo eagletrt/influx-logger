@@ -345,11 +345,12 @@ class Parser(Thread):  # pylint: disable=too-many-instance-attributes
                 return
             if self.last_parse_timer is not None:
                 self.last_parse_timer.cancel()  # Cancel the existing timer
+                self.last_parse_timer = None  # Clear the reference to the old timer
             self.last_parse_timer = Timer(
                 Parser.TIMER_TIMEOUT,
                 self._handle_inactivity)  # Create a new timer instance
-            self.last_parse_timer.start(
-            )  # Start or restart the timer whenever a new message is parsed
+            # Start or restart the timer whenever a new message is parsed
+            self.last_parse_timer.start()
 
     def reset_timer(self) -> None:
         """

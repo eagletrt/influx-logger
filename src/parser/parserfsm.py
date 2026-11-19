@@ -200,6 +200,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         with self._message_timer_lock:
             if self._message_timer is not None:
                 self._message_timer.cancel()
+                self._message_timer = None
             self._message_timer = Timer(self.MESSAGE_TIMEOUT,
                                         self.__handle_message_timeout)
             self._message_timer.daemon = True
