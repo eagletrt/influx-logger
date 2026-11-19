@@ -77,6 +77,6 @@ class TestConnectionHandler(TestCase):
         state_change = MagicMock()
         handler.on_state_change = state_change
         handler.mqtt = MagicMock()
-        handler.influx_adr = MagicMock()
+        handler.influx = MagicMock()
         handler._ConnectionHandler__notify_state_change()  # pylint: disable=protected-access
         state_change.assert_called_once_with()

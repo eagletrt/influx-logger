@@ -102,11 +102,7 @@ class MsgDispatcher:
             "+/+/info/version/libcan",
             "+/+/info/version/gpslib",
         ]
-        remaining_topics = [
-            topic for topic in self.topic_callbacks
-            if topic not in version_topics
-        ]
-        for topic in version_topics + remaining_topics:
+        for topic in version_topics:
             try:
                 self.mqtt.connection.subscribe(topic)
                 logger.info(
@@ -180,7 +176,7 @@ class MsgDispatcher:
         Handles incoming version messages by checking the existence of
         the commit and subscribing to data topics if the commit exists.
         Args:
-            library (type): The library manager class (LibcanManager or LibgpsManager).
+            library (type): The library manager class.
             version (str): The version string received in the message.
             ids (list[str]): A list containing the vehicle ID and device ID.
         """
@@ -197,15 +193,15 @@ class MsgDispatcher:
         sanitized_version: str = None
         # Regex pattern to sanitize the version string by extracting
         # the commit hash from the version string.
-        version_sanitize_regex = re_compile(r"^(\w+)", )
+        version_sanitize_regex: Pattern[str] = re_compile(r"^(\w+)", )
         try:
             match = version_sanitize_regex.search(version)
             if match:
-                sanitized_version = match.group(1)
+                sanitized_version: str = match.group(1)
         except Exception:  # pylint: disable=broad-except
             pass
         if sanitized_version:
-            version = sanitized_version
+            version: str = sanitized_version
         logger.info("msg_dispatcher: Received version message from %s",
                     str(ids))
         vehicle_id: str = ids[0] if len(ids) > 0 else "unknown_vehicle"
@@ -218,7 +214,7 @@ class MsgDispatcher:
         logger.info(
             "msg_dispatcher: Checking existance of commit %s, requested by device '%s/%s'",
             version, vehicle_id, device_id)
-        check = library.check_commit_existence(version)
+        check: bool = library.check_commit_existence(version)
         if check:
             logger.info(
                 "msg_dispatcher: Subscribing to data topics for the new device (%s/%s)",

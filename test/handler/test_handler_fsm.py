@@ -103,7 +103,7 @@ class TestHandlerFSM(unittest.TestCase):
             "logs": "l"
         }),
                                      excluded_networks=[])
-        fsm.handler = SimpleNamespace(influx_adr=MagicMock(), mqtt=MagicMock())
+        fsm.handler = SimpleNamespace(influx=MagicMock(), mqtt=MagicMock())
         fsm.msg_dispatcher = MagicMock()
         fsm.do_run = MagicMock()
         with patch("src.handler.handler_fsm.InfluxWriter") as writer_cls:

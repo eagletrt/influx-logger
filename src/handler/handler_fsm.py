@@ -241,7 +241,7 @@ class HandlerFSM(Thread, StateMachine):
         # Set the InfluxWriter and MQTT connection in the MsgDispatcher
         self.msg_dispatcher.set(
             influx_writer=InfluxWriter(
-                client=self.handler.influx_adr,
+                client=self.handler.influx,
                 adr_bucket=self.config.influx.buckets["adr"],
                 log_bucket=self.config.influx.buckets["logs"],
                 excluded_networks=self.config.excluded_networks),
