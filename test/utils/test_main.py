@@ -60,10 +60,8 @@ class TestMain(TestCase):
         self.assertEqual(error.exception.code, 1)
         with patch.object(main_module.Path, "mkdir") as mkdir, \
                 patch.object(main_module.HandlerFSM, "draw") as handler_draw, \
-                patch.object(main_module.ParserFSM, "draw") as parser_draw, \
-                patch.object(main_module.TelemetryFSM, "draw") as telemetry_draw:
+                patch.object(main_module.ParserFSM, "draw") as parser_draw:
             main_module.print_fsm()
         mkdir.assert_called_once_with(parents=True, exist_ok=True)
         self.assertEqual(handler_draw.call_count, 1)
         self.assertEqual(parser_draw.call_count, 1)
-        self.assertEqual(telemetry_draw.call_count, 1)
