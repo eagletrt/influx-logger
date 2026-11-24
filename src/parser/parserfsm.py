@@ -33,8 +33,8 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
     # Event transitions
     initialization: TransitionList = starting.to(idling)
     message_received: TransitionList = (idling.to(running)
-                                        | running.to(running)
-                                        | logging.to(logging))
+                                        | running.to(internal=True)
+                                        | logging.to(internal=True))
     no_messages_to_process: TransitionList = (running.to(idling)
                                               | logging.to(idling))
     log_started: TransitionList = (running.to(logging) | idling.to(logging))
@@ -200,6 +200,7 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         with self._message_timer_lock:
             if self._message_timer is not None:
                 self._message_timer.cancel()
+                self._message_timer = None
             self._message_timer = Timer(self.MESSAGE_TIMEOUT,
                                         self.__handle_message_timeout)
             self._message_timer.daemon = True
@@ -267,7 +268,6 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Logs the entry into the running state.
         """
         self.log_state("Entering running state")
-        self.signal_state()
 
     def on_enter_logging(self):
         """
@@ -275,7 +275,6 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Logs the entry into the logging state.
         """
         self.log_state("Entering logging state")
-        self.signal_state()
 
     def on_enter_final(self):
         """
@@ -283,7 +282,6 @@ class ParserFSM(StateMachine):  # pylint: disable=too-many-instance-attributes
         Logs the entry into the final state.
         """
         self.log_state("Entering final state")
-        self.signal_state()
 
     def new_telemetry_status(self, telemetry_status: Message) -> None:
         """

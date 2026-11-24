@@ -43,7 +43,7 @@ class InfluxWriter(InfluxManager):
             # The maximum number of points to be written in a single batch.
             # When this limit is reached, the points will be flushed to InfluxDB.
             batch_size=batch_size,
-            # Flush every 1 seconds
+            # Flush within 1 seconds
             flush_interval=1_000,
             # Retry every 1 second if the write fails
             retry_interval=1_000,
